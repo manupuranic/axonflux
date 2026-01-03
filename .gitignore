@@ -1,0 +1,57 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+.env
+.env.*
+.venv/
+venv/
+ENV/
+env/
+
+# ---- Python tooling ----
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.cache/
+
+# ---- VS Code ----
+.vscode/
+!.vscode/launch.json
+
+# ---- OS junk ----
+.DS_Store
+Thumbs.db
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+
+# ---- Data files (VERY IMPORTANT) ----
+data/
+*.csv
+*.xlsx
+*.xls
+*.ods
+
+# ---- Logs ----
+*.log
+
+# ---- SQL dumps / local DB ----
+*.dump
+*.sql.bak
+
+# ---- Secrets / credentials ----
+*.pem
+*.key
+*.crt
+*.json
+secrets/
+
+# ---- Node (if added later) ----
+node_modules/
