@@ -9,26 +9,26 @@ class RawItemCombinations(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    import_batch_id = Column(UUID(as_uuid=True), nullable=False)
+    import_batch_id = Column(UUID, nullable=False)
     source_file_name = Column(Text, nullable=False)
     imported_at = Column(TIMESTAMP)
 
-    item_code = Column(Text)
+    item_id_raw = Column(Text)
+    item_code = Column(Text)   # keep if billing sometimes exports it elsewhere
     item_name_raw = Column(Text)
     barcode = Column(Text)
     hsn_code = Column(Text)
+
+    tax_category_raw = Column(Text)
     brand_raw = Column(Text)
-    category_raw = Column(Text)
-
-    mrp = Column(Numeric)
-    expiry_date_raw = Column(Text)
     size_raw = Column(Text)
-    unit_raw = Column(Text)
+    colour_raw = Column(Text)
+    style_raw = Column(Text)
 
-    current_stock_snapshot = Column(Numeric)
-    reorder_level = Column(Numeric)
-    max_level = Column(Numeric)
+    expiry_date_raw = Column(Text)
 
-    is_active = Column(Text)
-    location_name = Column(Text)
-    remarks = Column(Text)
+    purchase_price = Column(Numeric)
+    mrp = Column(Numeric)
+    rate = Column(Numeric)
+
+    system_stock_snapshot = Column(Numeric)

@@ -1,9 +1,7 @@
-import uuid
-import pandas as pd
 from pathlib import Path
-from sqlalchemy import insert
+import pandas as pd
 
-from db.db import DB
+from raw_ingestion.common.ingest_core import ingest_raw_table
 from raw_models.sales import RawSalesBillwise
 
 COLUMN_MAP = {
@@ -101,54 +99,11 @@ COLUMN_MAP = {
     "Net Total": "net_total"
 }
 
-
-
-def clean(val):
-    return None if pd.isna(val) else val
-
-
-def normalize_column(col: str) -> str:
-    return (
-        col.replace("\xa0", " ")
-           .replace("\n", " ")
-           .strip()
+def ingest(file_path: str):
+    ingest_raw_table(
+        file_path=Path(file_path),
+        model=RawSalesBillwise,
+        header_map=COLUMN_MAP,
+        reader=pd.read_csv,
+        drop_last_row=True,
     )
-
-
-def ingest_sales_billwise(file_path: str):
-    file_path = Path(file_path)
-    if not file_path.exists():
-        raise FileNotFoundError(file_path)
-
-    print(f"[INGEST] Sales bill-wise → {file_path.name}")
-
-    batch_id = uuid.uuid4()
-
-    df = pd.read_csv(file_path)
-    df.columns = [normalize_column(c) for c in df.columns]
-
-    if df.empty:
-        print("[INGEST] Empty file, skipping")
-        return
-
-    rows = []
-
-    for _, row in df.iterrows():
-        record = {
-            "import_batch_id": batch_id,
-            "source_file_name": file_path.name,
-        }
-
-        for csv_col, db_col in COLUMN_MAP.items():
-            record[db_col] = clean(row.get(csv_col))
-
-        rows.append(record)
-
-    db = DB()
-    with db.session() as session:
-        session.execute(
-            insert(RawSalesBillwise),
-            rows
-        )
-
-    print(f"[INGEST] Inserted {len(rows)} rows (batch {batch_id})")
