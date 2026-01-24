@@ -24,7 +24,7 @@ class RawPurchaseItemwise(Base):
     brand_raw = Column(Text)
 
     tax_type = Column(Text)
-    gst_percent = Column(Numeric)
+    gst_percent = Column(Text)
 
     min_stock = Column(Numeric)
     max_stock = Column(Numeric)
