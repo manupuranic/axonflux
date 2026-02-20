@@ -27,6 +27,10 @@ def ingest_raw_table(
     if drop_last_row:
         df = df[:-1]
 
+    normalized_header_map = {
+        normalize_column(csv_col): db_col for csv_col, db_col in header_map.items()
+    }
+
     rows = []
     for _, row in df.iterrows():
         record = {
@@ -34,7 +38,7 @@ def ingest_raw_table(
             "source_file_name": file_path.name,
         }
 
-        for csv_col, db_col in header_map.items():
+        for csv_col, db_col in normalized_header_map.items():
             record[db_col] = clean(row.get(csv_col))
 
         rows.append(record)
