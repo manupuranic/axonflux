@@ -1,6 +1,23 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE SCHEMA IF NOT EXISTS raw;
+
+CREATE TABLE raw.ingestion_batches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    file_name TEXT NOT NULL,
+    file_hash TEXT NOT NULL,
+    report_type TEXT NOT NULL,
+
+    row_count INTEGER,
+    status TEXT NOT NULL DEFAULT 'SUCCESS',
+
+    imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    UNIQUE (file_hash)
+);
+
 
 CREATE TABLE raw.raw_item_combinations (
   id uuid NOT NULL DEFAULT extensions.uuid_generate_v4(),
