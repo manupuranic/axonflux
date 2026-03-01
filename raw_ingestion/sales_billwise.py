@@ -99,11 +99,22 @@ COLUMN_MAP = {
     "Net Total": "net_total"
 }
 
+
+REQUIRED_COLUMNS = [
+    "Bill No.",
+    "Date",
+    "Qty",
+    "Net Total",
+]
+
+
 def ingest(file_path: str):
     ingest_raw_table(
         file_path=Path(file_path),
         model=RawSalesBillwise,
         header_map=COLUMN_MAP,
         reader=pd.read_csv,
+        required_columns=REQUIRED_COLUMNS,
+        file_label="sales bill-wise",
         drop_last_row=True,
     )

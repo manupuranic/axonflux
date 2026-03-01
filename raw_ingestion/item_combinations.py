@@ -20,6 +20,14 @@ HEADER_MAP = {
     "Rate": "rate",
     "System Stock": "system_stock_snapshot",
 }
+
+
+REQUIRED_COLUMNS = [
+    "Item_Id",
+    "Barcode",
+    "Item Name",
+    "MRP",
+]
     
 def ingest(file_path: str):
     ingest_raw_table(
@@ -27,5 +35,7 @@ def ingest(file_path: str):
         model=RawItemCombinations,
         header_map=HEADER_MAP,
         reader=pd.read_excel,
+        required_columns=REQUIRED_COLUMNS,
+        file_label="item combinations",
         drop_last_row=False,
     )

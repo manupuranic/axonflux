@@ -26,6 +26,13 @@ HEADER_MAP = {
     "Create Ledger": "create_ledger_raw",
     "Closing Balance": "closing_balance_raw",
 }
+
+
+REQUIRED_COLUMNS = [
+    "Supplier Code",
+    "Supplier Name",
+    "Mobile",
+]
     
 def ingest(file_path: str | Path) -> None:
     ingest_raw_table(
@@ -33,5 +40,7 @@ def ingest(file_path: str | Path) -> None:
         model=RawSupplierMaster,
         header_map=HEADER_MAP,
         reader=pd.read_csv,
+        required_columns=REQUIRED_COLUMNS,
+        file_label="supplier master",
         drop_last_row=False,
     )

@@ -32,11 +32,22 @@ HEADER_MAP = {
     "Due Amount": "due_amount",
 }
 
+
+REQUIRED_COLUMNS = [
+    "ID",
+    "Date",
+    "Supplier",
+    "Total Qty",
+]
+
+
 def ingest(file_path: str):
     ingest_raw_table(
         file_path=Path(file_path),
         model=RawPurchaseBillwise,
         header_map=HEADER_MAP,
         reader=pd.read_csv,
+        required_columns=REQUIRED_COLUMNS,
+        file_label="purchase bill-wise",
         drop_last_row=True,
     )

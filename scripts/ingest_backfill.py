@@ -8,9 +8,19 @@ from raw_ingestion.sales_billwise import ingest as sb_ingest
 from raw_ingestion.sales_itemwise import ingest as si_ingest
 from raw_ingestion.purchase_billwise import ingest as pb_ingest
 from raw_ingestion.purchase_itemwise import ingest as pi_ingest
+from raw_ingestion.common.validators import IngestionValidationError
 
 
 BASE_DIR = Path("data/backfills")
+
+
+def ingest_with_guardrails(file: Path, ingest_fn) -> None:
+    try:
+        ingest_fn(str(file))
+    except IngestionValidationError as exc:
+        print(f"[FAILED] Schema validation failed for {file.name}: {exc}")
+    except Exception:
+        raise
 
 
 def ingest_snapshots():
@@ -23,14 +33,14 @@ def ingest_snapshots():
         for file in sorted(supplier_dir.iterdir()):
             if file.is_file():
                 print(f"\n[SNAPSHOT] Supplier master → {file.name}")
-                sm_ingest(str(file))
+                ingest_with_guardrails(file, sm_ingest)
 
     item_dir = snapshots_dir / "item_combinations"
     if item_dir.exists():
         for file in sorted(item_dir.iterdir()):
             if file.is_file():
                 print(f"\n[SNAPSHOT] Item combinations → {file.name}")
-                ic_ingest(str(file))
+                ingest_with_guardrails(file, ic_ingest)
 
 
 def ingest_events():
@@ -53,16 +63,16 @@ def ingest_events():
             print(f"\n[EVENT] Processing {file.name}")
 
             if "sales-itemwise" in fname:
-                si_ingest(str(file))
+                ingest_with_guardrails(file, si_ingest)
 
             elif "sales-billwise" in fname:
-                sb_ingest(str(file))
+                ingest_with_guardrails(file, sb_ingest)
 
             elif "purchase-itemwise" in fname:
-                pi_ingest(str(file))
+                ingest_with_guardrails(file, pi_ingest)
 
             elif "purchase-billwise" in fname:
-                pb_ingest(str(file))
+                ingest_with_guardrails(file, pb_ingest)
 
             else:
                 print(f"[SKIP] Unrecognized file: {file.name}")
@@ -81,16 +91,16 @@ def ingest_from_folder(folder_path: str):
         print(f"\n[EVENT] Processing {file.name}")
 
         if "sales-itemwise" in fname:
-            si_ingest(str(file))
+            ingest_with_guardrails(file, si_ingest)
 
         elif "sales-billwise" in fname:
-            sb_ingest(str(file))
+            ingest_with_guardrails(file, sb_ingest)
 
         elif "purchase-itemwise" in fname:
-            pi_ingest(str(file))
+            ingest_with_guardrails(file, pi_ingest)
 
         elif "purchase-billwise" in fname:
-            pb_ingest(str(file))
+            ingest_with_guardrails(file, pb_ingest)
 
         else:
             print(f"[SKIP] Unrecognized file: {file.name}")

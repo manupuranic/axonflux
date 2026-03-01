@@ -30,11 +30,22 @@ HEADER_MAP = {
     "Rate": "rate",
 }
 
+
+REQUIRED_COLUMNS = [
+    "Purchase Id",
+    "Item Name",
+    "Barcode",
+    "Total Qty",
+]
+
+
 def ingest(file_path: str):
     ingest_raw_table(
         file_path=Path(file_path),
         model=RawPurchaseItemwise,
         header_map=HEADER_MAP,
         reader=pd.read_csv,
+        required_columns=REQUIRED_COLUMNS,
+        file_label="purchase item-wise",
         drop_last_row=True,
     )

@@ -60,6 +60,15 @@ HEADER_MAP = {
     "Net Total": "net_total",
 }
 
+
+REQUIRED_COLUMNS = [
+    "Item Name",
+    "Barcode",
+    "Qty",
+    "Net Total",
+]
+
+
 def reader(path):
     if path.suffix.lower() in [".xlsx", ".xls"]:
         return pd.read_excel(path, skiprows=2, header=0)
@@ -75,6 +84,8 @@ def ingest(file_path: str):
         model=RawSalesItemwise,
         header_map=HEADER_MAP,
         reader=reader,
+        required_columns=REQUIRED_COLUMNS,
+        file_label="sales item-wise",
         drop_last_row=False,  # itemwise has no totals row
     )
 

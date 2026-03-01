@@ -6,6 +6,7 @@ import pandas as pd
 from utils.chunking import chunked
 from utils.helpers import clean, normalize_column
 from db.db import DB
+from raw_ingestion.common.validators import validate_required_columns
 
 
 def ingest_raw_table(
@@ -14,6 +15,8 @@ def ingest_raw_table(
     model,
     header_map: Dict[str, str],
     reader: Callable,
+    required_columns: list[str] | None = None,
+    file_label: str = "ingestion",
     drop_last_row: bool = False,
     chunk_size: int = 2000,
 ):
@@ -23,6 +26,11 @@ def ingest_raw_table(
 
     df = reader(file_path)
     df.columns = [normalize_column(c) for c in df.columns]
+    validate_required_columns(
+        df=df,
+        required_columns=required_columns,
+        file_label=file_label,
+    )
 
     if drop_last_row:
         df = df[:-1]

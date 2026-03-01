@@ -16,6 +16,7 @@ from raw_ingestion.purchase_itemwise import ingest as ingest_purchase_itemwise
 from raw_ingestion.sales_billwise import ingest as ingest_sales_billwise
 from raw_ingestion.sales_itemwise import ingest as ingest_sales_itemwise
 from raw_ingestion.supplier_master import ingest as ingest_supplier_master
+from raw_ingestion.common.validators import IngestionValidationError
 from raw_models.ingestion_batches import RawIngestionBatch
 
 
@@ -209,6 +210,19 @@ def process_file(
             row_count=row_count,
             status="SUCCESS",
         )
+    except IngestionValidationError as exc:
+        print(f"[FAILED][VALIDATION] {report_type}: {file_path.name} :: {exc}")
+        insert_ingestion_batch(
+            conn,
+            batch_columns=batch_columns,
+            file_name=file_path.name,
+            file_hash=file_hash,
+            report_type=report_type,
+            row_count=None,
+            status="FAILED",
+            error_message=str(exc),
+        )
+        return
     except Exception as exc:
         print(f"[FAILED] {report_type}: {file_path.name} :: {exc}")
         insert_ingestion_batch(
