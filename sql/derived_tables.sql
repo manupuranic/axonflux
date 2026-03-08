@@ -285,6 +285,7 @@ CREATE TABLE IF NOT EXISTS derived.product_daily_features (
 
     last_7_day_avg NUMERIC,
     last_30_day_avg NUMERIC,
+    last_60_day_avg NUMERIC,
     last_7_day_stddev NUMERIC,
 
     day_of_week INTEGER,
@@ -324,6 +325,12 @@ SELECT
         ROWS BETWEEN 29 PRECEDING AND CURRENT ROW
     ) AS last_30_day_avg,
 
+    AVG(m.quantity_sold) OVER (
+        PARTITION BY m.product_id
+        ORDER BY m.date
+        ROWS BETWEEN 59 PRECEDING AND CURRENT ROW
+    ) AS last_60_day_avg,
+
     STDDEV(m.quantity_sold) OVER (
         PARTITION BY m.product_id
         ORDER BY m.date
@@ -344,6 +351,7 @@ CREATE TABLE IF NOT EXISTS derived.product_health_signals (
     predicted_daily_demand NUMERIC,
     last_7_day_avg      NUMERIC,
     last_30_day_avg     NUMERIC,
+    last_60_day_avg     NUMERIC,
     demand_volatility   NUMERIC,
 
     -- health flags
@@ -367,6 +375,7 @@ INSERT INTO derived.product_health_signals (
     predicted_daily_demand,
     last_7_day_avg,
     last_30_day_avg,
+    last_60_day_avg,
     demand_volatility,
     fast_moving_flag,
     slow_moving_flag,
@@ -379,10 +388,21 @@ SELECT
     product_id,
 
     -- baseline prediction
-    last_7_day_avg AS predicted_daily_demand,
+    ROUND(
+        GREATEST(
+            (
+                0.6 * COALESCE(last_7_day_avg,0) +
+                0.3 * COALESCE(last_30_day_avg,0) +
+                0.1 * COALESCE(last_60_day_avg,0)
+            ),
+            0.02
+        ),
+        4
+    ) AS predicted_daily_demand,
 
     last_7_day_avg,
     last_30_day_avg,
+    last_60_day_avg,
     last_7_day_stddev AS demand_volatility,
 
     -- fast moving
@@ -825,4 +845,4 @@ AND h.date = (
     SELECT MAX(date)
     FROM derived.product_health_signals
 )
-AND h.predicted_daily_demand > 0;
+AND h.predicted_daily_demand > 0.02;

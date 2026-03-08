@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS derived.product_daily_features (
 
     last_7_day_avg NUMERIC,
     last_30_day_avg NUMERIC,
+    last_60_day_avg NUMERIC,
     last_7_day_stddev NUMERIC,
 
     day_of_week INTEGER,
@@ -49,6 +50,12 @@ SELECT
         ORDER BY m.date
         ROWS BETWEEN 29 PRECEDING AND CURRENT ROW
     ) AS last_30_day_avg,
+
+    AVG(m.quantity_sold) OVER (
+        PARTITION BY m.product_id
+        ORDER BY m.date
+        ROWS BETWEEN 59 PRECEDING AND CURRENT ROW
+    ) AS last_60_day_avg,
 
     STDDEV(m.quantity_sold) OVER (
         PARTITION BY m.product_id

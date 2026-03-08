@@ -28,4 +28,4 @@ AND h.date = (
     SELECT MAX(date)
     FROM derived.product_health_signals
 )
-AND h.predicted_daily_demand > 0;
+AND h.predicted_daily_demand > 0.02;

@@ -30,6 +30,8 @@ REBUILD_SQL_FILES = [
     REBUILD_SQL_DIR / "02_product_daily_features.sql",
     REBUILD_SQL_DIR / "03_product_health_signals.sql",
     REBUILD_SQL_DIR / "04_product_stock_position.sql",
+    REBUILD_SQL_DIR / "05_necessary_views.sql",
+    REBUILD_SQL_DIR / "06_supplier_restock_recommendations.sql",
 ]
 
 SHEET_SQL_FILES = [
