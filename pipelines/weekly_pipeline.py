@@ -42,11 +42,11 @@ load_dotenv()
 
 
 def get_engine_from_env() -> Engine:
-    host = os.environ["DB_HOST"]
-    port = os.environ["DB_PORT"]
-    user = os.environ["DB_USER"]
-    password = quote_plus(os.environ["DB_PASSWORD"])
-    db_name = os.environ["DB_NAME"]
+    host = os.getenv("host")
+    port = os.getenv("port")
+    user = os.getenv("user")
+    password = quote_plus(os.getenv("password"))
+    db_name = os.getenv("dbname")
 
     database_url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db_name}"
     return create_engine(database_url, future=True, pool_pre_ping=True)
@@ -137,13 +137,13 @@ def export_conversion_sheet(engine: Engine) -> None:
 def main() -> None:
     engine = get_engine_from_env()
 
-    print("Running ingestion...")
-    ingest_sales_itemwise()
-    ingest_sales_billwise()
-    ingest_purchase_itemwise()
-    ingest_purchase_billwise()
-    ingest_supplier_master()
-    ingest_item_combinations()
+    # print("Running ingestion...")
+    # ingest_sales_itemwise()
+    # ingest_sales_billwise()
+    # ingest_purchase_itemwise()
+    # ingest_purchase_billwise()
+    # ingest_supplier_master()
+    # ingest_item_combinations()
 
     print("Rebuilding derived tables...")
     for sql_file in REBUILD_SQL_FILES:

@@ -34,6 +34,7 @@ Thumbs.db
 
 # ---- Data files (VERY IMPORTANT) ----
 data/
+exports/
 *.csv
 *.xlsx
 *.xls
