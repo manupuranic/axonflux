@@ -119,6 +119,8 @@ def export_supplier_sheets(engine: Engine) -> None:
             con=engine,
             params={"supplier": supplier_name},
         )
+        supplier_df["physical stock"] = ""
+        supplier_df["order qty"] = ""
         safe_supplier = "".join(char if char.isalnum() or char in " -_." else "_" for char in supplier_name).strip()
         output_path = SUPPLIER_EXPORT_DIR / f"{safe_supplier}.xlsx"
         supplier_df.to_excel(output_path, index=False)
@@ -131,6 +133,8 @@ def export_conversion_sheet(engine: Engine) -> None:
         text("SELECT * FROM derived.conversion_attention_sheet"),
         con=engine,
     )
+    df["physical stock"] = ""
+    df["order qty"] = ""
     df.to_excel(EXPORTS_DIR / "conversion_attention_sheet.xlsx", index=False)
 
 

@@ -39,6 +39,7 @@ exports/
 *.xlsx
 *.xls
 *.ods
+*.zip
 
 # ---- Logs ----
 *.log
