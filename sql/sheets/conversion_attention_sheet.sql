@@ -6,7 +6,7 @@ SELECT
 
     ic.current_stock,
 
-    h.predicted_daily_demand,
+    ROUND(h.predicted_daily_demand, 2) AS predicted_daily_demand,
 
     ROUND(GREATEST(h.predicted_daily_demand * 7, 5)) AS min_stock,
 
@@ -20,10 +20,12 @@ ON h.product_id = pd.product_id
 LEFT JOIN derived.latest_item_combinations ic
 ON h.product_id = ic.product_id
 
-LEFT JOIN derived.product_supplier_mapping sm
-ON h.product_id = sm.product_id
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM derived.product_supplier_mapping sm
+    WHERE sm.product_id = h.product_id
+)
 
-WHERE sm.supplier_name IS NULL
 AND h.date = (
     SELECT MAX(date)
     FROM derived.product_health_signals

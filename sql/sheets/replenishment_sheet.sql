@@ -10,24 +10,21 @@ SELECT
 
     ROUND(h.predicted_daily_demand,2) AS predicted_daily_demand,
 
+    ROUND(
+        h.predicted_daily_demand *
+        CASE
+            WHEN sl.supplier_region = 'BELLARY' THEN 7
+            ELSE 15
+        END
+    ) AS min_stock,
 
-        ROUND(
-            h.predicted_daily_demand *
-            CASE
-                WHEN sl.supplier_region = 'BELLARY' THEN 7
-                ELSE 15
-            END
-        )
-     AS min_stock,
-
-        ROUND(
-            h.predicted_daily_demand *
-            CASE
-                WHEN sl.supplier_region = 'BELLARY' THEN 15
-                ELSE 30
-            END
-        )
-	 AS max_stock
+    ROUND(
+        h.predicted_daily_demand *
+        CASE
+            WHEN sl.supplier_region = 'BELLARY' THEN 15
+            ELSE 30
+        END
+    ) AS max_stock
 
 FROM derived.product_health_signals h
 

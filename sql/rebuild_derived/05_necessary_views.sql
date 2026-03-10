@@ -23,12 +23,10 @@ FROM raw.raw_supplier_master;
 
 -- product_supplier_mapping: 
 CREATE OR REPLACE VIEW derived.product_supplier_mapping AS
-SELECT DISTINCT ON (barcode)
+SELECT DISTINCT
     barcode AS product_id,
-    supplier_name_raw AS supplier_name,
-    min_stock
-FROM raw.raw_purchase_itemwise
-ORDER BY barcode, purchase_date_raw DESC;
+    supplier_name_raw AS supplier_name
+FROM raw.raw_purchase_itemwise;
 
 -- product_dimension_view: 
 CREATE OR REPLACE VIEW derived.product_dimension AS
