@@ -83,3 +83,16 @@ class AnalyticsSummary(BaseModel):
     dead_stock_count: int
     demand_spike_count: int
     products_needing_reorder: int
+    # Customer KPIs
+    total_unique_customers: int
+    repeat_customer_percent: float | None
+    new_customers_last_30d: int
+    walk_in_revenue_percent: float | None
+
+
+class TopProduct(BaseModel):
+    rank: int
+    barcode: str
+    product_name: str | None
+    total_revenue: float
+    total_qty: float

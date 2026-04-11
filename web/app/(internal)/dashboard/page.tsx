@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useFetch } from "@/hooks/useFetch";
 import { api } from "@/lib/api";
 import { DataStateWrapper } from "@/components/shared/DataStateWrapper";
@@ -7,12 +8,16 @@ import { SummaryGrid } from "@/components/dashboard/SummaryGrid";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { PaymentBreakdownChart } from "@/components/dashboard/PaymentBreakdownChart";
 import { PurchaseChart } from "@/components/dashboard/PurchaseChart";
+import { TopProductsCard } from "@/components/dashboard/TopProductsCard";
 
 export default function DashboardPage() {
+  const [topSort, setTopSort] = useState<"revenue" | "qty">("revenue");
+
   const summary = useFetch(() => api.summary());
   const revenue = useFetch(() => api.dailyRevenue());
   const payments = useFetch(() => api.dailyPayments());
   const purchases = useFetch(() => api.dailyPurchases());
+  const topProducts = useFetch(() => api.topProducts(30, 10, topSort), [topSort]);
 
   return (
     <div className="space-y-8">
@@ -56,6 +61,22 @@ export default function DashboardPage() {
         empty={!payments.data || payments.data.length === 0}
       >
         {payments.data && <PaymentBreakdownChart data={payments.data} />}
+      </DataStateWrapper>
+
+      {/* Top Products */}
+      <DataStateWrapper
+        loading={topProducts.loading}
+        error={topProducts.error}
+        empty={!topProducts.data || topProducts.data.length === 0}
+      >
+        {topProducts.data && (
+          <TopProductsCard
+            data={topProducts.data}
+            days={30}
+            sortBy={topSort}
+            onSortChange={setTopSort}
+          />
+        )}
       </DataStateWrapper>
     </div>
   );

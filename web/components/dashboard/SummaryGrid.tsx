@@ -85,6 +85,34 @@ export function SummaryGrid({ data }: SummaryGridProps) {
         accent="blue"
         icon="📅"
       />
+
+      <KpiCard
+        title="Unique Customers"
+        value={data.total_unique_customers.toLocaleString("en-IN")}
+        accent="blue"
+        icon="👥"
+      />
+
+      <KpiCard
+        title="Repeat Customers"
+        value={data.repeat_customer_percent != null ? `${data.repeat_customer_percent}%` : "—"}
+        accent="green"
+        icon="🔁"
+      />
+
+      <KpiCard
+        title="New (Last 30d)"
+        value={data.new_customers_last_30d.toLocaleString("en-IN")}
+        accent="purple"
+        icon="✨"
+      />
+
+      <KpiCard
+        title="Walk-in Revenue"
+        value={data.walk_in_revenue_percent != null ? `${data.walk_in_revenue_percent}%` : "—"}
+        accent="yellow"
+        icon="🚶"
+      />
     </div>
   );
 }

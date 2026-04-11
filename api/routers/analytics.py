@@ -13,6 +13,7 @@ from api.schemas.analytics import (
     DemandTrendPoint,
     ProductHealthSignal,
     ReplenishmentItem,
+    TopProduct,
 )
 from api.schemas.auth import CurrentUser
 
@@ -58,20 +59,44 @@ def get_summary(
             FROM derived.supplier_restock_recommendations
             WHERE date = (SELECT d FROM latest)
               AND required_quantity > 0
+        ),
+        customer_kpis AS (
+            SELECT
+                COUNT(*) FILTER (WHERE NOT is_walk_in)                                             AS total_unique,
+                COUNT(*) FILTER (WHERE is_repeat AND NOT is_walk_in)                               AS repeat_count,
+                COUNT(*) FILTER (WHERE first_seen_date >= CURRENT_DATE - INTERVAL '30 days'
+                                   AND NOT is_walk_in)                                             AS new_last_30d
+            FROM derived.customer_dimension
+        ),
+        walk_in_rev AS (
+            SELECT
+                ROUND(
+                    100.0 * SUM(total_revenue) FILTER (WHERE mobile_clean = 'WALK-IN')
+                    / NULLIF(SUM(total_revenue), 0),
+                    1
+                ) AS walk_in_pct
+            FROM derived.customer_metrics
         )
         SELECT
-            (SELECT d FROM latest)              AS latest_date,
-            (SELECT rev   FROM revenue_7d)      AS total_revenue_last_7d,
-            (SELECT bills FROM revenue_7d)      AS total_bills_last_7d,
-            (SELECT purch FROM purchase_7d)     AS total_purchases_last_7d,
-            (SELECT p_bills FROM purchase_7d)   AS total_purchase_bills_last_7d,
-            (SELECT credit FROM purchase_7d)    AS total_credit_last_7d,
-            (SELECT fast  FROM signals)         AS fast_moving_count,
-            (SELECT slow  FROM signals)         AS slow_moving_count,
-            (SELECT dead  FROM signals)         AS dead_stock_count,
-            (SELECT spike FROM signals)         AS demand_spike_count,
-            (SELECT needs_reorder FROM reorder) AS products_needing_reorder
+            (SELECT d FROM latest)                  AS latest_date,
+            (SELECT rev   FROM revenue_7d)          AS total_revenue_last_7d,
+            (SELECT bills FROM revenue_7d)          AS total_bills_last_7d,
+            (SELECT purch FROM purchase_7d)         AS total_purchases_last_7d,
+            (SELECT p_bills FROM purchase_7d)       AS total_purchase_bills_last_7d,
+            (SELECT credit FROM purchase_7d)        AS total_credit_last_7d,
+            (SELECT fast  FROM signals)             AS fast_moving_count,
+            (SELECT slow  FROM signals)             AS slow_moving_count,
+            (SELECT dead  FROM signals)             AS dead_stock_count,
+            (SELECT spike FROM signals)             AS demand_spike_count,
+            (SELECT needs_reorder FROM reorder)     AS products_needing_reorder,
+            (SELECT total_unique FROM customer_kpis)  AS total_unique_customers,
+            (SELECT repeat_count FROM customer_kpis)  AS repeat_customer_count,
+            (SELECT new_last_30d FROM customer_kpis)  AS new_customers_last_30d,
+            (SELECT walk_in_pct FROM walk_in_rev)     AS walk_in_revenue_percent
     """)).mappings().one()
+
+    total_unique = int(row["total_unique_customers"] or 0)
+    repeat_count = int(row["repeat_customer_count"] or 0)
 
     return AnalyticsSummary(
         latest_date=row["latest_date"],
@@ -85,6 +110,10 @@ def get_summary(
         dead_stock_count=int(row["dead_stock_count"] or 0),
         demand_spike_count=int(row["demand_spike_count"] or 0),
         products_needing_reorder=int(row["products_needing_reorder"] or 0),
+        total_unique_customers=total_unique,
+        repeat_customer_percent=round(repeat_count / total_unique * 100, 1) if total_unique else None,
+        new_customers_last_30d=int(row["new_customers_last_30d"] or 0),
+        walk_in_revenue_percent=float(row["walk_in_revenue_percent"]) if row["walk_in_revenue_percent"] else None,
     )
 
 
@@ -279,6 +308,39 @@ def get_replenishment(
         "offset": offset,
         "items": [ReplenishmentItem(**dict(r)) for r in rows],
     }
+
+
+@router.get("/top-products", response_model=list[TopProduct])
+def get_top_products(
+    days: int = Query(default=30, ge=7, le=365),
+    limit: int = Query(default=10, ge=1, le=50),
+    sort_by: str = Query(default="revenue", pattern="^(revenue|qty)$"),
+    conn: Connection = Depends(get_conn),
+    _: CurrentUser = Depends(get_current_user),
+):
+    """Top N products by revenue or quantity sold over the last N days."""
+    order_col = "total_revenue" if sort_by == "revenue" else "total_qty"
+
+    rows = conn.execute(
+        text(f"""
+            SELECT
+                ROW_NUMBER() OVER (ORDER BY SUM(f.revenue) DESC NULLS LAST) AS rank,
+                f.product_id                                                  AS barcode,
+                d.product_name,
+                COALESCE(SUM(f.revenue), 0)                                  AS total_revenue,
+                COALESCE(SUM(f.quantity_sold), 0)                            AS total_qty
+            FROM derived.product_daily_features f
+            LEFT JOIN derived.product_dimension d ON f.product_id = d.product_id
+            WHERE f.date >= CURRENT_DATE - (:days || ' days')::INTERVAL
+              AND f.quantity_sold > 0
+            GROUP BY f.product_id, d.product_name
+            ORDER BY {order_col} DESC NULLS LAST
+            LIMIT :limit
+        """),
+        {"days": days, "limit": limit},
+    ).mappings().all()
+
+    return [TopProduct(**dict(r)) for r in rows]
 
 
 @router.get("/demand-trend/{barcode}", response_model=list[DemandTrendPoint])

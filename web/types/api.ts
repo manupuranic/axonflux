@@ -19,6 +19,18 @@ export interface AnalyticsSummary {
   dead_stock_count: number;
   demand_spike_count: number;
   products_needing_reorder: number;
+  total_unique_customers: number;
+  repeat_customer_percent: number | null;
+  new_customers_last_30d: number;
+  walk_in_revenue_percent: number | null;
+}
+
+export interface TopProduct {
+  rank: number;
+  barcode: string;
+  product_name: string | null;
+  total_revenue: number;
+  total_qty: number;
 }
 
 export interface DailyRevenue {

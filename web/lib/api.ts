@@ -16,6 +16,7 @@ import type {
   CustomerBill,
   CustomerSummary,
   CustomerParams,
+  TopProduct,
 } from "@/types/api";
 
 const BASE = "http://localhost:8000";
@@ -103,6 +104,11 @@ export const api = {
   replenishment: (params: ReplenishmentParams) =>
     apiFetch<PaginatedResponse<ReplenishmentItem>>(
       `/api/analytics/replenishment${buildQuery(params)}`
+    ),
+
+  topProducts: (days = 30, limit = 10, sort_by: "revenue" | "qty" = "revenue") =>
+    apiFetch<TopProduct[]>(
+      `/api/analytics/top-products${buildQuery({ days, limit, sort_by })}`
     ),
 
   demandTrend: (barcode: string, days = 60) =>
