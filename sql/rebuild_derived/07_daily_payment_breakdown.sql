@@ -48,5 +48,10 @@ SELECT
   COALESCE(SUM(COALESCE(membercard_discount, 0)), 0) AS membercard_discount_total
 FROM raw.raw_sales_billwise
 WHERE bill_datetime_raw IS NOT NULL
+  -- Exclude opening-balance / journal entries: no realistic supermarket bill
+  -- will have a single payment component exceeding ₹10,00,000 (10 lakh).
+  AND COALESCE(actual_cash, cash_amount, 0) < 1000000
+  AND COALESCE(card_amount, 0)              < 1000000
+  AND COALESCE(net_total, 0)               < 1000000
 GROUP BY TO_TIMESTAMP(bill_datetime_raw, 'DD-MM-YYYYHH12:MI AM')::DATE
 ORDER BY sale_date DESC;

@@ -26,7 +26,32 @@ const COLORS = {
   credit: "#ef4444",
 };
 
+/** Drop rows where any payment column is a clear outlier (> 100× the median).
+ *  Catches opening-balance / journal entries that leak into billing exports. */
+function filterOutliers(rows: DailyPayment[]): DailyPayment[] {
+  if (rows.length < 2) return rows;
+
+  const cashes = rows.map((r) => r.cash_total).sort((a, b) => a - b);
+  const mid = Math.floor(cashes.length / 2);
+  const median = cashes.length % 2 !== 0
+    ? cashes[mid]
+    : (cashes[mid - 1] + cashes[mid]) / 2;
+
+  // If median is 0 (no cash days at all), fall back to a hard cap of ₹50L/day
+  const threshold = median > 0 ? median * 100 : 5_000_000;
+
+  return rows.filter(
+    (r) =>
+      r.cash_total   <= threshold &&
+      r.card_total   <= threshold &&
+      r.upi_total    <= threshold &&
+      r.credit_total <= threshold
+  );
+}
+
 export function PaymentBreakdownChart({ data }: PaymentBreakdownChartProps) {
+  const clean = filterOutliers(data);
+
   return (
     <Card>
       <CardHeader>
@@ -35,7 +60,7 @@ export function PaymentBreakdownChart({ data }: PaymentBreakdownChartProps) {
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+          <BarChart data={clean} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis
               dataKey="sale_date"
