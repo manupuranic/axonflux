@@ -62,11 +62,12 @@ def get_summary(
         ),
         customer_kpis AS (
             SELECT
-                COUNT(*) FILTER (WHERE NOT is_walk_in)                                             AS total_unique,
-                COUNT(*) FILTER (WHERE is_repeat AND NOT is_walk_in)                               AS repeat_count,
-                COUNT(*) FILTER (WHERE first_seen_date >= CURRENT_DATE - INTERVAL '30 days'
-                                   AND NOT is_walk_in)                                             AS new_last_30d
-            FROM derived.customer_dimension
+                COUNT(*) FILTER (WHERE NOT cd.is_walk_in)                                          AS total_unique,
+                COUNT(*) FILTER (WHERE cm.is_repeat AND NOT cd.is_walk_in)                         AS repeat_count,
+                COUNT(*) FILTER (WHERE cd.first_seen_date >= CURRENT_DATE - INTERVAL '30 days'
+                                   AND NOT cd.is_walk_in)                                          AS new_last_30d
+            FROM derived.customer_dimension cd
+            LEFT JOIN derived.customer_metrics cm ON cd.mobile_clean = cm.mobile_clean
         ),
         walk_in_rev AS (
             SELECT
