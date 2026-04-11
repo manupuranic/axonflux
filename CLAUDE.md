@@ -161,3 +161,126 @@ SECRET_KEY=...   # required for API JWT auth
 | FastAPI (uvicorn) | 8000 |
 | Next.js (`web/`) | 3000 |
 | MLflow UI (`ml/`) | 5001 |
+
+---
+
+## Project Roadmap
+
+### ✅ Complete
+
+**Infrastructure & Pipeline**
+- 10-step SQL rebuild pipeline (steps 00–09), weekly_pipeline.py
+- Folder-based ingestion for 6 report types with SHA-256 deduplication
+- Alembic migrations for `app.*` schema
+- FastAPI backend: auth (JWT), analytics, customers, products, suppliers, pipeline routers
+- Tool plugin system: cash_closure + pamphlets (backends complete)
+
+**Analytics (derived layer)**
+- `derived.product_daily_metrics` — date × product time series (~2.3M rows)
+- `derived.product_daily_features` — lag, rolling 7/30/60d avg, stddev
+- `derived.product_health_signals` — fast/slow/dead/spike flags + predicted_daily_demand (SQL WMA)
+- `derived.product_stock_position` — pseudo-stock via cumulative window functions
+- `derived.supplier_restock_recommendations` — procurement intelligence
+- `derived.daily_sales_summary` + `daily_purchase_summary`
+- `derived.daily_payment_breakdown` — cash/card/UPI/credit by day
+- `derived.customer_dimension` — normalized mobile + WALK-IN synthetic key
+- `derived.customer_metrics` — spend, recency, preferred payment per customer
+
+**Dashboard (Next.js `web/`)**
+- Auth (JWT, localStorage), protected layout, sidebar with mobile overlay
+- Dashboard: 14 KPI cards, revenue chart, purchase chart, payment breakdown chart, top products card
+- Product Health page (paginated, filterable by signal type)
+- Replenishment page (filterable by supplier, urgent-only)
+- Customers page (search, filters, drawer with purchase history)
+- Pipeline trigger modal
+- System design page (`/docs`)
+
+**Canonical Products**
+- `app.products` table with canonical_name, category, brand
+- Seeding script from derived layer
+- PATCH API — creates row on first edit, falls back to derived name if not overridden
+
+---
+
+### Phase A — Operational Completeness *(next)*
+
+**A1 — Cash Closure UI** *(backend done, frontend missing)*
+Staff submits EOD cash count nightly. `api/tools/cash_closure/` is complete.
+Frontend: date picker → system totals vs physical count grid → live delta → submit.
+New Alembic migration may be needed if columns changed.
+
+**A2 — Daily Ingestion + Refresh Button** *(not started)*
+`POST /api/pipeline/trigger-daily` — ingests only today's sales files, then rebuilds derived.
+"Refresh Data" button on dashboard. Unblocks cash closure for same-day use.
+
+**A3 — Pamphlet Generator UI** *(backend done, frontend missing)*
+`api/tools/pamphlets/` is complete. Frontend: product search, add items, set offer price/validity,
+PDF preview + download via `@react-pdf/renderer` (client-side, no PDF bytes stored in DB).
+
+---
+
+### Phase B — ML Upgrade *(after Phase A)*
+
+**B1 — ML Demand Forecasting**
+Replace SQL WMA with validated XGBoost/ARIMA model.
+- Export `derived.product_daily_features` → parquet → `ml/` notebooks
+- Experiment tracking: MLflow (port 5001, `ml/mlflow.db`)
+- Notebook sequence: 01_baseline → 02_arima → 03_xgboost → 04_feature_importance
+- Promotion: update step 03 SQL formula (simple) OR write to `derived.demand_predictions` (complex)
+
+**B2 — Basket Analysis / Recommendation Engine**
+`raw.raw_item_combinations` already ingested — data exists.
+- FP-Growth on co-purchased items → `derived.product_associations`
+- `GET /api/recommendations?barcode=` endpoint
+- Show "frequently bought together" in product drawer
+
+**B3 — Product Entity Resolution**
+Billing exports have name variants: "SURF EXCEL 1KG" / "Surf Excel 1 Kg" / "SURFEXCEL1KG".
+- RapidFuzz clustering of product names → suggest merges
+- Admin review + confirm UI → updates `app.products.canonical_name`
+- `app.product_aliases` mapping table
+
+---
+
+### Phase C — AI / Retail Co-pilot *(after Phase B)*
+
+**C1 — Product Content Generation (LLM-powered)**
+For promoted products (especially herbals). Requires new `app.products` columns:
+`description TEXT`, `tags TEXT[]`, `use_cases TEXT[]`, `diseases_cured TEXT[]`, `key_benefits TEXT[]`.
+Script: `scripts/generate_product_content.py` — takes barcode list → calls Claude API →
+returns structured JSON → upserts into `app.products`. Framing must be wellness (not medical claims).
+
+**C2 — Product Images**
+For promoted products only (select few, not entire catalog).
+- **Source priority**: Open Food Facts API (free, has images for FMCG by barcode) → manufacturer site → manual upload
+- **Storage**: Cloudflare R2 (S3-compatible, free 10GB) or Vercel Blob
+- **DB**: add `image_url TEXT` column to `app.products` — store CDN URL, not binary
+- **Script**: `scripts/fetch_product_images.py` — tries Open Food Facts by barcode, falls back to manual
+
+**C3 — Embedding Pipeline + pgvector**
+Product catalog → vectors stored in PostgreSQL via pgvector extension.
+Rebuilt on each pipeline run.
+
+**C4 — RAG Chatbot**
+Query → retrieve relevant products/signals/recommendations → Claude API → response.
+Example: *"What should I reorder this week?"*, *"Which herbals are selling well?"*
+Chat interface in dashboard sidebar.
+
+**C5 — "What should I do today?" Decision Engine**
+Daily briefing combining: restock alerts, demand spikes, dead stock to discount,
+new customer trends, cash closure discrepancy flag.
+
+---
+
+### Phase D — Public Presence *(parallel to C)*
+
+Next.js `(public)/` segment: store info, current offers from published pamphlets.
+Deploy to Vercel (free). No raw/internal data exposed.
+Product pages for promoted items: image, description, tags, key benefits (from Phase C content generation).
+
+---
+
+## What's NOT in scope (do not modify)
+- `raw_ingestion/` — ingestion modules are stable, do not touch
+- `raw.*` schema — append-only, never UPDATE or DELETE
+- `derived.*` tables — never store application state here (truncated on every rebuild)
