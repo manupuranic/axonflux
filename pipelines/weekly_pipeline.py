@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import os
 from pathlib import Path
 from urllib.parse import quote_plus
@@ -26,12 +27,16 @@ EXPORTS_DIR = ROOT / "exports"
 SUPPLIER_EXPORT_DIR = EXPORTS_DIR / "supplier_orders"
 
 REBUILD_SQL_FILES = [
+    REBUILD_SQL_DIR / "00_daily_sales_summary.sql",
     REBUILD_SQL_DIR / "01_product_daily_metrics.sql",
     REBUILD_SQL_DIR / "02_product_daily_features.sql",
     REBUILD_SQL_DIR / "03_product_health_signals.sql",
     REBUILD_SQL_DIR / "04_product_stock_position.sql",
     REBUILD_SQL_DIR / "05_necessary_views.sql",
     REBUILD_SQL_DIR / "06_supplier_restock_recommendations.sql",
+    REBUILD_SQL_DIR / "07_daily_payment_breakdown.sql",
+    REBUILD_SQL_DIR / "08_customer_dimension.sql",
+    REBUILD_SQL_DIR / "09_customer_metrics.sql",
 ]
 
 SHEET_SQL_FILES = [
@@ -140,16 +145,19 @@ def export_conversion_sheet(engine: Engine) -> None:
     df.to_excel(EXPORTS_DIR / "conversion_attention_sheet.xlsx", index=False)
 
 
-def main() -> None:
+def main(run_ingestion: bool = False) -> None:
     engine = get_engine_from_env()
 
-    # print("Running ingestion...")
-    # ingest_sales_itemwise()
-    # ingest_sales_billwise()
-    # ingest_purchase_itemwise()
-    # ingest_purchase_billwise()
-    # ingest_supplier_master()
-    # ingest_item_combinations()
+    if run_ingestion:
+        print("Running ingestion...")
+        ingest_sales_itemwise()
+        ingest_sales_billwise()
+        ingest_purchase_itemwise()
+        ingest_purchase_billwise()
+        ingest_supplier_master()
+        ingest_item_combinations()
+    else:
+        print("Skipping ingestion (pass --run-ingestion to include)")
 
     print("Rebuilding derived tables...")
     for sql_file in REBUILD_SQL_FILES:
@@ -169,4 +177,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Run the weekly LedgerAI data pipeline")
+    parser.add_argument(
+        "--run-ingestion",
+        action="store_true",
+        help="Run ingestion from incoming data files before rebuilding derived tables"
+    )
+    args = parser.parse_args()
+    main(run_ingestion=args.run_ingestion)

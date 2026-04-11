@@ -846,3 +846,20 @@ AND h.date = (
     FROM derived.product_health_signals
 )
 AND h.predicted_daily_demand > 0.02;
+
+-- Daily Payment Breakdown
+CREATE TABLE IF NOT EXISTS derived.daily_payment_breakdown (
+    sale_date              DATE PRIMARY KEY,
+    total_bills            INTEGER,
+    cash_total             NUMERIC,
+    card_total             NUMERIC,
+    google_pay_total       NUMERIC,
+    phonepe_total          NUMERIC,
+    paytm_total            NUMERIC,
+    upi_total              NUMERIC,
+    credit_total           NUMERIC,
+    cn_redeemed_total      NUMERIC,
+    total_discount         NUMERIC,
+    membercard_discount_total NUMERIC,
+    created_at             TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);

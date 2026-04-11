@@ -54,14 +54,11 @@ select DISTINCT ON (h.date, h.product_id)
         ELSE s.pseudo_stock / h.predicted_daily_demand
     END AS days_of_cover,
 
-    COALESCE(
-        sm.min_stock,
-        CASE
-            WHEN sm.supplier_name IS NULL
-            THEN 2 * h.predicted_daily_demand
-            ELSE 7 * h.predicted_daily_demand
-        END
-    ) AS min_stock,
+    CASE
+        WHEN sm.supplier_name IS NULL
+        THEN 2 * h.predicted_daily_demand
+        ELSE 7 * h.predicted_daily_demand
+    END AS min_stock,
 
     30 * h.predicted_daily_demand AS max_stock,
 
