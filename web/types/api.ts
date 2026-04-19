@@ -185,3 +185,68 @@ export interface ReplenishmentParams {
   offset?: number;
   [key: string]: unknown;
 }
+
+// HOTO — Daily Cash Closure
+export interface HotoLineItem {
+  description: string;
+  amount: number;
+}
+
+export interface HotoResponse {
+  id: string;
+  closure_date: string;
+  status: "draft" | "submitted" | "verified" | "rejected";
+  submitted_at: string | null;
+
+  opening_cash: number | null;
+  net_sales: number | null;
+  sodexo_collection: number | null;
+  manual_billings: HotoLineItem[];
+  old_balance_collections: HotoLineItem[];
+  distributor_expiry: number | null;
+  oil_crush: number | null;
+  other_income: number | null;
+
+  pluxee_amount: number | null;
+  paytm_amount: number | null;
+  phonepe_amount: number | null;
+  card_amount: number | null;
+  credits_given: HotoLineItem[];
+  returns_amount: number | null;
+
+  expenses: HotoLineItem[];
+
+  physical_cash_counted: number | null;
+  denominations_opening: Record<string, number>;
+  denominations_sales: Record<string, number>;
+
+  total_inside_counter: number | null;
+  total_outside_counter: number | null;
+  expected_cash: number | null;
+  difference_amount: number | null;
+
+  notes: string | null;
+}
+
+export interface HotoCreate {
+  closure_date: string;
+  opening_cash?: number | null;
+  net_sales?: number | null;
+  sodexo_collection?: number | null;
+  manual_billings?: HotoLineItem[];
+  old_balance_collections?: HotoLineItem[];
+  distributor_expiry?: number | null;
+  oil_crush?: number | null;
+  other_income?: number | null;
+  pluxee_amount?: number | null;
+  paytm_amount?: number | null;
+  phonepe_amount?: number | null;
+  card_amount?: number | null;
+  credits_given?: HotoLineItem[];
+  returns_amount?: number | null;
+  expenses?: HotoLineItem[];
+  physical_cash_counted?: number | null;
+  denominations_opening?: Record<string, number>;
+  denominations_sales?: Record<string, number>;
+  notes?: string | null;
+}

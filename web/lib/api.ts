@@ -17,10 +17,12 @@ import type {
   CustomerSummary,
   CustomerParams,
   TopProduct,
+  HotoResponse,
+  HotoCreate,
 } from "@/types/api";
 
 const BASE = "http://localhost:8000";
-// const BASE = "http://192.168.0.149:8000"
+// const BASE = "http://192.168.1.20:8000"
 
 function buildQuery(params: Record<string, unknown>): string {
   const filtered = Object.entries(params)
@@ -147,4 +149,33 @@ export const api = {
 
   pipelineStatus: (limit: number = 10) =>
     apiFetch<PipelineRun[]>(`/api/pipeline/status?limit=${limit}`),
+
+  // HOTO — Daily Cash Closure
+  hoto: {
+    getByDate: (date: string) =>
+      apiFetch<HotoResponse>(`/api/tools/cash-closure/date/${date}`),
+
+    list: (limit = 30, offset = 0) =>
+      apiFetch<{ total: number; limit: number; offset: number; items: HotoResponse[] }>(
+        `/api/tools/cash-closure${buildQuery({ limit, offset })}`
+      ),
+
+    saveDraft: (body: HotoCreate) =>
+      apiFetch<HotoResponse>("/api/tools/cash-closure/draft", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+
+    submit: (body: HotoCreate) =>
+      apiFetch<HotoResponse>("/api/tools/cash-closure", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+
+    verify: (id: string, status: "verified" | "rejected", notes?: string) =>
+      apiFetch<HotoResponse>(`/api/tools/cash-closure/${id}/verify`, {
+        method: "PATCH",
+        body: JSON.stringify({ status, notes }),
+      }),
+  },
 };
