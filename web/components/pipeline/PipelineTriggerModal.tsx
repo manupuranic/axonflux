@@ -1,71 +1,153 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import type { PipelineRun } from "@/types/api";
+import type { LastDataDate, PipelineRun } from "@/types/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, CheckCircle, AlertCircle, Clock } from "lucide-react";
-import { format } from "date-fns";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  RefreshCw,
+  Database,
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
+  X,
+} from "lucide-react";
+import { format, parseISO } from "date-fns";
 
 interface PipelineTriggerModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function PipelineTriggerModal({ isOpen, onClose }: PipelineTriggerModalProps) {
-  const [latestRun, setLatestRun] = useState<PipelineRun | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isTriggering, setIsTriggering] = useState(false);
-  const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
-  const [error, setError] = useState<string | null>(null);
+type Step = "export" | "ingest" | "rebuild";
 
-  // Load latest run on mount or when modal opens
+function detectStep(log: string): Step {
+  if (log.includes("[STEP 3/3]")) return "rebuild";
+  if (log.includes("[STEP 2/3]")) return "ingest";
+  return "export";
+}
+
+function StepIndicator({
+  label,
+  icon: Icon,
+  state,
+}: {
+  label: string;
+  icon: React.ElementType;
+  state: "pending" | "active" | "done" | "failed";
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <div
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+          state === "done"
+            ? "bg-green-100 text-green-700"
+            : state === "active"
+            ? "bg-blue-100 text-blue-700"
+            : state === "failed"
+            ? "bg-red-100 text-red-700"
+            : "bg-gray-100 text-gray-400"
+        }`}
+      >
+        {state === "active" ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : state === "done" ? (
+          <CheckCircle className="h-3.5 w-3.5" />
+        ) : state === "failed" ? (
+          <AlertCircle className="h-3.5 w-3.5" />
+        ) : (
+          <Icon className="h-3.5 w-3.5" />
+        )}
+      </div>
+      <span
+        className={`text-sm ${
+          state === "active"
+            ? "font-medium text-blue-700"
+            : state === "done"
+            ? "text-green-700"
+            : state === "failed"
+            ? "text-red-700"
+            : "text-gray-400"
+        }`}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+export function PipelineTriggerModal({ isOpen, onClose }: PipelineTriggerModalProps) {
+  const [lastDataInfo, setLastDataInfo] = useState<LastDataDate | null>(null);
+  const [activeRun, setActiveRun] = useState<PipelineRun | null>(null);
+  const [isTriggering, setIsTriggering] = useState(false);
+  const [showFullLog, setShowFullLog] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const logRef = useRef<HTMLPreElement>(null);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
-    if (isOpen) {
-      loadLatestRun();
-    }
-    return () => {
-      if (pollInterval) clearInterval(pollInterval);
-    };
+    if (!isOpen) return;
+    setError(null);
+    setActiveRun(null);
+    // Load last data date for preflight info
+    api.pipelineLastDataDate().then(setLastDataInfo).catch(() => {});
   }, [isOpen]);
 
-  // Poll while running
+  // Auto-scroll log to bottom when new content arrives
   useEffect(() => {
-    if (latestRun?.status === "running" && isOpen) {
-      const interval = setInterval(() => {
-        loadLatestRun();
-      }, 2000); // Poll every 2 seconds
-      setPollInterval(interval);
-      return () => clearInterval(interval);
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
     }
-    if (pollInterval) {
-      clearInterval(pollInterval);
-      setPollInterval(null);
-    }
-  }, [latestRun?.status, isOpen]);
+  }, [activeRun?.log_output]);
 
-  const loadLatestRun = async () => {
+  // Poll specific run while it's running
+  useEffect(() => {
+    if (!activeRun || activeRun.status !== "running") {
+      if (pollRef.current) clearInterval(pollRef.current);
+      return;
+    }
+    pollRef.current = setInterval(async () => {
+      try {
+        const updated = await api.pipelineRunById(activeRun.id);
+        setActiveRun(updated);
+        if (updated.status !== "running") clearInterval(pollRef.current!);
+      } catch {}
+    }, 2000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [activeRun?.id, activeRun?.status]);
+
+  const triggerFullRefresh = async () => {
+    setIsTriggering(true);
+    setError(null);
+    setActiveRun(null);
+    setShowFullLog(false);
     try {
-      setIsLoading(true);
-      const run = await api.pipelineLatestRun();
-      setLatestRun(run);
-      setError(null);
+      const result = await api.pipelineFullRefresh();
+      // Brief delay so the run record is committed
+      await new Promise((r) => setTimeout(r, 600));
+      const run = await api.pipelineRunById(result.run_id);
+      setActiveRun(run);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load pipeline status");
+      setError(err instanceof Error ? err.message : "Failed to start refresh");
     } finally {
-      setIsLoading(false);
+      setIsTriggering(false);
     }
   };
 
-  const handleTrigger = async (withIngestion: boolean) => {
+  const triggerLegacy = async (withIngestion: boolean) => {
+    setIsTriggering(true);
+    setError(null);
+    setActiveRun(null);
+    setShowFullLog(false);
     try {
-      setIsTriggering(true);
-      setError(null);
       const result = await api.pipelineTrigger(withIngestion);
-      // Refresh the latest run
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      await loadLatestRun();
+      await new Promise((r) => setTimeout(r, 600));
+      const run = await api.pipelineRunById(result.run_id);
+      setActiveRun(run);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to trigger pipeline");
     } finally {
@@ -75,137 +157,213 @@ export function PipelineTriggerModal({ isOpen, onClose }: PipelineTriggerModalPr
 
   if (!isOpen) return null;
 
+  const isRunning = activeRun?.status === "running";
+  const log = activeRun?.log_output ?? "";
+  const currentStep = isRunning ? detectStep(log) : null;
+
+  const stepState = (step: Step): "pending" | "active" | "done" | "failed" => {
+    if (!activeRun) return "pending";
+    if (activeRun.status === "failed") {
+      if (currentStep === step) return "failed";
+      // steps before current are done, steps after are pending
+    }
+    const order: Step[] = ["export", "ingest", "rebuild"];
+    const runningIdx = currentStep ? order.indexOf(currentStep) : -1;
+    const stepIdx = order.indexOf(step);
+    if (!isRunning && activeRun.status === "success") return "done";
+    if (!isRunning && activeRun.status === "failed") {
+      if (stepIdx < runningIdx) return "done";
+      if (stepIdx === runningIdx) return "failed";
+      return "pending";
+    }
+    if (stepIdx < runningIdx) return "done";
+    if (stepIdx === runningIdx) return "active";
+    return "pending";
+  };
+
+  const isFullRefreshRun = activeRun?.pipeline_type === "full_refresh";
+  const logLines = log.split("\n");
+  const visibleLog = showFullLog ? log : logLines.slice(-30).join("\n");
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <CardHeader>
-          <CardTitle>Pipeline Management</CardTitle>
-          <CardDescription>View status and trigger data pipeline</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Latest Run Status */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium">Last Run</h3>
-            {isLoading && !latestRun ? (
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading status...
-              </div>
-            ) : latestRun ? (
-              <div className="border rounded-lg p-3 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    {latestRun.status === "running" && (
-                      <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                    )}
-                    {latestRun.status === "success" && (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    )}
-                    {latestRun.status === "failed" && (
-                      <AlertCircle className="h-4 w-4 text-red-500" />
-                    )}
-                    <div>
-                      <p className="text-sm font-medium capitalize">{latestRun.status}</p>
-                      <p className="text-xs text-gray-500">
-                        {format(new Date(latestRun.triggered_at), "d MMM yyyy HH:mm:ss")}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs px-2 py-1 bg-gray-100 rounded">
-                    {latestRun.pipeline_type === "weekly_full_with_ingestion"
-                      ? "With Ingestion"
-                      : "Rebuild Only"}
-                  </span>
-                </div>
-
-                {latestRun.completed_at && (
-                  <p className="text-xs text-gray-500">
-                    Completed: {format(new Date(latestRun.completed_at), "d MMM yyyy HH:mm:ss")}
-                  </p>
-                )}
-
-                {latestRun.log_output && (
-                  <div className="mt-2">
-                    <p className="text-xs font-medium text-gray-600 mb-1">Log Output:</p>
-                    <div className="bg-gray-900 text-gray-100 text-xs p-2 rounded font-mono max-h-32 overflow-y-auto">
-                      <pre>{latestRun.log_output}</pre>
-                    </div>
-                  </div>
-                )}
-
-                {latestRun.error_message && (
-                  <div className="mt-2">
-                    <p className="text-xs font-medium text-red-600 mb-1">Error:</p>
-                    <div className="bg-red-50 text-red-800 text-xs p-2 rounded border border-red-200">
-                      <pre className="overflow-x-auto">{latestRun.error_message}</pre>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500">No pipeline runs yet</p>
-            )}
+      <Card className="w-full max-w-lg max-h-[92vh] flex flex-col">
+        <CardHeader className="shrink-0 pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Refresh Data</CardTitle>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
           </div>
+          {lastDataInfo && !activeRun && (
+            <div className="mt-1 text-sm text-gray-500">
+              {lastDataInfo.last_data_date ? (
+                <>
+                  Last data:{" "}
+                  <span className="font-medium text-gray-700">
+                    {format(parseISO(lastDataInfo.last_data_date), "d MMM yyyy")}
+                  </span>
+                  {lastDataInfo.days_behind != null && lastDataInfo.days_behind > 0 && (
+                    <span className="ml-2 text-amber-600 font-medium">
+                      ({lastDataInfo.days_behind} day{lastDataInfo.days_behind !== 1 ? "s" : ""} behind)
+                    </span>
+                  )}
+                  {lastDataInfo.days_behind === 0 && (
+                    <span className="ml-2 text-green-600 font-medium">(up to date)</span>
+                  )}
+                </>
+              ) : (
+                "No data ingested yet"
+              )}
+            </div>
+          )}
+        </CardHeader>
 
-          {/* Error Message */}
+        <CardContent className="flex-1 overflow-y-auto space-y-4">
+          {/* Error */}
           {error && (
             <div className="bg-red-50 text-red-800 text-sm p-3 rounded border border-red-200">
               {error}
             </div>
           )}
 
-          {/* Trigger Buttons */}
-          <div className="space-y-2 border-t pt-4">
-            <p className="text-sm font-medium">Run Pipeline</p>
-
-            <Button
-              onClick={() => handleTrigger(false)}
-              disabled={isTriggering || latestRun?.status === "running"}
-              className="w-full"
-              variant="outline"
-            >
-              {isTriggering ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Triggering...
-                </>
-              ) : (
-                <>
-                  <Clock className="mr-2 h-4 w-4" />
-                  Rebuild Derived Tables Only
-                </>
+          {/* Active run */}
+          {activeRun ? (
+            <div className="space-y-4">
+              {/* Step indicators — only for full_refresh */}
+              {isFullRefreshRun && (
+                <div className="border rounded-lg p-3 space-y-2.5 bg-gray-50">
+                  <StepIndicator
+                    label="Export from Er4u"
+                    icon={RefreshCw}
+                    state={stepState("export")}
+                  />
+                  <StepIndicator
+                    label="Ingest files"
+                    icon={Database}
+                    state={stepState("ingest")}
+                  />
+                  <StepIndicator
+                    label="Rebuild derived tables"
+                    icon={BarChart3}
+                    state={stepState("rebuild")}
+                  />
+                </div>
               )}
-            </Button>
 
-            <Button
-              onClick={() => handleTrigger(true)}
-              disabled={isTriggering || latestRun?.status === "running"}
-              className="w-full"
-              variant="default"
-            >
-              {isTriggering ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Triggering...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Run With Ingestion
-                </>
+              {/* Status badge */}
+              <div className="flex items-center gap-2">
+                {isRunning && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+                {activeRun.status === "success" && (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                )}
+                {activeRun.status === "failed" && (
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                )}
+                <span className="text-sm font-medium capitalize">
+                  {isRunning ? "Running..." : activeRun.status}
+                </span>
+                {activeRun.completed_at && (
+                  <span className="text-xs text-gray-400 ml-auto">
+                    {format(new Date(activeRun.completed_at), "HH:mm:ss")}
+                  </span>
+                )}
+              </div>
+
+              {/* Live log */}
+              {log && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-500">
+                      {isRunning ? "Live output" : "Log output"}
+                    </span>
+                    <button
+                      className="text-xs text-blue-600 flex items-center gap-0.5 hover:underline"
+                      onClick={() => setShowFullLog((v) => !v)}
+                    >
+                      {showFullLog ? (
+                        <>
+                          <ChevronUp className="h-3 w-3" /> Show less
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-3 w-3" /> View full log
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <pre
+                    ref={logRef}
+                    className={`bg-gray-950 text-gray-100 text-xs p-3 rounded font-mono overflow-y-auto whitespace-pre-wrap break-all transition-all ${
+                      showFullLog ? "max-h-[40vh]" : "max-h-48"
+                    }`}
+                  >
+                    {visibleLog || " "}
+                    {isRunning && (
+                      <span className="inline-block w-1.5 h-3 bg-gray-100 animate-pulse ml-0.5 align-middle" />
+                    )}
+                  </pre>
+                </div>
               )}
+            </div>
+          ) : (
+            /* Pre-run: trigger buttons */
+            <div className="space-y-3">
+              <Button
+                onClick={triggerFullRefresh}
+                disabled={isTriggering}
+                className="w-full"
+                size="lg"
+              >
+                {isTriggering ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                Full Refresh (Export + Ingest + Rebuild)
+              </Button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-gray-400">Advanced</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  onClick={() => triggerLegacy(true)}
+                  disabled={isTriggering}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Database className="mr-1.5 h-3.5 w-3.5" />
+                  Ingest + Rebuild
+                </Button>
+                <Button
+                  onClick={() => triggerLegacy(false)}
+                  disabled={isTriggering}
+                  variant="outline"
+                  size="sm"
+                >
+                  <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
+                  Rebuild Only
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+
+        {/* Footer close button — always show when run is done */}
+        {activeRun && !isRunning && (
+          <div className="shrink-0 border-t p-4">
+            <Button onClick={onClose} className="w-full" variant="outline">
+              Close
             </Button>
           </div>
-
-          {/* Close Button */}
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            className="w-full"
-          >
-            Close
-          </Button>
-        </CardContent>
+        )}
       </Card>
     </div>
   );

@@ -162,11 +162,23 @@ export interface CustomerParams {
 export interface PipelineRun {
   id: string;
   triggered_at: string;
-  pipeline_type: "weekly_full" | "weekly_full_with_ingestion";
+  pipeline_type: "weekly_full" | "weekly_full_with_ingestion" | "full_refresh";
   status: "running" | "success" | "failed";
   completed_at: string | null;
   log_output?: string | null;
   error_message?: string | null;
+}
+
+export interface FullRefreshResult {
+  run_id: string;
+  status: string;
+  days_to_export: number;
+  last_data_date: string | null;
+}
+
+export interface LastDataDate {
+  last_data_date: string | null;
+  days_behind: number | null;
 }
 
 // Query params

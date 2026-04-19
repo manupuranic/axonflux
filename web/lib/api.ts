@@ -12,6 +12,8 @@ import type {
   HealthSignalParams,
   ReplenishmentParams,
   PipelineRun,
+  FullRefreshResult,
+  LastDataDate,
   CustomerListItem,
   CustomerBill,
   CustomerSummary,
@@ -141,11 +143,20 @@ export const api = {
   pipelineLatestRun: () =>
     apiFetch<PipelineRun | null>("/api/pipeline/status/latest"),
 
+  pipelineRunById: (runId: string) =>
+    apiFetch<PipelineRun>(`/api/pipeline/status/${runId}`),
+
   pipelineTrigger: (runIngestion: boolean = false) =>
-    apiFetch<{ run_id: string; status: string; message: string }>(
+    apiFetch<{ run_id: string; status: string }>(
       `/api/pipeline/trigger${runIngestion ? "?run_ingestion=true" : ""}`,
       { method: "POST" }
     ),
+
+  pipelineFullRefresh: () =>
+    apiFetch<FullRefreshResult>("/api/pipeline/full-refresh", { method: "POST" }),
+
+  pipelineLastDataDate: () =>
+    apiFetch<LastDataDate>("/api/pipeline/last-data-date"),
 
   pipelineStatus: (limit: number = 10) =>
     apiFetch<PipelineRun[]>(`/api/pipeline/status?limit=${limit}`),
