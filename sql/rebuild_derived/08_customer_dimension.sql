@@ -23,10 +23,29 @@ INSERT INTO derived.customer_dimension (
     last_seen_date,
     total_bills
 )
-WITH normalized AS (
+WITH raw_norm AS (
+    -- Pre-normalize datetime: ensure space between date and time parts.
+    -- Handles old exports (no space) and new exports (space present, 12- or 24-hour).
     SELECT
         bill_no,
-        TO_TIMESTAMP(bill_datetime_raw, 'DD-MM-YYYYHH12:MI AM')::DATE AS bill_date,
+        customer_name_raw,
+        customer_mobile_raw,
+        membercard_discount,
+        CASE WHEN SUBSTRING(bill_datetime_raw, 11, 1) = ' '
+             THEN bill_datetime_raw
+             ELSE SUBSTRING(bill_datetime_raw, 1, 10) || ' ' || SUBSTRING(bill_datetime_raw, 11)
+        END AS dt
+    FROM raw.raw_sales_billwise
+    WHERE bill_datetime_raw IS NOT NULL
+      AND bill_datetime_raw ~ '^\d{2}-\d{2}-\d{4}'   -- skip ISO-format or garbage rows
+),
+normalized AS (
+    SELECT
+        bill_no,
+        CASE WHEN dt ~* '(AM|PM)\s*$'
+             THEN TO_TIMESTAMP(dt, 'DD-MM-YYYY HH12:MI AM')
+             ELSE TO_TIMESTAMP(dt, 'DD-MM-YYYY HH24:MI')
+        END::DATE                                                      AS bill_date,
         customer_name_raw,
         COALESCE(membercard_discount, 0)                               AS membercard_discount,
         -- Normalize mobile to clean 10-digit or NULL
@@ -48,8 +67,7 @@ WITH normalized AS (
                 THEN REGEXP_REPLACE(COALESCE(customer_mobile_raw, ''), '[^0-9]', '', 'g')
             ELSE NULL
         END AS mobile_clean
-    FROM raw.raw_sales_billwise
-    WHERE bill_datetime_raw IS NOT NULL
+    FROM raw_norm
 ),
 classified AS (
     SELECT

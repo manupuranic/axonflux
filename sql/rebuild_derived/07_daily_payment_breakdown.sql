@@ -33,25 +33,40 @@ INSERT INTO derived.daily_payment_breakdown (
   total_discount,
   membercard_discount_total
 )
+WITH norm AS (
+    SELECT
+        CASE WHEN SUBSTRING(bill_datetime_raw, 11, 1) = ' '
+             THEN bill_datetime_raw
+             ELSE SUBSTRING(bill_datetime_raw, 1, 10) || ' ' || SUBSTRING(bill_datetime_raw, 11)
+        END                                           AS dt,
+        actual_cash, cash_amount, card_amount,
+        google_pay_amount, phonepe_amount, paytm_amount,
+        credit_amount, cn_amount, total_discount, membercard_discount,
+        net_total
+    FROM raw.raw_sales_billwise
+    WHERE bill_datetime_raw IS NOT NULL
+      AND bill_datetime_raw ~ '^\d{2}-\d{2}-\d{4}'   -- skip ISO-format or garbage rows
+      AND COALESCE(actual_cash, cash_amount, 0) < 1000000
+      AND COALESCE(card_amount, 0)              < 1000000
+      AND COALESCE(net_total, 0)                < 1000000
+)
 SELECT
-  TO_TIMESTAMP(bill_datetime_raw, 'DD-MM-YYYYHH12:MI AM')::DATE AS sale_date,
-  COUNT(*) AS total_bills,
-  COALESCE(SUM(COALESCE(actual_cash, cash_amount, 0)), 0) AS cash_total,
-  COALESCE(SUM(COALESCE(card_amount, 0)), 0) AS card_total,
-  COALESCE(SUM(COALESCE(google_pay_amount, 0)), 0) AS google_pay_total,
-  COALESCE(SUM(COALESCE(phonepe_amount, 0)), 0) AS phonepe_total,
-  COALESCE(SUM(COALESCE(paytm_amount, 0)), 0) AS paytm_total,
-  COALESCE(SUM(COALESCE(google_pay_amount, 0) + COALESCE(phonepe_amount, 0) + COALESCE(paytm_amount, 0)), 0) AS upi_total,
-  COALESCE(SUM(COALESCE(credit_amount, 0)), 0) AS credit_total,
-  COALESCE(SUM(COALESCE(cn_amount, 0)), 0) AS cn_redeemed_total,
-  COALESCE(SUM(COALESCE(total_discount, 0)), 0) AS total_discount,
-  COALESCE(SUM(COALESCE(membercard_discount, 0)), 0) AS membercard_discount_total
-FROM raw.raw_sales_billwise
-WHERE bill_datetime_raw IS NOT NULL
-  -- Exclude opening-balance / journal entries: no realistic supermarket bill
-  -- will have a single payment component exceeding ₹10,00,000 (10 lakh).
-  AND COALESCE(actual_cash, cash_amount, 0) < 1000000
-  AND COALESCE(card_amount, 0)              < 1000000
-  AND COALESCE(net_total, 0)               < 1000000
-GROUP BY TO_TIMESTAMP(bill_datetime_raw, 'DD-MM-YYYYHH12:MI AM')::DATE
+  CASE WHEN dt ~* '(AM|PM)\s*$'
+       THEN TO_TIMESTAMP(dt, 'DD-MM-YYYY HH12:MI AM')
+       ELSE TO_TIMESTAMP(dt, 'DD-MM-YYYY HH24:MI')
+  END::DATE                                                                       AS sale_date,
+  COUNT(*)                                                                        AS total_bills,
+  COALESCE(SUM(COALESCE(actual_cash, cash_amount, 0)), 0)                        AS cash_total,
+  COALESCE(SUM(COALESCE(card_amount, 0)), 0)                                     AS card_total,
+  COALESCE(SUM(COALESCE(google_pay_amount, 0)), 0)                               AS google_pay_total,
+  COALESCE(SUM(COALESCE(phonepe_amount, 0)), 0)                                  AS phonepe_total,
+  COALESCE(SUM(COALESCE(paytm_amount, 0)), 0)                                    AS paytm_total,
+  COALESCE(SUM(COALESCE(google_pay_amount, 0) + COALESCE(phonepe_amount, 0)
+               + COALESCE(paytm_amount, 0)), 0)                                  AS upi_total,
+  COALESCE(SUM(COALESCE(credit_amount, 0)), 0)                                   AS credit_total,
+  COALESCE(SUM(COALESCE(cn_amount, 0)), 0)                                       AS cn_redeemed_total,
+  COALESCE(SUM(COALESCE(total_discount, 0)), 0)                                  AS total_discount,
+  COALESCE(SUM(COALESCE(membercard_discount, 0)), 0)                             AS membercard_discount_total
+FROM norm
+GROUP BY 1
 ORDER BY sale_date DESC;

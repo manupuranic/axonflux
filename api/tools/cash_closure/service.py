@@ -1,72 +1,174 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import text
-from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
 from api.tools.cash_closure.models import CashClosureRecord
-from api.tools.cash_closure.schemas import CashClosureCreate, SystemTotals
-
-# SQL to pull system-side payment totals for a given date from raw billing data.
-# Uses the same TO_TIMESTAMP format string as derived_tables.sql.
-_SYSTEM_TOTALS_SQL = text("""
-    SELECT
-        COUNT(*)                                                    AS total_bills,
-        COALESCE(SUM(cash_amount::numeric),       0)               AS system_cash,
-        COALESCE(SUM(card_amount::numeric),       0)               AS system_card,
-        COALESCE(SUM(google_pay_amount::numeric), 0)               AS system_googlepay,
-        COALESCE(SUM(phonepe_amount::numeric),    0)               AS system_phonepe,
-        COALESCE(SUM(paytm_amount::numeric),      0)               AS system_paytm,
-        COALESCE(SUM(net_total::numeric),         0)               AS system_net_total
-    FROM raw.raw_sales_billwise
-    WHERE TO_TIMESTAMP(bill_datetime_raw, 'DD-MM-YYYYHH12:MI AM')::DATE = :closure_date
-""")
+from api.tools.cash_closure.schemas import HotoCreate
 
 
-def get_system_totals(conn: Connection, closure_date: date) -> SystemTotals:
-    row = conn.execute(_SYSTEM_TOTALS_SQL, {"closure_date": closure_date}).mappings().one()
-    return SystemTotals(
-        closure_date=closure_date,
-        total_bills=int(row["total_bills"]),
-        system_cash=float(row["system_cash"]),
-        system_card=float(row["system_card"]),
-        system_googlepay=float(row["system_googlepay"]),
-        system_phonepe=float(row["system_phonepe"]),
-        system_paytm=float(row["system_paytm"]),
-        system_net_total=float(row["system_net_total"]),
+def _sum_items(items: list) -> float:
+    """Sum the amount field across a list of LineItem-like dicts."""
+    return sum(float(item.get("amount", 0) if isinstance(item, dict) else item.amount) for item in items)
+
+
+def _n(v) -> float:
+    """Coerce None to 0.0 for arithmetic."""
+    return float(v) if v is not None else 0.0
+
+
+def compute_totals(body: HotoCreate) -> dict:
+    """
+    Replicates the Inside / Outside reconciliation from the HOTO Excel.
+
+    Inside Counter  = opening_cash + net_sales + sodexo + sum(manual_billings)
+                    + sum(old_balance_collections) + distributor_expiry
+                    + oil_crush + other_income
+
+    Outside Counter = pluxee + paytm + phonepe + card + sum(credits_given)
+                    + returns + sum(expenses)
+
+    Expected Cash   = Inside − Outside
+    Difference      = physical_cash_counted − expected_cash
+    """
+    inside = (
+        _n(body.opening_cash)
+        + _n(body.net_sales)
+        + _n(body.sodexo_collection)
+        + _sum_items(body.manual_billings)
+        + _sum_items(body.old_balance_collections)
+        + _n(body.distributor_expiry)
+        + _n(body.oil_crush)
+        + _n(body.other_income)
     )
 
+    outside = (
+        _n(body.pluxee_amount)
+        + _n(body.paytm_amount)
+        + _n(body.phonepe_amount)
+        + _n(body.card_amount)
+        + _sum_items(body.credits_given)
+        + _n(body.returns_amount)
+        + _sum_items(body.expenses)
+    )
 
-def create_closure(
-    db: Session,
-    conn: Connection,
-    body: CashClosureCreate,
-    user_id: str,
-) -> CashClosureRecord:
-    totals = get_system_totals(conn, body.closure_date)
+    expected = inside - outside
 
-    staff_upi = sum(filter(None, [body.upi_googlepay, body.upi_phonepe, body.upi_paytm]))
-    system_upi = totals.system_googlepay + totals.system_phonepe + totals.system_paytm
+    difference = (
+        _n(body.physical_cash_counted) - expected
+        if body.physical_cash_counted is not None
+        else None
+    )
 
-    record = CashClosureRecord(
+    return {
+        "total_inside_counter": round(inside, 2),
+        "total_outside_counter": round(outside, 2),
+        "expected_cash": round(expected, 2),
+        "difference_amount": round(difference, 2) if difference is not None else None,
+    }
+
+
+def _items_to_dict(items) -> list[dict]:
+    """Convert list of LineItem or dict to plain dicts for JSONB storage."""
+    result = []
+    for item in items:
+        if isinstance(item, dict):
+            result.append(item)
+        else:
+            result.append(item.model_dump())
+    return result
+
+
+def upsert_closure(db: Session, body: HotoCreate, user_id: str) -> CashClosureRecord:
+    """
+    Insert a new record or update an existing draft for the same date.
+    Submitted/verified records cannot be overwritten — return as-is.
+    """
+    existing = get_closure_by_date(db, body.closure_date)
+    if existing and existing.status == "verified":
+        return existing
+
+    totals = compute_totals(body)
+
+    data = dict(
         closure_date=body.closure_date,
         submitted_by=user_id,
         submitted_at=datetime.now(timezone.utc),
         status="submitted",
-        physical_cash=body.physical_cash,
-        card_total=body.card_total,
-        upi_googlepay=body.upi_googlepay,
-        upi_phonepe=body.upi_phonepe,
-        upi_paytm=body.upi_paytm,
-        system_cash=totals.system_cash,
-        system_card=totals.system_card,
-        system_googlepay=totals.system_googlepay,
-        system_phonepe=totals.system_phonepe,
-        system_paytm=totals.system_paytm,
-        system_net_total=totals.system_net_total,
+        opening_cash=body.opening_cash,
+        net_sales=body.net_sales,
+        sodexo_collection=body.sodexo_collection,
+        manual_billings=_items_to_dict(body.manual_billings),
+        old_balance_collections=_items_to_dict(body.old_balance_collections),
+        distributor_expiry=body.distributor_expiry,
+        oil_crush=body.oil_crush,
+        other_income=body.other_income,
+        pluxee_amount=body.pluxee_amount,
+        paytm_amount=body.paytm_amount,
+        phonepe_amount=body.phonepe_amount,
+        card_amount=body.card_amount,
+        credits_given=_items_to_dict(body.credits_given),
+        returns_amount=body.returns_amount,
+        expenses=_items_to_dict(body.expenses),
+        physical_cash_counted=body.physical_cash_counted,
+        denominations_opening=body.denominations_opening,
+        denominations_sales=body.denominations_sales,
         notes=body.notes,
+        **totals,
     )
-    db.add(record)
+
+    if existing:
+        for k, v in data.items():
+            setattr(existing, k, v)
+        record = existing
+    else:
+        record = CashClosureRecord(**data)
+        db.add(record)
+
+    db.flush()
+    return record
+
+
+def save_draft(db: Session, body: HotoCreate, user_id: str) -> CashClosureRecord:
+    """Save without changing status to submitted (for Save Draft button)."""
+    existing = get_closure_by_date(db, body.closure_date)
+    if existing and existing.status == "verified":
+        return existing
+
+    totals = compute_totals(body)
+
+    data = dict(
+        closure_date=body.closure_date,
+        submitted_by=user_id,
+        opening_cash=body.opening_cash,
+        net_sales=body.net_sales,
+        sodexo_collection=body.sodexo_collection,
+        manual_billings=_items_to_dict(body.manual_billings),
+        old_balance_collections=_items_to_dict(body.old_balance_collections),
+        distributor_expiry=body.distributor_expiry,
+        oil_crush=body.oil_crush,
+        other_income=body.other_income,
+        pluxee_amount=body.pluxee_amount,
+        paytm_amount=body.paytm_amount,
+        phonepe_amount=body.phonepe_amount,
+        card_amount=body.card_amount,
+        credits_given=_items_to_dict(body.credits_given),
+        returns_amount=body.returns_amount,
+        expenses=_items_to_dict(body.expenses),
+        physical_cash_counted=body.physical_cash_counted,
+        denominations_opening=body.denominations_opening,
+        denominations_sales=body.denominations_sales,
+        notes=body.notes,
+        **totals,
+    )
+
+    if existing:
+        for k, v in data.items():
+            setattr(existing, k, v)
+        record = existing
+    else:
+        record = CashClosureRecord(**data)
+        db.add(record)
+
     db.flush()
     return record
 
@@ -82,7 +184,17 @@ def get_closure(db: Session, closure_id: str) -> CashClosureRecord | None:
     return db.query(CashClosureRecord).filter(CashClosureRecord.id == closure_id).first()
 
 
-def verify_closure(db: Session, closure_id: str, verifier_id: str, new_status: str, notes: str | None) -> CashClosureRecord | None:
+def get_closure_by_date(db: Session, closure_date: date) -> CashClosureRecord | None:
+    return db.query(CashClosureRecord).filter(CashClosureRecord.closure_date == closure_date).first()
+
+
+def verify_closure(
+    db: Session,
+    closure_id: str,
+    verifier_id: str,
+    new_status: str,
+    notes: str | None,
+) -> CashClosureRecord | None:
     record = get_closure(db, closure_id)
     if record:
         record.status = new_status

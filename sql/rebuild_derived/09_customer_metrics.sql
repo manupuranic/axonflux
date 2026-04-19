@@ -31,10 +31,29 @@ INSERT INTO derived.customer_metrics (
     is_repeat,
     preferred_payment
 )
-WITH normalized AS (
+WITH raw_norm AS (
     SELECT
         bill_no,
-        TO_TIMESTAMP(bill_datetime_raw, 'DD-MM-YYYYHH12:MI AM')::DATE AS bill_date,
+        customer_name_raw,
+        customer_mobile_raw,
+        net_total, total_discount, membercard_discount,
+        actual_cash, cash_amount, card_amount,
+        google_pay_amount, phonepe_amount, paytm_amount, credit_amount,
+        CASE WHEN SUBSTRING(bill_datetime_raw, 11, 1) = ' '
+             THEN bill_datetime_raw
+             ELSE SUBSTRING(bill_datetime_raw, 1, 10) || ' ' || SUBSTRING(bill_datetime_raw, 11)
+        END AS dt
+    FROM raw.raw_sales_billwise
+    WHERE bill_datetime_raw IS NOT NULL
+      AND bill_datetime_raw ~ '^\d{2}-\d{2}-\d{4}'   -- skip ISO-format or garbage rows
+),
+normalized AS (
+    SELECT
+        bill_no,
+        CASE WHEN dt ~* '(AM|PM)\s*$'
+             THEN TO_TIMESTAMP(dt, 'DD-MM-YYYY HH12:MI AM')
+             ELSE TO_TIMESTAMP(dt, 'DD-MM-YYYY HH24:MI')
+        END::DATE AS bill_date,
         customer_name_raw,
         COALESCE(net_total, 0)            AS net_total,
         COALESCE(total_discount, 0)       AS total_discount,
@@ -63,8 +82,7 @@ WITH normalized AS (
                 THEN REGEXP_REPLACE(COALESCE(customer_mobile_raw, ''), '[^0-9]', '', 'g')
             ELSE NULL
         END AS mobile_clean
-    FROM raw.raw_sales_billwise
-    WHERE bill_datetime_raw IS NOT NULL
+    FROM raw_norm
 ),
 classified AS (
     SELECT

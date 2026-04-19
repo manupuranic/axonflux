@@ -1,18 +1,12 @@
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_conn, get_db, get_current_user, require_admin
+from api.dependencies import get_db, get_current_user, require_admin
 from api.schemas.auth import CurrentUser
 from api.tools.cash_closure import MANIFEST
-from api.tools.cash_closure.schemas import (
-    CashClosureCreate,
-    CashClosureResponse,
-    CashClosureVerify,
-    SystemTotals,
-)
+from api.tools.cash_closure.schemas import HotoCreate, HotoResponse, HotoVerify
 from api.tools.cash_closure import service
 
 router = APIRouter(
@@ -21,24 +15,87 @@ router = APIRouter(
 )
 
 
-@router.get("/system-totals", response_model=SystemTotals)
-def get_system_totals(
-    closure_date: date = Query(default=None),
-    conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
-):
-    target = closure_date or date.today()
-    return service.get_system_totals(conn, target)
+def _to_response(record) -> HotoResponse:
+    def to_float(v):
+        return float(v) if v is not None else None
+
+    def to_items(raw) -> list:
+        if not raw:
+            return []
+        return [{"description": item.get("description", ""), "amount": float(item.get("amount", 0))} for item in raw]
+
+    def to_denoms(raw) -> dict:
+        if not raw:
+            return {}
+        return {k: int(v) for k, v in raw.items()}
+
+    return HotoResponse(
+        id=str(record.id),
+        closure_date=record.closure_date,
+        status=record.status,
+        submitted_at=record.submitted_at,
+        opening_cash=to_float(record.opening_cash),
+        net_sales=to_float(record.net_sales),
+        sodexo_collection=to_float(record.sodexo_collection),
+        manual_billings=to_items(record.manual_billings),
+        old_balance_collections=to_items(record.old_balance_collections),
+        distributor_expiry=to_float(record.distributor_expiry),
+        oil_crush=to_float(record.oil_crush),
+        other_income=to_float(record.other_income),
+        pluxee_amount=to_float(record.pluxee_amount),
+        paytm_amount=to_float(record.paytm_amount),
+        phonepe_amount=to_float(record.phonepe_amount),
+        card_amount=to_float(record.card_amount),
+        credits_given=to_items(record.credits_given),
+        returns_amount=to_float(record.returns_amount),
+        expenses=to_items(record.expenses),
+        physical_cash_counted=to_float(record.physical_cash_counted),
+        denominations_opening=to_denoms(record.denominations_opening),
+        denominations_sales=to_denoms(record.denominations_sales),
+        total_inside_counter=to_float(record.total_inside_counter),
+        total_outside_counter=to_float(record.total_outside_counter),
+        expected_cash=to_float(record.expected_cash),
+        difference_amount=to_float(record.difference_amount),
+        notes=record.notes,
+    )
 
 
-@router.post("", response_model=CashClosureResponse, status_code=201)
-def create_closure(
-    body: CashClosureCreate,
+@router.post("", response_model=HotoResponse, status_code=201)
+def submit_closure(
+    body: HotoCreate,
     db: Session = Depends(get_db),
-    conn: Connection = Depends(get_conn),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    record = service.create_closure(db, conn, body, current_user.id)
+    """Submit the HOTO for a given date. Upserts — re-submitting an existing draft is allowed."""
+    record = service.upsert_closure(db, body, str(current_user.id))
+    db.commit()
+    db.refresh(record)
+    return _to_response(record)
+
+
+@router.put("/draft", response_model=HotoResponse, status_code=200)
+def save_draft(
+    body: HotoCreate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Save a draft without marking as submitted. Safe to call repeatedly."""
+    record = service.save_draft(db, body, str(current_user.id))
+    db.commit()
+    db.refresh(record)
+    return _to_response(record)
+
+
+@router.get("/date/{closure_date}", response_model=HotoResponse)
+def get_by_date(
+    closure_date: date,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(get_current_user),
+):
+    """Fetch the HOTO record for a specific date. Used to pre-fill today's form."""
+    record = service.get_closure_by_date(db, closure_date)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No HOTO for this date")
     return _to_response(record)
 
 
@@ -58,7 +115,7 @@ def list_closures(
     }
 
 
-@router.get("/{closure_id}", response_model=CashClosureResponse)
+@router.get("/{closure_id}", response_model=HotoResponse)
 def get_closure(
     closure_id: str,
     db: Session = Depends(get_db),
@@ -70,52 +127,16 @@ def get_closure(
     return _to_response(record)
 
 
-@router.patch("/{closure_id}/verify", response_model=CashClosureResponse)
+@router.patch("/{closure_id}/verify", response_model=HotoResponse)
 def verify_closure(
     closure_id: str,
-    body: CashClosureVerify,
+    body: HotoVerify,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ):
-    record = service.verify_closure(db, closure_id, current_user.id, body.status, body.notes)
+    record = service.verify_closure(db, closure_id, str(current_user.id), body.status, body.notes)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Closure not found")
+    db.commit()
+    db.refresh(record)
     return _to_response(record)
-
-
-def _to_response(record) -> CashClosureResponse:
-    delta_cash = None
-    delta_card = None
-    delta_upi = None
-
-    if record.physical_cash is not None and record.system_cash is not None:
-        delta_cash = float(record.physical_cash) - float(record.system_cash)
-    if record.card_total is not None and record.system_card is not None:
-        delta_card = float(record.card_total) - float(record.system_card)
-
-    staff_upi = sum(float(v) for v in [record.upi_googlepay, record.upi_phonepe, record.upi_paytm] if v is not None)
-    sys_upi = sum(float(v) for v in [record.system_googlepay, record.system_phonepe, record.system_paytm] if v is not None)
-    if staff_upi or sys_upi:
-        delta_upi = staff_upi - sys_upi
-
-    return CashClosureResponse(
-        id=str(record.id),
-        closure_date=record.closure_date,
-        status=record.status,
-        submitted_at=record.submitted_at,
-        physical_cash=float(record.physical_cash) if record.physical_cash is not None else None,
-        card_total=float(record.card_total) if record.card_total is not None else None,
-        upi_googlepay=float(record.upi_googlepay) if record.upi_googlepay is not None else None,
-        upi_phonepe=float(record.upi_phonepe) if record.upi_phonepe is not None else None,
-        upi_paytm=float(record.upi_paytm) if record.upi_paytm is not None else None,
-        system_cash=float(record.system_cash) if record.system_cash is not None else None,
-        system_card=float(record.system_card) if record.system_card is not None else None,
-        system_googlepay=float(record.system_googlepay) if record.system_googlepay is not None else None,
-        system_phonepe=float(record.system_phonepe) if record.system_phonepe is not None else None,
-        system_paytm=float(record.system_paytm) if record.system_paytm is not None else None,
-        system_net_total=float(record.system_net_total) if record.system_net_total is not None else None,
-        delta_cash=delta_cash,
-        delta_card=delta_card,
-        delta_upi=delta_upi,
-        notes=record.notes,
-    )

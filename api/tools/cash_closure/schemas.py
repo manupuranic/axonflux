@@ -1,59 +1,88 @@
 from datetime import date, datetime
+
 from pydantic import BaseModel
 
 
-class SystemTotals(BaseModel):
-    closure_date: date
-    total_bills: int
-    system_cash: float
-    system_card: float
-    system_googlepay: float
-    system_phonepe: float
-    system_paytm: float
-    system_net_total: float
+class LineItem(BaseModel):
+    """A single named row in manual_billings, old_balance_collections, credits_given, or expenses."""
+    description: str
+    amount: float
 
 
-class CashClosureCreate(BaseModel):
+class HotoCreate(BaseModel):
     closure_date: date
-    physical_cash: float | None = None
-    card_total: float | None = None
-    upi_googlepay: float | None = None
-    upi_phonepe: float | None = None
-    upi_paytm: float | None = None
+
+    # Opening
+    opening_cash: float | None = None
+
+    # Inside Counter
+    net_sales: float | None = None
+    sodexo_collection: float | None = None
+    manual_billings: list[LineItem] = []
+    old_balance_collections: list[LineItem] = []
+    distributor_expiry: float | None = None
+    oil_crush: float | None = None
+    other_income: float | None = None
+
+    # Outside Counter — digital
+    pluxee_amount: float | None = None
+    paytm_amount: float | None = None
+    phonepe_amount: float | None = None
+    card_amount: float | None = None
+    credits_given: list[LineItem] = []
+    returns_amount: float | None = None
+
+    # Outside Counter — expenses
+    expenses: list[LineItem] = []
+
+    # Physical count
+    physical_cash_counted: float | None = None
+
+    # Denomination counts  {"500": qty, "200": qty, ...}
+    denominations_opening: dict[str, int] = {}
+    denominations_sales: dict[str, int] = {}
+
     notes: str | None = None
 
 
-class CashClosureResponse(BaseModel):
+class HotoResponse(BaseModel):
     id: str
     closure_date: date
     status: str
     submitted_at: datetime | None = None
 
-    # Staff-entered
-    physical_cash: float | None = None
-    card_total: float | None = None
-    upi_googlepay: float | None = None
-    upi_phonepe: float | None = None
-    upi_paytm: float | None = None
+    opening_cash: float | None = None
+    net_sales: float | None = None
+    sodexo_collection: float | None = None
+    manual_billings: list[LineItem] = []
+    old_balance_collections: list[LineItem] = []
+    distributor_expiry: float | None = None
+    oil_crush: float | None = None
+    other_income: float | None = None
 
-    # System totals
-    system_cash: float | None = None
-    system_card: float | None = None
-    system_googlepay: float | None = None
-    system_phonepe: float | None = None
-    system_paytm: float | None = None
-    system_net_total: float | None = None
+    pluxee_amount: float | None = None
+    paytm_amount: float | None = None
+    phonepe_amount: float | None = None
+    card_amount: float | None = None
+    credits_given: list[LineItem] = []
+    returns_amount: float | None = None
 
-    # Computed deltas (positive = surplus, negative = shortage)
-    delta_cash: float | None = None
-    delta_card: float | None = None
-    delta_upi: float | None = None
+    expenses: list[LineItem] = []
+
+    physical_cash_counted: float | None = None
+    denominations_opening: dict[str, int] = {}
+    denominations_sales: dict[str, int] = {}
+
+    total_inside_counter: float | None = None
+    total_outside_counter: float | None = None
+    expected_cash: float | None = None
+    difference_amount: float | None = None
 
     notes: str | None = None
 
     model_config = {"from_attributes": True}
 
 
-class CashClosureVerify(BaseModel):
-    status: str  # "verified" or "rejected"
+class HotoVerify(BaseModel):
+    status: str  # "verified" | "rejected"
     notes: str | None = None

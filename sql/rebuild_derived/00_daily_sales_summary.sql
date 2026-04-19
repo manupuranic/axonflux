@@ -19,21 +19,53 @@ INSERT INTO derived.daily_sales_summary (
     total_revenue,
     avg_bill_value
 )
-WITH bill_agg AS (
+WITH billwise_norm AS (
+    -- Normalize raw datetime string to always have a space at position 11,
+    -- then classify as 12-hour (with AM/PM) or 24-hour (no AM/PM suffix).
+    -- Handles three export variants seen in the wild:
+    --   "04-04-202507:29 AM"  → old, no space, 12-hour
+    --   "04-04-2025 07:29 AM" → new, space, 12-hour
+    --   "04-04-2025 18:30"    → new, space, 24-hour
     SELECT
-        TO_TIMESTAMP(bill_datetime_raw, 'DD-MM-YYYYHH12:MI AM')::DATE AS sale_date,
-        COUNT(*)                                                        AS total_bills,
-        SUM(net_total)                                                  AS total_revenue
+        net_total,
+        CASE WHEN SUBSTRING(bill_datetime_raw, 11, 1) = ' '
+             THEN bill_datetime_raw
+             ELSE SUBSTRING(bill_datetime_raw, 1, 10) || ' ' || SUBSTRING(bill_datetime_raw, 11)
+        END AS dt
     FROM raw.raw_sales_billwise
     WHERE bill_datetime_raw IS NOT NULL
+      AND bill_datetime_raw ~ '^\d{2}-\d{2}-\d{4}'   -- skip ISO-format or garbage rows
+),
+bill_agg AS (
+    SELECT
+        CASE WHEN dt ~* '(AM|PM)\s*$'
+             THEN TO_TIMESTAMP(dt, 'DD-MM-YYYY HH12:MI AM')
+             ELSE TO_TIMESTAMP(dt, 'DD-MM-YYYY HH24:MI')
+        END::DATE          AS sale_date,
+        COUNT(*)           AS total_bills,
+        SUM(net_total)     AS total_revenue
+    FROM billwise_norm
     GROUP BY 1
+),
+itemwise_norm AS (
+    SELECT
+        sale_qty,
+        CASE WHEN SUBSTRING(sale_datetime_raw, 11, 1) = ' '
+             THEN sale_datetime_raw
+             ELSE SUBSTRING(sale_datetime_raw, 1, 10) || ' ' || SUBSTRING(sale_datetime_raw, 11)
+        END AS dt
+    FROM raw.raw_sales_itemwise
+    WHERE sale_datetime_raw IS NOT NULL
+      AND sale_datetime_raw ~ '^\d{2}-\d{2}-\d{4}'   -- skip ISO-format or garbage rows
 ),
 item_agg AS (
     SELECT
-        TO_TIMESTAMP(sale_datetime_raw, 'DD-MM-YYYYHH12:MI AM')::DATE AS sale_date,
-        SUM(sale_qty)                                                   AS total_items_sold
-    FROM raw.raw_sales_itemwise
-    WHERE sale_datetime_raw IS NOT NULL
+        CASE WHEN dt ~* '(AM|PM)\s*$'
+             THEN TO_TIMESTAMP(dt, 'DD-MM-YYYY HH12:MI AM')
+             ELSE TO_TIMESTAMP(dt, 'DD-MM-YYYY HH24:MI')
+        END::DATE          AS sale_date,
+        SUM(sale_qty)      AS total_items_sold
+    FROM itemwise_norm
     GROUP BY 1
 )
 SELECT
