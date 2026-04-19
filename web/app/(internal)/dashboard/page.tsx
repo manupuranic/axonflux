@@ -9,9 +9,13 @@ import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { PaymentBreakdownChart } from "@/components/dashboard/PaymentBreakdownChart";
 import { PurchaseChart } from "@/components/dashboard/PurchaseChart";
 import { TopProductsCard } from "@/components/dashboard/TopProductsCard";
+import { PipelineTriggerModal } from "@/components/pipeline/PipelineTriggerModal";
+import { RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
   const [topSort, setTopSort] = useState<"revenue" | "qty">("revenue");
+  const [isPipelineOpen, setIsPipelineOpen] = useState(false);
 
   const summary = useFetch(() => api.summary());
   const revenue = useFetch(() => api.dailyRevenue());
@@ -21,10 +25,26 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-1">Overview of your inventory, sales, and purchases</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600 mt-1">Overview of your inventory, sales, and purchases</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-1 shrink-0 gap-1.5"
+          onClick={() => setIsPipelineOpen(true)}
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Refresh Data
+        </Button>
       </div>
+
+      <PipelineTriggerModal
+        isOpen={isPipelineOpen}
+        onClose={() => setIsPipelineOpen(false)}
+      />
 
       {/* KPI Summary */}
       <DataStateWrapper

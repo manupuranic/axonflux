@@ -43,6 +43,8 @@ exports/
 
 # ---- Logs ----
 *.log
+logs/*
+!logs/.gitkeep
 
 # ---- SQL dumps / local DB ----
 *.dump
