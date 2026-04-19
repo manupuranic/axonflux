@@ -240,6 +240,107 @@ export interface HotoResponse {
   notes: string | null;
 }
 
+// Products — search
+export interface ProductSearchResult {
+  barcode: string;
+  canonical_name: string;
+  category: string | null;
+  mrp: number | null;
+}
+
+export interface ProductRecommendation {
+  other_barcode: string;
+  canonical_name: string;
+  category: string | null;
+  mrp: number | null;
+  co_occurrences: number;
+  confidence: number | string;
+  lift: number | string;
+}
+
+// Pamphlets
+export interface PamphletItem {
+  id: string;
+  pamphlet_id: string;
+  barcode: string | null;
+  display_name: string | null;
+  offer_price: number | null;
+  original_price: number | null;
+  highlight_text: string | null;
+  sort_order: number;
+  image_url: string | null;
+}
+
+export interface PamphletItemCreate {
+  barcode?: string | null;
+  display_name?: string | null;
+  offer_price?: number | null;
+  original_price?: number | null;
+  highlight_text?: string | null;
+  sort_order?: number;
+  image_url?: string | null;
+}
+
+export interface PamphletItemUpdate {
+  display_name?: string | null;
+  offer_price?: number | null;
+  original_price?: number | null;
+  highlight_text?: string | null;
+  sort_order?: number | null;
+  image_url?: string | null;
+}
+
+export interface Pamphlet {
+  id: string;
+  title: string;
+  template_type: string;
+  created_at: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  is_published: boolean;
+  rows: number;
+  cols: number;
+  items: PamphletItem[];
+}
+
+export interface PamphletSummary {
+  id: string;
+  title: string;
+  template_type: string;
+  valid_from: string | null;
+  valid_until: string | null;
+  is_published: boolean;
+  rows: number;
+  cols: number;
+  item_count: number;
+}
+
+export interface GSheetImportRequest {
+  url: string;
+  title: string;
+  rows?: number;
+  cols?: number;
+}
+
+export interface PamphletCreate {
+  title: string;
+  template_type?: string;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  rows?: number;
+  cols?: number;
+}
+
+export interface PamphletUpdate {
+  title?: string | null;
+  template_type?: string | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  is_published?: boolean | null;
+  rows?: number | null;
+  cols?: number | null;
+}
+
 export interface HotoCreate {
   closure_date: string;
   opening_cash?: number | null;

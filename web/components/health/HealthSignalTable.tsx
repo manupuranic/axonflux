@@ -39,7 +39,11 @@ export function HealthSignalTable({ items, onViewTrend }: HealthSignalTableProps
         </TableHeader>
         <TableBody>
           {items.map((item) => (
-            <TableRow key={item.product_id} className="hover:bg-gray-50">
+            <TableRow
+              key={item.product_id}
+              className="hover:bg-gray-50 cursor-pointer"
+              onClick={() => onViewTrend?.(item.product_id, item.product_name || item.product_id)}
+            >
               <TableCell className="font-medium text-gray-900">
                 {item.product_name || "—"}
               </TableCell>

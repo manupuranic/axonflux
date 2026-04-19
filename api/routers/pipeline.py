@@ -15,12 +15,12 @@ from api.schemas.auth import CurrentUser
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _PIPELINE_SCRIPT = _PROJECT_ROOT / "pipelines" / "weekly_pipeline.py"
 _EXPORT_SCRIPT   = _PROJECT_ROOT / "scripts" / "er4u_export.py"
 _INGEST_SCRIPT   = _PROJECT_ROOT / "scripts" / "ingest_all.py"
 
-_LOG_FLUSH_EVERY = 15   # lines between DB flushes during live run
+_LOG_FLUSH_EVERY = 3    # lines between DB flushes during live run
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ def _run_full_refresh(run_id: str, days_to_export: int) -> None:
         if counter[0] % _LOG_FLUSH_EVERY == 0:
             _flush_logs(run_id, lines[:])
 
-    base_env = {**os.environ, "PYTHONPATH": str(_PROJECT_ROOT)}
+    base_env = {**os.environ, "PYTHONPATH": str(_PROJECT_ROOT), "PYTHONIOENCODING": "utf-8"}
 
     # ── Step 1: Export ──────────────────────────────────────────────────────
     emit(f"[STEP 1/3] Exporting Er4u data — {days_to_export} day(s)...")
@@ -156,7 +156,7 @@ def _run_pipeline(run_id: str, run_ingestion: bool = False) -> None:
         if counter[0] % _LOG_FLUSH_EVERY == 0:
             _flush_logs(run_id, lines[:])
 
-    base_env = {**os.environ, "PYTHONPATH": str(_PROJECT_ROOT)}
+    base_env = {**os.environ, "PYTHONPATH": str(_PROJECT_ROOT), "PYTHONIOENCODING": "utf-8"}
     cmd = [sys.executable, str(_PIPELINE_SCRIPT)]
     if run_ingestion:
         cmd.append("--run-ingestion")

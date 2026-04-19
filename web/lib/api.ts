@@ -21,6 +21,16 @@ import type {
   TopProduct,
   HotoResponse,
   HotoCreate,
+  ProductSearchResult,
+  ProductRecommendation,
+  Pamphlet,
+  PamphletSummary,
+  PamphletCreate,
+  PamphletUpdate,
+  PamphletItemCreate,
+  PamphletItemUpdate,
+  PamphletItem,
+  GSheetImportRequest,
 } from "@/types/api";
 
 const BASE = "http://localhost:8000";
@@ -63,6 +73,7 @@ async function apiFetch<T>(
       throw new Error(err.detail ?? `HTTP ${res.status}`);
     }
 
+    if (res.status === 204) return undefined as T;
     return res.json() as Promise<T>;
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
@@ -160,6 +171,76 @@ export const api = {
 
   pipelineStatus: (limit: number = 10) =>
     apiFetch<PipelineRun[]>(`/api/pipeline/status?limit=${limit}`),
+
+  // Products
+  productSearch: (q: string, limit = 20) =>
+    apiFetch<ProductSearchResult[]>(
+      `/api/products/search${buildQuery({ q, limit })}`
+    ),
+
+  productRecommendations: (barcode: string, limit = 5) =>
+    apiFetch<ProductRecommendation[]>(
+      `/api/products/${encodeURIComponent(barcode)}/recommendations${buildQuery({ limit })}`
+    ),
+
+  // Pamphlets
+  pamphlets: {
+    list: (limit = 30, offset = 0) =>
+      apiFetch<{ total: number; limit: number; offset: number; items: PamphletSummary[] }>(
+        `/api/tools/pamphlets${buildQuery({ limit, offset })}`
+      ),
+
+    create: (body: PamphletCreate) =>
+      apiFetch<Pamphlet>("/api/tools/pamphlets", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+
+    get: (id: string) =>
+      apiFetch<Pamphlet>(`/api/tools/pamphlets/${id}`),
+
+    update: (id: string, body: PamphletUpdate) =>
+      apiFetch<Pamphlet>(`/api/tools/pamphlets/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+
+    addItem: (id: string, item: PamphletItemCreate) =>
+      apiFetch<PamphletItem>(`/api/tools/pamphlets/${id}/items`, {
+        method: "POST",
+        body: JSON.stringify(item),
+      }),
+
+    updateItem: (pamphletId: string, itemId: string, body: PamphletItemUpdate) =>
+      apiFetch<PamphletItem>(`/api/tools/pamphlets/${pamphletId}/items/${itemId}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+
+    removeItem: (pamphletId: string, itemId: string) =>
+      apiFetch<void>(`/api/tools/pamphlets/${pamphletId}/items/${itemId}`, {
+        method: "DELETE",
+      }),
+
+    generateHighlights: (id: string) =>
+      apiFetch<Pamphlet>(`/api/tools/pamphlets/${id}/ai/highlights`, {
+        method: "POST",
+      }),
+
+    delete: (id: string) =>
+      apiFetch<void>(`/api/tools/pamphlets/${id}`, { method: "DELETE" }),
+
+    duplicate: (id: string) =>
+      apiFetch<Pamphlet>(`/api/tools/pamphlets/${id}/duplicate`, {
+        method: "POST",
+      }),
+
+    importFromSheet: (body: GSheetImportRequest) =>
+      apiFetch<Pamphlet>("/api/tools/pamphlets/import-gsheet", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+  },
 
   // HOTO — Daily Cash Closure
   hoto: {

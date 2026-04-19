@@ -399,8 +399,128 @@ def get_conn():
         </ul>
       </Section>
 
-      {/* ── 9. Deployment ────────────────────────────────────────── */}
-      <Section title="9. Deployment &amp; Process Map">
+      {/* ── 9. Pamphlet Generator ────────────────────────────────── */}
+      <Section title="9. Pamphlet Generator (Staff Tool)">
+        <p>
+          A client-side PDF builder for monthly offer pamphlets. No PDF bytes are stored in the
+          database — the PDF is generated in the browser on demand and downloaded directly.
+        </p>
+
+        <SubSection title="Architecture">
+          <ul className="list-disc list-inside space-y-1 text-sm">
+            <li>
+              <strong>Backend</strong>: <code>api/tools/pamphlets/</code> — full CRUD for pamphlets
+              and items, AI highlight endpoint, Google Sheets import. Mounted via the tool plugin
+              system at <code>/api/tools/pamphlets</code>.
+            </li>
+            <li>
+              <strong>PDF rendering</strong>: <code>@react-pdf/renderer</code> runs entirely in the
+              browser — no server-side PDF generation, no storage cost. The{" "}
+              <code>PDFViewer</code> component is loaded with <code>dynamic(ssr: false)</code> to
+              avoid server-side import of browser-only APIs.
+            </li>
+            <li>
+              <strong>PNG export</strong>: <code>pdfjs-dist</code> renders each PDF page to an
+              HTML canvas at 2× scale, then the canvases are either downloaded individually or
+              stitched vertically into a single merged image.
+            </li>
+            <li>
+              <strong>Font</strong>: Geist-Regular.ttf + Geist-Bold.ttf (from Vercel's{" "}
+              <code>geist</code> npm package, served from <code>/public/fonts/</code>). Required
+              because react-pdf's built-in Helvetica lacks ₹ (U+20B9), and font subset files
+              (e.g. Roboto latin + latin-ext) cannot be composited — react-pdf needs a single TTF
+              with all required glyphs.
+            </li>
+          </ul>
+        </SubSection>
+
+        <SubSection title="AI Highlight Generation">
+          <p>
+            <code>POST /api/tools/pamphlets/{"{id}"}/ai/highlights</code> sends all item names +
+            prices to <strong>Claude Haiku</strong> (<code>claude-haiku-4-5-20251001</code>) with a
+            retail copywriting prompt. The model returns a JSON array of{" "}
+            <code>{"{id, highlight_text}"}</code> pairs which are bulk-upserted into{" "}
+            <code>app.pamphlet_items</code>. Haiku is used (not Sonnet/Opus) because the task is
+            short-form copy — fast and cheap per item.
+          </p>
+        </SubSection>
+
+        <SubSection title="Google Sheets Import">
+          <p>
+            Staff can paste a regular Google Sheets URL. The backend auto-converts it to an export
+            URL (<code>/export?format=csv</code>), fetches the CSV via httpx, normalizes header
+            keys (lowercase, spaces → underscores), and calculates{" "}
+            <code>offer_price</code> and <code>highlight_text</code> from{" "}
+            <code>discount_type</code> (percent / amount / combo) and{" "}
+            <code>discount_value</code> columns.
+          </p>
+          <Callout>
+            Design decision: auto-conversion means staff paste the same URL they already share —
+            no need to publish the sheet or copy a separate export URL.
+          </Callout>
+        </SubSection>
+      </Section>
+
+      {/* ── 10. Basket Analysis (B2) ─────────────────────────────── */}
+      <Section title="10. Basket Analysis — Frequently Bought Together">
+        <p>
+          A SQL-only implementation of market basket analysis. No Python, no FP-Growth library —
+          just a self-join on <code>bill_no</code> across <code>raw.raw_sales_itemwise</code>.
+        </p>
+
+        <SubSection title="Algorithm">
+          <p>
+            For every pair of products that appear in the same bill, count co-occurrences and
+            compute support / confidence / lift:
+          </p>
+          <CodeBlock>{`-- Co-occurrence pairs (minimum 5 bills to filter noise)
+WITH pairs AS (
+  SELECT
+    LEAST(a.barcode, b.barcode)    AS barcode_a,
+    GREATEST(a.barcode, b.barcode) AS barcode_b,
+    COUNT(DISTINCT a.bill_no)      AS co_occurrences
+  FROM raw.raw_sales_itemwise a
+  JOIN raw.raw_sales_itemwise b
+    ON a.bill_no = b.bill_no AND a.barcode != b.barcode
+  GROUP BY 1, 2
+  HAVING COUNT(DISTINCT a.bill_no) >= 5
+)
+-- Lift = P(A∩B) / (P(A) × P(B))
+-- Values > 1 mean co-purchase is non-random`}</CodeBlock>
+          <Callout>
+            Interview angle: self-join on a 5M+ row table sounds expensive, but PostgreSQL's hash
+            join on indexed <code>bill_no</code> handles it. The result is 30,018 pairs from
+            ~500K unique bills — fast enough to rebuild on every pipeline run.
+          </Callout>
+        </SubSection>
+
+        <SubSection title="Metrics">
+          <ul className="list-disc list-inside space-y-1 text-sm">
+            <li><strong>Support</strong> — fraction of all bills containing both products</li>
+            <li><strong>Confidence A→B</strong> — P(B | A): of bills with A, what fraction also have B</li>
+            <li><strong>Confidence B→A</strong> — P(A | B): the reverse direction</li>
+            <li><strong>Lift</strong> — how much more likely A+B co-occur vs. random chance. Lift &gt; 1 is actionable.</li>
+          </ul>
+        </SubSection>
+
+        <SubSection title="API + UI">
+          <p>
+            <code>GET /api/products/{"{barcode}"}/recommendations?limit=6</code> returns the top
+            co-purchased products ranked by lift. Displayed in two places: the{" "}
+            <strong>product detail page</strong> (full card with confidence %) and the{" "}
+            <strong>product drawer</strong> (compact list accessible from the Product Health table
+            by clicking any row).
+          </p>
+          <p className="mt-2 text-sm text-gray-600">
+            PostgreSQL <code>NUMERIC</code> columns (confidence, lift) serialize to JSON as strings.
+            The frontend coerces with <code>Number(r.lift).toFixed(1)</code> rather than relying on
+            type assumptions.
+          </p>
+        </SubSection>
+      </Section>
+
+      {/* ── 11. Deployment ───────────────────────────────────────── */}
+      <Section title="11. Deployment &amp; Process Map">
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>

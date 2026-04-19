@@ -5,7 +5,9 @@ import { api } from "@/lib/api";
 import { DataStateWrapper } from "@/components/shared/DataStateWrapper";
 import { DemandTrendChart } from "./DemandTrendChart";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Package } from "lucide-react";
+import type { ProductRecommendation } from "@/types/api";
 
 interface ProductDrawerProps {
   barcode: string;
@@ -14,32 +16,48 @@ interface ProductDrawerProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function ProductDrawer({
-  barcode,
-  productName,
-  open,
-  onOpenChange,
-}: ProductDrawerProps) {
-  const trend = useFetch(
-    () => api.demandTrend(barcode, 60),
-    [barcode, open]
-  );
+export function ProductDrawer({ barcode, productName, open, onOpenChange }: ProductDrawerProps) {
+  const trend = useFetch(() => api.demandTrend(barcode, 60), [barcode, open]);
+  const recs  = useFetch(() => api.productRecommendations(barcode, 6), [barcode, open]);
+
+  const last = trend.data?.[trend.data.length - 1];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{productName}</SheetTitle>
-          <p className="text-sm text-gray-600 mt-1">Barcode: {barcode}</p>
-        </SheetHeader>
+      <SheetContent className="w-full sm:max-w-[480px] overflow-y-auto flex flex-col gap-0 p-0">
 
-        <Separator className="my-4" />
+        {/* Header band */}
+        <div className="px-6 pt-6 pb-4 border-b bg-muted/30">
+          <SheetHeader className="space-y-1">
+            <SheetTitle className="text-base font-semibold leading-tight">{productName}</SheetTitle>
+            <p className="text-xs text-muted-foreground font-mono">{barcode}</p>
+          </SheetHeader>
+        </div>
 
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Demand Trend (60 days)
-            </h3>
+        <div className="flex flex-col gap-5 px-6 py-5">
+
+          {/* Stats row */}
+          {last && (
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: "Qty Sold (latest)", value: Math.round(last.quantity_sold * 10) / 10 },
+                { label: "Revenue (latest)",  value: `₹${Math.round(last.revenue).toLocaleString("en-IN")}` },
+                { label: "7-Day Avg",         value: last.last_7_day_avg == null ? "—" : Math.round(last.last_7_day_avg * 10) / 10 },
+                { label: "Predicted Demand",  value: last.predicted_daily_demand == null ? "—" : Math.round(last.predicted_daily_demand * 10) / 10 },
+              ].map(({ label, value }) => (
+                <div key={label} className="rounded-lg border bg-card px-4 py-3">
+                  <p className="text-[11px] text-muted-foreground mb-1">{label}</p>
+                  <p className="text-xl font-bold tracking-tight">{value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Demand chart */}
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              Demand Trend — 60 days
+            </p>
             <DataStateWrapper
               loading={trend.loading}
               error={trend.error}
@@ -50,43 +68,51 @@ export function ProductDrawer({
             </DataStateWrapper>
           </div>
 
-          {/* Summary stats from latest data point */}
-          {trend.data && trend.data.length > 0 && (
-            <div className="grid grid-cols-2 gap-4 rounded-lg bg-gray-50 p-4">
-              <div>
-                <p className="text-sm text-gray-600">Latest Qty Sold</p>
-                <p className="text-xl font-semibold text-gray-900">
-                  {Math.round(trend.data[trend.data.length - 1].quantity_sold * 10) / 10}
-                </p>
+          {/* Frequently bought together */}
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              Frequently Bought Together
+            </p>
+
+            {recs.loading && (
+              <div className="space-y-2">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-14 rounded-md bg-muted animate-pulse" />
+                ))}
               </div>
-              <div>
-                <p className="text-sm text-gray-600">Latest Revenue</p>
-                <p className="text-xl font-semibold text-gray-900">
-                  ₹{Math.round(trend.data[trend.data.length - 1].revenue)}
-                </p>
+            )}
+
+            {!recs.loading && (!recs.data || recs.data.length === 0) && (
+              <p className="text-sm text-muted-foreground py-2">No basket data yet.</p>
+            )}
+
+            {recs.data && recs.data.length > 0 && (
+              <div className="space-y-2">
+                {recs.data.map((r: ProductRecommendation) => (
+                  <div
+                    key={r.other_barcode}
+                    className="flex items-center gap-3 rounded-md border px-3 py-2.5 hover:bg-muted/40 transition-colors"
+                  >
+                    <div className="shrink-0 w-8 h-8 rounded bg-muted flex items-center justify-center">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate leading-tight">{r.canonical_name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {r.co_occurrences} bills · lift {Number(r.lift).toFixed(1)}×
+                      </p>
+                    </div>
+                    {r.mrp != null && (
+                      <Badge variant="secondary" className="shrink-0 text-xs font-semibold">
+                        ₹{r.mrp}
+                      </Badge>
+                    )}
+                  </div>
+                ))}
               </div>
-              <div>
-                <p className="text-sm text-gray-600">7d Avg</p>
-                <p className="text-lg font-semibold text-gray-900">
-                  {trend.data[trend.data.length - 1].last_7_day_avg == null
-                    ? "—"
-                    : Math.round(
-                        trend.data[trend.data.length - 1].last_7_day_avg! * 10
-                      ) / 10}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Predicted Demand</p>
-                <p className="text-lg font-semibold text-gray-900">
-                  {trend.data[trend.data.length - 1].predicted_daily_demand == null
-                    ? "—"
-                    : Math.round(
-                        trend.data[trend.data.length - 1].predicted_daily_demand! * 10
-                      ) / 10}
-                </p>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
+
         </div>
       </SheetContent>
     </Sheet>

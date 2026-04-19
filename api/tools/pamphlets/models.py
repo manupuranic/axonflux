@@ -18,6 +18,8 @@ class Pamphlet(AppBase):
     valid_from = Column(Date)
     valid_until = Column(Date)
     is_published = Column(Boolean, default=False)
+    rows = Column(Integer, nullable=False, default=4)
+    cols = Column(Integer, nullable=False, default=5)
 
 
 class PamphletItem(AppBase):
@@ -26,9 +28,10 @@ class PamphletItem(AppBase):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     pamphlet_id = Column(UUID(as_uuid=True), nullable=False)  # FK to app.pamphlets.id
-    barcode = Column(Text, nullable=False)
+    barcode = Column(Text)                  # nullable — custom products have no barcode
     display_name = Column(Text)
     offer_price = Column(Numeric)
     original_price = Column(Numeric)
     highlight_text = Column(Text)
     sort_order = Column(Integer, default=0)
+    image_url = Column(Text)

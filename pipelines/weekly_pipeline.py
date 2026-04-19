@@ -37,6 +37,7 @@ REBUILD_SQL_FILES = [
     REBUILD_SQL_DIR / "07_daily_payment_breakdown.sql",
     REBUILD_SQL_DIR / "08_customer_dimension.sql",
     REBUILD_SQL_DIR / "09_customer_metrics.sql",
+    REBUILD_SQL_DIR / "10_product_associations.sql",
 ]
 
 SHEET_SQL_FILES = [
@@ -167,8 +168,8 @@ def main(run_ingestion: bool = False) -> None:
     for sql_file in SHEET_SQL_FILES:
         run_sql_file(engine, sql_file)
 
-    print("Exporting supplier sheets...")
-    export_supplier_sheets(engine)
+    # print("Exporting supplier sheets...")
+    # export_supplier_sheets(engine)
 
     print("Exporting conversion attention sheet...")
     export_conversion_sheet(engine)

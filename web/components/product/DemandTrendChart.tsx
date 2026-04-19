@@ -37,7 +37,7 @@ export function DemandTrendChart({ data }: DemandTrendChartProps) {
           tickFormatter={(v) => format(new Date(v), "d MMM")}
           tick={{ fontSize: 11 }}
         />
-        <YAxis tick={{ fontSize: 11 }} />
+        <YAxis tick={{ fontSize: 11 }} domain={[0, "auto"]} />
         <Tooltip
           labelFormatter={(v) => format(new Date(v as string), "d MMM yyyy")}
           formatter={(value) => {

@@ -6,8 +6,9 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { api } from "@/lib/api";
 import { DataStateWrapper } from "@/components/shared/DataStateWrapper";
 import { HealthSignalTable } from "@/components/health/HealthSignalTable";
+import { ProductDrawer } from "@/components/product/ProductDrawer";
 import { Pagination } from "@/components/shared/Pagination";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search } from "lucide-react";
 
@@ -17,6 +18,7 @@ export default function HealthPage() {
   const [flag, setFlag] = useState<SignalFlag>("all");
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebounce(searchInput, 300);
+  const [drawer, setDrawer] = useState<{ barcode: string; name: string } | null>(null);
 
   const health = usePaginatedFetch(
     api.healthSignals,
@@ -75,7 +77,10 @@ export default function HealthPage() {
       >
         {health.data && (
           <>
-            <HealthSignalTable items={health.data.items} />
+            <HealthSignalTable
+              items={health.data.items}
+              onViewTrend={(barcode, name) => setDrawer({ barcode, name })}
+            />
             <Pagination
               page={health.page}
               setPage={health.setPage}
@@ -86,6 +91,14 @@ export default function HealthPage() {
           </>
         )}
       </DataStateWrapper>
+      {drawer && (
+        <ProductDrawer
+          barcode={drawer.barcode}
+          productName={drawer.name}
+          open={!!drawer}
+          onOpenChange={(open) => { if (!open) setDrawer(null); }}
+        />
+      )}
     </div>
   );
 }

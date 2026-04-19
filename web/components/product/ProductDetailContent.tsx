@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatInr, formatQty } from "@/lib/formatters";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Package, Zap } from "lucide-react";
+import { ArrowLeft, Package, Zap, ShoppingBasket } from "lucide-react";
+import type { ProductRecommendation } from "@/types/api";
 import { format } from "date-fns";
 
 export function ProductDetailContent({
@@ -23,6 +24,7 @@ export function ProductDetailContent({
 
   const details = useFetch(() => api.productDetail(barcode), [barcode]);
   const trend = useFetch(() => api.demandTrend(barcode, 60), [barcode]);
+  const recs = useFetch(() => api.productRecommendations(barcode, 8), [barcode]);
 
   const product = details.data as Record<string, unknown> | undefined;
 
@@ -220,6 +222,43 @@ export function ProductDetailContent({
                 </CardContent>
               </Card>
             </div>
+          )}
+
+          {/* Frequently Bought Together */}
+          {recs.data && recs.data.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShoppingBasket className="h-5 w-5" />
+                  Frequently Bought Together
+                </CardTitle>
+                <CardDescription>
+                  Products customers purchase in the same bill
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {recs.data.map((r: ProductRecommendation) => (
+                    <div
+                      key={r.other_barcode}
+                      className="flex items-center justify-between rounded-lg border px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{r.canonical_name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {r.co_occurrences} bills · lift {Number(r.lift).toFixed(1)}× · {(Number(r.confidence) * 100).toFixed(0)}% of buyers
+                        </p>
+                      </div>
+                      {r.mrp != null && (
+                        <span className="ml-3 shrink-0 font-semibold text-sm text-green-700">
+                          ₹{r.mrp}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Additional Info */}

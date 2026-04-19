@@ -200,22 +200,29 @@ SECRET_KEY=...   # required for API JWT auth
 - Seeding script from derived layer
 - PATCH API — creates row on first edit, falls back to derived name if not overridden
 
+**Phase A — Operational Completeness ✅ Complete**
+
+**A1 — Cash Closure UI** ✅
+Staff submits EOD cash count nightly. Full frontend at `/tools/cash-closure`.
+Date picker → system totals vs physical count grid → live delta → submit → manager verify/reject.
+
+**A2 — Daily Ingestion + Refresh Button** ✅
+`POST /api/pipeline/trigger` with `run_ingestion=true` flag. "Refresh Data" button on dashboard.
+Er4u export automation via Playwright (`scripts/er4u_export.py`) — auto-downloads latest sales file.
+
+**A3 — Pamphlet Generator** ✅
+Full builder at `/tools/pamphlet-generator`. Features:
+- Product catalog search + custom products (no barcode)
+- Per-item: editable display name, MRP, offer price, image URL, highlight badge
+- AI-generated highlight copy via Claude Haiku (`POST /{id}/ai/highlights`)
+- Compact list view with search filter + edit modal (no inline card expansion)
+- Client-side PDF via `@react-pdf/renderer` — A4 landscape, 5×5 grid, Geist font (₹ support)
+- Download as PDF, PNG per page, or PNG all-pages merged (pdfjs-dist → canvas)
+- Duplicate pamphlet, delete pamphlet
+- Import from Google Sheets CSV (auto-converts regular URL to export URL)
+- Backend: `api/tools/pamphlets/` — full CRUD + AI endpoint, Alembic migration 005
+
 ---
-
-### Phase A — Operational Completeness *(next)*
-
-**A1 — Cash Closure UI** *(backend done, frontend missing)*
-Staff submits EOD cash count nightly. `api/tools/cash_closure/` is complete.
-Frontend: date picker → system totals vs physical count grid → live delta → submit.
-New Alembic migration may be needed if columns changed.
-
-**A2 — Daily Ingestion + Refresh Button** *(not started)*
-`POST /api/pipeline/trigger-daily` — ingests only today's sales files, then rebuilds derived.
-"Refresh Data" button on dashboard. Unblocks cash closure for same-day use.
-
-**A3 — Pamphlet Generator UI** *(backend done, frontend missing)*
-`api/tools/pamphlets/` is complete. Frontend: product search, add items, set offer price/validity,
-PDF preview + download via `@react-pdf/renderer` (client-side, no PDF bytes stored in DB).
 
 ---
 
@@ -228,11 +235,12 @@ Replace SQL WMA with validated XGBoost/ARIMA model.
 - Notebook sequence: 01_baseline → 02_arima → 03_xgboost → 04_feature_importance
 - Promotion: update step 03 SQL formula (simple) OR write to `derived.demand_predictions` (complex)
 
-**B2 — Basket Analysis / Recommendation Engine**
-`raw.raw_item_combinations` already ingested — data exists.
-- FP-Growth on co-purchased items → `derived.product_associations`
-- `GET /api/recommendations?barcode=` endpoint
-- Show "frequently bought together" in product drawer
+**B2 — Basket Analysis / Recommendation Engine** ✅
+- SQL self-join on `bill_no` → `derived.product_associations` (30,018 pairs, min 5 co-occurrences)
+- Metrics: support, confidence (both directions), lift
+- `GET /api/products/{barcode}/recommendations` endpoint
+- "Frequently Bought Together" in product detail page + product drawer (click any row in Health table)
+- ProductDrawer: tinted header, 2×2 stat cards, icon-row recommendation list, chart Y-axis clamped ≥0
 
 **B3 — Product Entity Resolution**
 Billing exports have name variants: "SURF EXCEL 1KG" / "Surf Excel 1 Kg" / "SURFEXCEL1KG".

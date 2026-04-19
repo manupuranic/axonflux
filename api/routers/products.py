@@ -147,6 +147,50 @@ def bulk_categorize(
     return BulkCategorizeResponse(updated=updated, skipped=skipped)
 
 
+@router.get("/{barcode}/recommendations", response_model=list[dict])
+def get_recommendations(
+    barcode: str,
+    limit: int = Query(default=5, le=20),
+    conn: Connection = Depends(get_conn),
+    _: CurrentUser = Depends(get_current_user),
+):
+    """
+    Returns products frequently bought together with the given barcode.
+    Sorted by co_occurrences desc, then lift desc.
+    """
+    rows = conn.execute(
+        text("""
+            SELECT
+                other_barcode,
+                COALESCE(p.canonical_name, d.product_name) AS canonical_name,
+                p.category,
+                ic.mrp,
+                pa.co_occurrences,
+                pa.lift,
+                CASE
+                    WHEN pa.barcode_a = :barcode THEN pa.confidence_a_to_b
+                    ELSE pa.confidence_b_to_a
+                END AS confidence
+            FROM (
+                SELECT
+                    CASE WHEN barcode_a = :barcode THEN barcode_b ELSE barcode_a END AS other_barcode,
+                    co_occurrences, lift, confidence_a_to_b, confidence_b_to_a,
+                    barcode_a
+                FROM derived.product_associations
+                WHERE barcode_a = :barcode OR barcode_b = :barcode
+            ) pa
+            JOIN derived.product_dimension d ON d.product_id = pa.other_barcode
+            LEFT JOIN app.products         p ON p.barcode = pa.other_barcode
+            LEFT JOIN derived.latest_item_combinations ic ON ic.product_id = pa.other_barcode
+            ORDER BY pa.co_occurrences DESC, pa.lift DESC
+            LIMIT :limit
+        """),
+        {"barcode": barcode, "limit": limit},
+    ).mappings().all()
+
+    return [dict(r) for r in rows]
+
+
 @router.get("/{barcode}", response_model=dict)
 def get_product(
     barcode: str,

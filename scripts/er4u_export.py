@@ -24,7 +24,7 @@ First-time setup
 
 Er4u export flow (two-step)
 ----------------------------
-Er4u uses a filter page → results page pattern. The correct sequence is:
+Er4u uses a filter page -> results page pattern. The correct sequence is:
 
   1. Navigate to report page (report_sale.php or report_purchase.php)
   2. Select Report Type in the chosen.js dropdown
@@ -40,10 +40,10 @@ separate file; file_watcher deduplicates via SHA-256 on ingest.
 
 Report configs
 --------------
-  sales_billwise   → report_sale.php     → report_type=report_sale1.php      (Bill Wise)
-  sales_itemwise   → report_sale.php     → report_type=report_itemsale1.php  (Item Wise)
-  purchase_billwise→ report_purchase.php → report_type=report_purchase1.php  (Bill Wise)
-  purchase_itemwise→ report_purchase.php → report_type=report_itempurchase1.php (Item Wise)
+  sales_billwise   -> report_sale.php     -> report_type=report_sale1.php      (Bill Wise)
+  sales_itemwise   -> report_sale.php     -> report_type=report_itemsale1.php  (Item Wise)
+  purchase_billwise-> report_purchase.php -> report_type=report_purchase1.php  (Bill Wise)
+  purchase_itemwise-> report_purchase.php -> report_type=report_itempurchase1.php (Item Wise)
 
 All reports download as CSV from the DataTables CSV button.
 """
@@ -149,7 +149,7 @@ def convert_xlsx_to_csv(xlsx_path: Path) -> Path:
     df = pd.read_excel(xlsx_path, engine="openpyxl", skiprows=2, header=0)
     df.to_csv(csv_path, index=False)
     xlsx_path.unlink()
-    log(f"         Converted XLSX → CSV: {csv_path.name}")
+    log(f"         Converted XLSX -> CSV: {csv_path.name}")
     return csv_path
 
 
@@ -226,7 +226,7 @@ def export_chunk(page, cfg: dict, date_from: date, date_to: date, dest_base: Pat
     name     = cfg["name"]
     page_url = f"{BASE_URL}/{cfg['page']}"
 
-    log(f"  [CHUNK] {name}  {date_from} → {date_to}")
+    log(f"  [CHUNK] {name}  {date_from} -> {date_to}")
 
     # Use domcontentloaded to avoid net::ERR_ABORTED on server-side redirects.
     # If session expired, server will redirect to login — we catch that below.
@@ -275,9 +275,11 @@ def export_chunk(page, cfg: dict, date_from: date, date_to: date, dest_base: Pat
     # Click View button and wait for results page to load
     try:
         page.locator("input#button1").click()
-        # Results page URL will contain the report_type filename
+        # Results page URL will contain the report_type filename.
+        # Use glob string (not lambda) — Python 3.13 IOCP event loop crashes on
+        # Playwright lambda callbacks via greenlet async bridge on Windows.
         results_pattern = cfg["report_type"].replace(".php", "")
-        page.wait_for_url(lambda url: results_pattern in url, timeout=60_000)
+        page.wait_for_url(f"**{results_pattern}**", timeout=60_000)
         # Wait for DataTables export buttons to appear after table renders
         page.wait_for_selector(cfg["dl_selector"], timeout=60_000)
         page.wait_for_timeout(500)
@@ -308,7 +310,7 @@ def export_chunk(page, cfg: dict, date_from: date, date_to: date, dest_base: Pat
     if cfg.get("xlsx_to_csv"):
         dest_path = convert_xlsx_to_csv(dest_path)
 
-    log(f"  [OK]    → {dest_path}")
+    log(f"  [OK]    -> {dest_path}")
     return dest_path
 
 
@@ -318,16 +320,16 @@ def export_report(page, cfg: dict, date_from: date, date_to: date, dest_base: Pa
     """Export all date chunks for one report type. Returns True if all chunks succeeded."""
     name   = cfg["name"]
     chunks = date_chunks(date_from, date_to)
-    log(f"\n[EXPORT] {name}  ({date_from} → {date_to}, {len(chunks)} chunk(s))")
+    log(f"\n[EXPORT] {name}  ({date_from} -> {date_to}, {len(chunks)} chunk(s))")
 
     all_ok = True
     for chunk_from, chunk_to in chunks:
         result = export_chunk(page, cfg, chunk_from, chunk_to, dest_base=dest_base)
         if result is None:
-            log(f"  [RETRY] {chunk_from} → {chunk_to}...")
+            log(f"  [RETRY] {chunk_from} -> {chunk_to}...")
             result = export_chunk(page, cfg, chunk_from, chunk_to, dest_base=dest_base)
         if result is None:
-            log(f"  [FAIL]  chunk {chunk_from} → {chunk_to} skipped")
+            log(f"  [FAIL]  chunk {chunk_from} -> {chunk_to} skipped")
             all_ok = False
 
     return all_ok
@@ -343,7 +345,7 @@ def main(headless: bool = True, staging: bool = False) -> None:
     dest_base = STAGING_DIR if staging else INCOMING_DIR
     date_from, date_to = date_range()
     mode_label = "STAGING (verify before ingesting)" if staging else "INCOMING (auto-ingest via file_watcher)"
-    log(f"[START] Er4u export  {date_from} → {date_to}  (headless={headless}, dest={mode_label})")
+    log(f"[START] Er4u export  {date_from} -> {date_to}  (headless={headless}, dest={mode_label})")
 
     results: dict[str, bool] = {}
 

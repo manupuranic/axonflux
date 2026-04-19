@@ -28,7 +28,7 @@ def get_summary(
     """KPI cards for the dashboard home."""
     row = conn.execute(text("""
         WITH latest AS (
-            SELECT MAX(date) AS d FROM derived.product_health_signals
+            SELECT MAX(sale_date) AS d FROM derived.daily_sales_summary
         ),
         revenue_7d AS (
             SELECT
@@ -126,7 +126,9 @@ def get_daily_revenue(
     _: CurrentUser = Depends(get_current_user),
 ):
     if not to_date:
-        to_date = date.today()
+        to_date = conn.execute(text(
+            "SELECT COALESCE(MAX(sale_date), CURRENT_DATE - 1) FROM derived.daily_sales_summary"
+        )).scalar()
     if not from_date:
         from_date = to_date - timedelta(days=89)
 
@@ -151,7 +153,9 @@ def get_daily_payments(
     _: CurrentUser = Depends(get_current_user),
 ):
     if not to_date:
-        to_date = date.today()
+        to_date = conn.execute(text(
+            "SELECT COALESCE(MAX(sale_date), CURRENT_DATE - 1) FROM derived.daily_sales_summary"
+        )).scalar()
     if not from_date:
         from_date = to_date - timedelta(days=89)
 
@@ -179,7 +183,9 @@ def get_daily_purchases(
     _: CurrentUser = Depends(get_current_user),
 ):
     if not to_date:
-        to_date = date.today()
+        to_date = conn.execute(text(
+            "SELECT COALESCE(MAX(purchase_date), CURRENT_DATE - 1) FROM derived.daily_purchase_summary"
+        )).scalar()
     if not from_date:
         from_date = to_date - timedelta(days=89)
 
@@ -365,6 +371,10 @@ def get_demand_trend(
                    ON f.product_id = h.product_id AND f.date = h.date
             WHERE f.product_id = :barcode
               AND f.date >= CURRENT_DATE - (:days || ' days')::INTERVAL
+              AND f.date <= (
+                  SELECT COALESCE(MAX(sale_date), CURRENT_DATE - 1)
+                  FROM derived.daily_sales_summary
+              )
             ORDER BY f.date
         """),
         {"barcode": barcode, "days": days},

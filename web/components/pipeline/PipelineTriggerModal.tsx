@@ -92,9 +92,19 @@ export function PipelineTriggerModal({ isOpen, onClose }: PipelineTriggerModalPr
   useEffect(() => {
     if (!isOpen) return;
     setError(null);
-    setActiveRun(null);
-    // Load last data date for preflight info
-    api.pipelineLastDataDate().then(setLastDataInfo).catch(() => {});
+
+    // Check if a run is already in progress (e.g. user closed and reopened modal)
+    api.pipelineLatestRun().then((run) => {
+      if (run && run.status === "running") {
+        setActiveRun(run);
+      } else {
+        setActiveRun(null);
+        api.pipelineLastDataDate().then(setLastDataInfo).catch(() => {});
+      }
+    }).catch(() => {
+      setActiveRun(null);
+      api.pipelineLastDataDate().then(setLastDataInfo).catch(() => {});
+    });
   }, [isOpen]);
 
   // Auto-scroll log to bottom when new content arrives
@@ -114,7 +124,11 @@ export function PipelineTriggerModal({ isOpen, onClose }: PipelineTriggerModalPr
       try {
         const updated = await api.pipelineRunById(activeRun.id);
         setActiveRun(updated);
-        if (updated.status !== "running") clearInterval(pollRef.current!);
+        if (updated.status !== "running") {
+          clearInterval(pollRef.current!);
+          // Refresh preflight info after run completes
+          api.pipelineLastDataDate().then(setLastDataInfo).catch(() => {});
+        }
       } catch {}
     }, 2000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
