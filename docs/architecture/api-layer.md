@@ -2,7 +2,7 @@
 
 ## Overview
 
-The LedgerAI API is a FastAPI application that lives in `api/` alongside the existing data pipeline. It provides HTTP endpoints for the analytics dashboard, canonical product management, internal staff tools, and pipeline control.
+The AxonFlux API is a FastAPI application that lives in `api/` alongside the existing data pipeline. It provides HTTP endpoints for the analytics dashboard, canonical product management, internal staff tools, and pipeline control.
 
 ## Key Design Decisions
 
@@ -51,7 +51,7 @@ api/
 ## Running the API
 
 ```bash
-# From project root (D:\projects\ledgerai)
+# From project root (D:\projects\axonflux)
 pip install -r api/requirements.txt
 
 # Run migrations (first time only)

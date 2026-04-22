@@ -1,4 +1,4 @@
-# LedgerAI — Project Memory Summary
+# AxonFlux — Project Memory Summary
 
 **Phase 1: Raw Ingestion — COMPLETE**  
 **Phase 2: Reconciliation & Core Derivations — COMPLETE**
@@ -7,7 +7,7 @@
 
 ## 1. Project Overview
 
-- **What it is:** LedgerAI is a raw-first, append-only data platform for supermarket billing software that provides only manual CSV/XLS exports (no API).
+- **What it is:** AxonFlux is a raw-first, append-only data platform for supermarket billing software that provides only manual CSV/XLS exports (no API).
 - **Core problem:** Billing data is messy, inconsistent, incomplete, and semantically overloaded (no conversion events, inconsistent units, snapshot vs event confusion).
 - **Core philosophy:** Preserve raw truth first, then _explicitly_ derive interpretations through reconciliation and derived layers.
 
@@ -155,7 +155,7 @@ These are structural limitations, not ingestion errors.
 
 ---
 
-## 6. What LedgerAI Can Safely Do Now
+## 6. What AxonFlux Can Safely Do Now
 
 - Daily / weekly dashboards
 - Revenue analytics

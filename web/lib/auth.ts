@@ -1,5 +1,5 @@
-const TOKEN_KEY = "ledgerai_token";
-const USER_KEY = "ledgerai_user";
+const TOKEN_KEY = "axonflux_token";
+const USER_KEY = "axonflux_user";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;

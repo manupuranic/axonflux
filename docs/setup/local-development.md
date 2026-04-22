@@ -140,6 +140,6 @@ Replace `192.168.1.42` with your actual IP address from Step 1.
 
 ## Important Notes
 
-- Run all commands from the **project root** (`D:\projects\ledgerai`) so that Python can resolve `from config.db import engine` etc.
+- Run all commands from the **project root** (`D:\projects\axonflux`) so that Python can resolve `from config.db import engine` etc.
 - The existing pipeline scripts (`scripts/`, `pipelines/`) are completely unaffected. They run independently.
 - Alembic only manages `app.*` tables. It will never touch `raw.*`, `derived.*`, or `recon.*`.

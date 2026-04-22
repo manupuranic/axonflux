@@ -69,7 +69,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       >
         {/* Header */}
         <div className="p-6">
-          <h1 className="text-2xl font-bold text-gray-900">LedgerAI</h1>
+          <h1 className="text-2xl font-bold text-gray-900">AxonFlux</h1>
           <p className="text-sm text-gray-600">Analytics Dashboard</p>
         </div>
 

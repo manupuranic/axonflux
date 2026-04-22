@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     # CORS origins for Next.js dev + local LAN
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
-        "http://ledgerai.local",
+        "http://axonflux.local",
         "http://127.0.0.1:3000",
         "http://192.168.1.20:3000",
     ]

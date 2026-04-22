@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-LedgerAI is a raw-first analytics platform for a supermarket's billing software exports. The billing system has no API — staff export CSVs/XLS manually. This project ingests those exports, maintains an immutable raw data layer, rebuilds analytical derived tables on demand, and exposes the data via a FastAPI backend + Next.js dashboard.
+AxonFlux is a raw-first analytics platform for a supermarket's billing software exports. The billing system has no API — staff export CSVs/XLS manually. This project ingests those exports, maintains an immutable raw data layer, rebuilds analytical derived tables on demand, and exposes the data via a FastAPI backend + Next.js dashboard.
 
 ## Running commands
 
-**All commands must be run from the project root** (`D:\projects\ledgerai`). Python imports like `from config.db import engine` and `from db.db import DB` rely on the project root being in `sys.path`.
+**All commands must be run from the project root** (`D:\projects\axonflux`). Python imports like `from config.db import engine` and `from db.db import DB` rely on the project root being in `sys.path`.
 
 ### Pipeline (data)
 ```bash
@@ -149,7 +149,7 @@ user=postgres
 password=...
 host=localhost
 port=5432
-dbname=ledgerai
+dbname=axonflux
 SECRET_KEY=...   # required for API JWT auth
 ```
 

@@ -69,7 +69,7 @@ def _find_latest_file(directory: Path) -> Path:
 
 def _ingest_latest_report(report_type: str, ingest_fn) -> None:
     incoming_base = Path(
-        os.getenv("LEDGERAI_INCOMING_DIR")
+        os.getenv("AXONFLUX_INCOMING_DIR")
         or os.getenv("INCOMING_DIR")
         or ROOT / "data" / "incoming"
     )
@@ -178,7 +178,7 @@ def main(run_ingestion: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run the weekly LedgerAI data pipeline")
+    parser = argparse.ArgumentParser(description="Run the weekly AxonFlux data pipeline")
     parser.add_argument(
         "--run-ingestion",
         action="store_true",

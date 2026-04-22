@@ -14,7 +14,7 @@ export default function SystemDesignPage() {
         <p>
           A supermarket uses off-the-shelf billing software that has <strong>no API</strong>. Staff
           periodically export reports as Excel/CSV files (sales itemwise, sales billwise, purchase
-          itemwise, purchase billwise, supplier master, item combinations). LedgerAI ingests those
+          itemwise, purchase billwise, supplier master, item combinations). AxonFlux ingests those
           exports, maintains an immutable record of every transaction, rebuilds analytical views on
           demand, and exposes the results through a REST API and web dashboard.
         </p>

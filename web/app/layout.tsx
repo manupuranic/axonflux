@@ -15,7 +15,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LedgerAI — Inventory Analytics",
+  title: "AxonFlux — Inventory Analytics",
   description: "Internal supermarket analytics dashboard",
 };
 

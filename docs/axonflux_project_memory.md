@@ -1,12 +1,12 @@
-# LedgerAI — Project Memory Summary
+# AxonFlux — Project Memory Summary
 
 ## (Updated — Phase 3 Week 3 Complete)
 
 ## 1\. Project Overview
 
-**What it is:**LedgerAI is a raw-first, append-only analytical data platform for supermarket billing software that only provides manual CSV/XLS exports (no API).
+**What it is:**AxonFlux is a raw-first, append-only analytical data platform for supermarket billing software that only provides manual CSV/XLS exports (no API).
 
-**Core problem:**Billing data is messy, inconsistent, and incomplete (no conversion events, inconsistent naming, snapshot vs event confusion). LedgerAI preserves immutable raw truth and builds deterministic derived layers to enable analytics, demand modeling, and future AI-driven inventory intelligence.
+**Core problem:**Billing data is messy, inconsistent, and incomplete (no conversion events, inconsistent naming, snapshot vs event confusion). AxonFlux preserves immutable raw truth and builds deterministic derived layers to enable analytics, demand modeling, and future AI-driven inventory intelligence.
 
 ### Core Philosophy
 
@@ -104,7 +104,7 @@ Supabase Free tier limitations encountered:
 - DBeaver installed for warehouse inspection
 - Restore verification (row counts + revenue parity)
 
-LedgerAI analytics now runs on **local PostgreSQL (OLAP warehouse)**.
+AxonFlux analytics now runs on **local PostgreSQL (OLAP warehouse)**.
 
 Supabase removed as primary analytics DB.
 
@@ -219,7 +219,7 @@ Phase 3 foundation is complete.
 
 ## 9\. System Maturity Level
 
-LedgerAI has transitioned from:
+AxonFlux has transitioned from:
 
 > CSV ingestion experiment
 

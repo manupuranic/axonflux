@@ -35,7 +35,7 @@ export default function InternalLayout({
           >
             <Menu className="h-5 w-5" />
           </button>
-          <span className="font-semibold text-gray-900">LedgerAI</span>
+          <span className="font-semibold text-gray-900">AxonFlux</span>
         </header>
 
         <main className="flex-1 overflow-auto">

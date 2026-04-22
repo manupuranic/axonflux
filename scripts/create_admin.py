@@ -17,7 +17,7 @@ from config.db import SessionLocal
 
 
 def main():
-    print("Create LedgerAI admin user")
+    print("Create AxonFlux admin user")
     username = input("Username: ").strip()
     full_name = input("Full name (optional): ").strip() or None
     password = getpass.getpass("Password: ")

@@ -45,7 +45,7 @@ Client-side PDF pamphlet builder for monthly offer promotions.
 - `Claude Haiku` — AI-generated marketing copy per product
 
 ### Features
-- Product search from LedgerAI catalog + custom products (no barcode)
+- Product search from AxonFlux catalog + custom products (no barcode)
 - Per-item: display name override, MRP, offer price, image URL, highlight badge
 - AI Copy button → bulk-generates highlight text for all items
 - Compact list view with search filter, edit modal (no inline card expansion)

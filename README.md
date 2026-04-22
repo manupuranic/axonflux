@@ -1,6 +1,6 @@
-# LedgerAI
+# AxonFlux
 
-LedgerAI is a raw-first data ingestion and analytics platform for supermarket billing software exports.
+AxonFlux is a raw-first data ingestion and analytics platform for supermarket billing software exports.
 
 ## Features
 - Append-only raw ingestion

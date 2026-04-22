@@ -50,7 +50,7 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle>LedgerAI</CardTitle>
+        <CardTitle>AxonFlux</CardTitle>
         <CardDescription>Analytics Dashboard</CardDescription>
       </CardHeader>
       <CardContent>

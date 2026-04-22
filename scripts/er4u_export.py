@@ -19,7 +19,7 @@ First-time setup
        PYTHONPATH=. python scripts\\er4u_export.py --no-headless
 
 4. Schedule via Windows Task Scheduler (daily at 22:00):
-       Action: cmd /c "cd /d D:\\projects\\ledgerai && .venv\\Scripts\\python.exe
+       Action: cmd /c "cd /d D:\\projects\\axonflux && .venv\\Scripts\\python.exe
                scripts\\er4u_export.py >> logs\\er4u_export.log 2>&1"
 
 Er4u export flow (two-step)

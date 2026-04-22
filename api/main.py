@@ -7,7 +7,7 @@ from api.tools import register_tools, _registered_manifests, get_manifests
 from api.tools.base import ToolManifest
 
 app = FastAPI(
-    title="LedgerAI API",
+    title="AxonFlux API",
     description="Analytics, inventory intelligence, and internal staff tools for supermarket operations.",
     version="0.1.0",
     docs_url="/api/docs",

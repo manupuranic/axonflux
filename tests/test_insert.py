@@ -11,7 +11,7 @@ def main():
         "import_batch_id": uuid.uuid4(),
         "source_file_name": "test_sales_itemwise.xlsx",
 
-        "store_name": "Puranic Health Mart",
+        "store_name": "Test Supermarket",
         "sale_location": "Main Store",
         "operator_name": "Test Operator",
 
