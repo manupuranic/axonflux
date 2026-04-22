@@ -1,3 +1,6 @@
+# ---- Claude Code working directory ----
+.claude/
+
 # ---- Python ----
 __pycache__/
 *.py[cod]
@@ -43,6 +46,7 @@ exports/
 *.xls
 *.ods
 *.zip
+scripts/er4u_export.py
 
 # ---- Logs ----
 *.log
