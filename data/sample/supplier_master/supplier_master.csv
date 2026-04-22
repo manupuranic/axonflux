@@ -1,0 +1,6 @@
+Id,Status,Supplier Code,Supplier Name,Location,Address,Mobile,Email,Supplier Date,city,Country,State,Register Type,GSTIN / UID,Tin No,Pan No,Registered Invoice Start Duration,Supplier Category,Create Ledger,Closing Balance
+1,Active,SUP-001,HINDUSTAN UNILEVER LTD,Demo City,123 Industrial Area,9000000001,hul@example.com,01-01-2020,Demo City,India,Karnataka,Regular,29AAAAA0000A1Z5,,,01-01-2020,FMCG,Yes,0
+2,Active,SUP-002,ITC LIMITED,Demo City,456 Trade Park,9000000002,itc@example.com,01-01-2020,Demo City,India,Karnataka,Regular,29BBBBB0000B1Z5,,,01-01-2020,FMCG,Yes,0
+3,Active,SUP-003,AMUL DAIRY,Demo City,789 Dairy Road,9000000003,amul@example.com,01-01-2020,Demo City,India,Karnataka,Regular,29CCCCC0000C1Z5,,,01-01-2020,DAIRY,Yes,0
+4,Active,SUP-004,NESTLE INDIA,Demo City,321 Food Street,9000000004,nestle@example.com,01-01-2020,Demo City,India,Karnataka,Regular,29DDDDD0000D1Z5,,,01-01-2020,FMCG,Yes,0
+5,Active,SUP-005,COLGATE PALMOLIVE,Demo City,654 Consumer Lane,9000000005,colgate@example.com,01-01-2020,Demo City,India,Karnataka,Regular,29EEEEE0000E1Z5,,,01-01-2020,PERSONAL CARE,Yes,0

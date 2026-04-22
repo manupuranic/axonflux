@@ -8,6 +8,7 @@ __pycache__/
 .eggs/
 .env
 .env.*
+!.env.example
 .venv/
 venv/
 ENV/
@@ -33,9 +34,11 @@ Thumbs.db
 .ipynb_checkpoints/
 
 # ---- Data files (VERY IMPORTANT) ----
-data/
+data/*
+!data/sample/
 exports/
 *.csv
+!data/sample/**/*.csv
 *.xlsx
 *.xls
 *.ods
