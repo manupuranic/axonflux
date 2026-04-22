@@ -62,6 +62,11 @@ logs/*
 *.key
 *.crt
 *.json
+!web/package.json
+!web/package-lock.json
+!web/tsconfig.json
+!web/components.json
+!.vscode/launch.json
 secrets/
 
 # ---- Node (if added later) ----
