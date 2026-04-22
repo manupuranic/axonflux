@@ -547,6 +547,90 @@ WITH pairs AS (
           </table>
         </div>
       </Section>
+
+      {/* ── 12. Repository & Deployment Strategy ─────────────────── */}
+      <Section title="12. Repository &amp; Deployment Strategy">
+        <SubSection title="Two-remote git setup">
+          <p>
+            The same local repo pushes to two destinations: a private remote (backup / internal
+            history) and a public GitHub repo (portfolio). The <code>.gitignore</code> is the safety
+            layer — real data, <code>.env</code>, and the Er4u automation script are excluded, so
+            pushing to the public remote is safe by construction.
+          </p>
+          <CodeBlock>{`# Add public remote (one-time)
+git remote add public git@github.com:YOUR_USERNAME/axonflux.git
+
+# Push to both with one command
+git config alias.pushall '!git push origin main && git push public main'
+git pushall`}</CodeBlock>
+          <p className="mt-2">
+            Push to <code>public</code> only when a feature is complete — not on every commit. See{" "}
+            <code>docs/setup/git-strategy.md</code> for the full table of what&apos;s safe to push.
+          </p>
+        </SubSection>
+
+        <SubSection title="What's excluded from the public repo">
+          <ul className="list-disc list-inside space-y-1 text-sm">
+            <li><code>scripts/er4u_export.py</code> — automates Er4u&apos;s web UI; ToS grey zone</li>
+            <li><code>data/</code> and <code>exports/</code> — real customer PII and business financials</li>
+            <li><code>.env</code> — database credentials and JWT secret</li>
+            <li><code>.claude/</code> — Claude Code working directory (worktrees, local settings)</li>
+          </ul>
+          <Callout>
+            Interview angle: the public repo exposes zero business-specific logic. The schema, SQL,
+            and APIs are entirely generic — any supermarket using similar billing software could run
+            this. That&apos;s intentional.
+          </Callout>
+        </SubSection>
+
+        <SubSection title="Demo database">
+          <p>
+            A separate <code>axonflux_demo</code> database is populated with synthetic data generated
+            by <code>scripts/generate_demo_data.py</code> — 6 months of FMCG sales, purchases, and
+            supplier data. Same schema, same API, different data.
+          </p>
+          <p className="mt-2">
+            The synthetic data deliberately includes realistic data quality problems: duplicate
+            barcodes for the same product, name typo variants, mixed casing. These replicate the
+            real-world issues that Phase B3 (Product Entity Resolution) is designed to fix — making
+            that feature demonstrable on the live demo.
+          </p>
+          <CodeBlock>{`python scripts/generate_demo_data.py      # ~90k sales rows, 6 months
+cp -r data/sample/* data/incoming/
+PYTHONPATH=. python scripts/ingest_all.py
+PYTHONPATH=. python pipelines/weekly_pipeline.py`}</CodeBlock>
+        </SubSection>
+
+        <SubSection title="Live demo stack">
+          <div className="overflow-x-auto mt-2">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200 text-left text-gray-500">
+                  <th className="pb-2 pr-4 font-medium">Service</th>
+                  <th className="pb-2 pr-4 font-medium">Role</th>
+                  <th className="pb-2 font-medium">Free tier</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {[
+                  ["Neon", "PostgreSQL hosting", "512 MB, always on"],
+                  ["Railway", "FastAPI hosting", "~$5/month"],
+                  ["Vercel", "Next.js hosting", "Free"],
+                ].map(([svc, role, cost]) => (
+                  <tr key={svc}>
+                    <td className="py-2 pr-4 font-medium text-gray-800">{svc}</td>
+                    <td className="py-2 pr-4 text-gray-600">{role}</td>
+                    <td className="py-2 text-gray-600">{cost}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-sm text-gray-600">
+            See <code>docs/setup/demo-data.md</code> for step-by-step deployment instructions.
+          </p>
+        </SubSection>
+      </Section>
     </div>
   );
 }

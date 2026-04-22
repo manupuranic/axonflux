@@ -1,5 +1,10 @@
 # Local Development Setup
 
+## Related Guides
+
+- [Git & Remote Strategy](./git-strategy.md) — two-remote setup, what's safe to push, daily workflow
+- [Demo Data Setup](./demo-data.md) — running with synthetic data, switching between demo/real DB
+
 ## Prerequisites
 
 - Python 3.13+
