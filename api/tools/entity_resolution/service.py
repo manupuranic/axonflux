@@ -15,6 +15,7 @@ from api.schemas.auth import CurrentUser
 from api.tools.entity_resolution.schemas import (
     AliasResponse,
     ConfirmRequest,
+    ProductDetail,
     SuggestionCluster,
     SuggestionItem,
 )
@@ -255,3 +256,45 @@ def delete_alias(db: Session, alias_barcode: str) -> None:
         SET status = 'pending', reviewed_by = NULL, reviewed_at = NULL
         WHERE alias_barcode = :alias AND status = 'confirmed'
     """), {"alias": alias_barcode})
+
+
+# ---------------------------------------------------------------------------
+# Product detail (for hover preview)
+# ---------------------------------------------------------------------------
+
+def get_product_detail(conn: Connection, barcode: str) -> ProductDetail | None:
+    # Latest item_combinations row for this barcode
+    item = conn.execute(text("""
+        SELECT item_name_raw, brand_raw, mrp, purchase_price, rate,
+               size_raw, expiry_date_raw, hsn_code, system_stock_snapshot
+        FROM raw.raw_item_combinations
+        WHERE barcode = :barcode
+        ORDER BY imported_at DESC
+        LIMIT 1
+    """), {"barcode": barcode}).fetchone()
+
+    # Sales aggregates
+    sales = conn.execute(text("""
+        SELECT SUM(sale_qty) AS total_qty,
+               MAX(TO_TIMESTAMP(sale_datetime_raw, 'DD-MM-YYYYHH12:MI AM')) AS last_sold
+        FROM raw.raw_sales_itemwise
+        WHERE barcode = :barcode
+    """), {"barcode": barcode}).fetchone()
+
+    if not item and not sales:
+        return None
+
+    return ProductDetail(
+        barcode=barcode,
+        item_name=item.item_name_raw if item else None,
+        brand=item.brand_raw if item else None,
+        mrp=float(item.mrp) if item and item.mrp else None,
+        purchase_price=float(item.purchase_price) if item and item.purchase_price else None,
+        rate=float(item.rate) if item and item.rate else None,
+        size=item.size_raw if item else None,
+        expiry_date=item.expiry_date_raw if item else None,
+        hsn_code=item.hsn_code if item else None,
+        system_stock=float(item.system_stock_snapshot) if item and item.system_stock_snapshot else None,
+        total_sales_qty=float(sales.total_qty) if sales and sales.total_qty else None,
+        last_sold=sales.last_sold.strftime("%Y-%m-%d") if sales and sales.last_sold else None,
+    )

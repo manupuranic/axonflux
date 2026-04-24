@@ -80,7 +80,7 @@ Six tables: `raw_sales_itemwise`, `raw_sales_billwise`, `raw_purchase_itemwise`,
 Two output views: `derived.replenishment_sheet` (products with suppliers) and `derived.conversion_attention_sheet` (products without suppliers).
 
 ### `app.*` schema — application state
-New schema for human-authored data that must survive pipeline rebuilds. Managed by Alembic (migrations in `api/migrations/`). Tables: `users`, `products` (canonical names/categories), `pipeline_runs`, `cash_closure_records`, `pamphlets`, `pamphlet_items`.
+New schema for human-authored data that must survive pipeline rebuilds. Managed by Alembic (migrations in `api/migrations/`). Tables: `users`, `products` (canonical names/categories), `pipeline_runs`, `cash_closure_records`, `pamphlets`, `pamphlet_items`, `product_aliases` (entity resolution: alias→canonical barcode mapping), `product_merge_suggestions` (pending review queue).
 
 **Critical join pattern** — `app.*` enriches `derived.*`, never replaces it:
 ```sql
@@ -131,7 +131,7 @@ The pipeline is **never imported by the API** — `POST /api/pipeline/trigger` r
 Routers: `auth`, `analytics`, `customers`, `products`, `suppliers`, `pipeline` + auto-discovered tool plugins.
 
 ### Tool plugin system
-Internal staff tools (cash closure, pamphlet generator) live in `api/tools/<name>/`. Each tool needs `__init__.py` with a `MANIFEST` and `router.py` with an `APIRouter`. `register_tools()` in `api/tools/__init__.py` auto-discovers and mounts them — no changes to `main.py` needed. See `docs/architecture/tool-plugins.md`.
+Internal staff tools (cash closure, pamphlet generator, entity resolution) live in `api/tools/<name>/`. Each tool needs `__init__.py` with a `MANIFEST` and `router.py` with an `APIRouter`. `register_tools()` in `api/tools/__init__.py` auto-discovers and mounts them — no changes to `main.py` needed. See `docs/architecture/tool-plugins.md`.
 
 ## Date parsing quirk
 
@@ -242,11 +242,13 @@ Replace SQL WMA with validated XGBoost/ARIMA model.
 - "Frequently Bought Together" in product detail page + product drawer (click any row in Health table)
 - ProductDrawer: tinted header, 2×2 stat cards, icon-row recommendation list, chart Y-axis clamped ≥0
 
-**B3 — Product Entity Resolution**
-Billing exports have name variants: "SURF EXCEL 1KG" / "Surf Excel 1 Kg" / "SURFEXCEL1KG".
-- RapidFuzz clustering of product names → suggest merges
-- Admin review + confirm UI → updates `app.products.canonical_name`
-- `app.product_aliases` mapping table
+**B3 — Product Entity Resolution** ✅
+Different barcodes for the same physical product split analytics. Resolution pipeline:
+- RapidFuzz clustering (`scripts/cluster_product_names.py`) with prefix+numeric blocking, `--min-score 78` default
+- Staff review UI at `/tools/entity-resolution` — swap canonical direction, hover product details (MRP/brand/stock)
+- Confirmed aliases stored in `app.product_aliases`, remapped in derived layer via LEFT JOIN + COALESCE
+- Remapping at aggregation source (`01_product_daily_metrics.sql`), dimension view (`05_necessary_views.sql`), and basket analysis (`10_product_associations.sql`)
+- Alembic migration 006. See `docs/architecture/entity-resolution.md` and `docs/decisions/003-entity-resolution-design.md`
 
 ---
 

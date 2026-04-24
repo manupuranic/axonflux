@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -14,6 +15,7 @@ from api.tools.entity_resolution.schemas import (
     AliasResponse,
     ConfirmRequest,
     ConfirmResponse,
+    ProductDetail,
     RejectRequest,
     SuggestionCluster,
 )
@@ -23,7 +25,7 @@ router = APIRouter(
     tags=[MANIFEST.name],
 )
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[4]
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 # ---------------------------------------------------------------------------
@@ -99,12 +101,29 @@ def delete_alias(
 
 
 # ---------------------------------------------------------------------------
+# Product detail (hover preview)
+# ---------------------------------------------------------------------------
+
+@router.get("/product/{barcode}", response_model=ProductDetail | None)
+def get_product_detail(
+    barcode: str,
+    conn: Connection = Depends(get_conn),
+    _: CurrentUser = Depends(get_current_user),
+):
+    detail = service.get_product_detail(conn, barcode)
+    if detail is None:
+        from fastapi import HTTPException as HE
+        raise HE(status_code=404, detail="Barcode not found")
+    return detail
+
+
+# ---------------------------------------------------------------------------
 # Recompute suggestions (admin only — runs clustering script as subprocess)
 # ---------------------------------------------------------------------------
 
 @router.post("/recompute")
 def recompute_suggestions(
-    min_score: int = Query(62, ge=50, le=95),
+    min_score: int = Query(78, ge=50, le=95),
     _: CurrentUser = Depends(require_admin),
 ):
     cmd = [
@@ -112,19 +131,26 @@ def recompute_suggestions(
         str(_PROJECT_ROOT / "scripts" / "cluster_product_names.py"),
         "--min-score", str(min_score),
     ]
-    proc = subprocess.Popen(
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(_PROJECT_ROOT)
+    result = subprocess.run(
         cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
         cwd=str(_PROJECT_ROOT),
-        env=None,  # inherit environment (picks up .env via dotenv in config/db.py)
+        env=env,
+        timeout=300,
     )
-    # Fire-and-forget: return immediately, script runs in background
+    if result.returncode != 0:
+        return {
+            "status": "error",
+            "message": f"Clustering script failed (exit code {result.returncode})",
+            "output": (result.stdout or "") + (result.stderr or ""),
+        }
     return {
-        "status": "started",
-        "message": f"Clustering script launched (min_score={min_score}). Refresh suggestions in ~30–90s.",
-        "pid": proc.pid,
+        "status": "completed",
+        "message": f"Clustering complete (min_score={min_score}).",
+        "output": result.stdout or "",
     }

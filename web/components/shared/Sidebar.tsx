@@ -69,9 +69,19 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         ].join(" ")}
       >
         {/* Header */}
-        <div className="px-5 py-4">
-          <img src="/logo.png" alt="AxonFlux" className="h-10 w-auto" />
-          <p className="text-xs text-gray-500 mt-1">Analytics Dashboard</p>
+        <div className="px-4 pt-4 pb-3 flex items-center">
+          <img
+            src="/logo.png"
+            alt="AxonFlux"
+            style={{ width: "72px", height: "auto", display: "block", flexShrink: 0 }}
+          />
+          <div className="leading-tight">
+            <div className="text-base font-bold tracking-tight">
+              <span style={{ color: "#105dff" }}>Axon</span>
+              <span style={{ color: "#1b293e" }}>Flux</span>
+            </div>
+            <p className="text-xs text-gray-400">Retail Intelligence</p>
+          </div>
         </div>
 
         <Separator />

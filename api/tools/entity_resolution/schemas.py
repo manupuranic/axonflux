@@ -46,3 +46,18 @@ class AliasResponse(BaseModel):
 class ConfirmResponse(BaseModel):
     alias: AliasResponse
     pipeline_rebuild_required: bool = True
+
+
+class ProductDetail(BaseModel):
+    barcode: str
+    item_name: str | None
+    brand: str | None
+    mrp: float | None
+    purchase_price: float | None
+    rate: float | None
+    size: str | None
+    expiry_date: str | None
+    hsn_code: str | None
+    system_stock: float | None
+    total_sales_qty: float | None
+    last_sold: str | None

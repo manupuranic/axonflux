@@ -82,8 +82,7 @@ export function EntityResolutionPage() {
     setRecomputeLoading(true);
     try {
       await api.entityResolution.recompute();
-      // Poll after 45s for new suggestions
-      setTimeout(loadClusters, 45_000);
+      await loadClusters();
     } catch (err) {
       setClustersError(err instanceof Error ? err.message : "Recompute failed");
     } finally {

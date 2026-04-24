@@ -379,6 +379,21 @@ export interface ConfirmRequest {
   notes?: string | null;
 }
 
+export interface ProductDetail {
+  barcode: string;
+  item_name: string | null;
+  brand: string | null;
+  mrp: number | null;
+  purchase_price: number | null;
+  rate: number | null;
+  size: string | null;
+  expiry_date: string | null;
+  hsn_code: string | null;
+  system_stock: number | null;
+  total_sales_qty: number | null;
+  last_sold: string | null;
+}
+
 export interface RejectRequest {
   suggestion_id: string;
   notes?: string | null;

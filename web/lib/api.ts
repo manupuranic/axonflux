@@ -36,6 +36,7 @@ import type {
   ConfirmResponse,
   RejectRequest,
   AliasListResponse,
+  ProductDetail,
 } from "@/types/api";
 
 const BASE = "http://localhost:8000";
@@ -317,10 +318,15 @@ export const api = {
         { method: "DELETE" }
       ),
 
-    recompute: (minScore = 62) =>
+    recompute: (minScore = 78) =>
       apiFetch<{ status: string; message: string; pid: number }>(
         `/api/tools/entity-resolution/recompute${buildQuery({ min_score: minScore })}`,
         { method: "POST" }
+      ),
+
+    productDetail: (barcode: string) =>
+      apiFetch<ProductDetail>(
+        `/api/tools/entity-resolution/product/${encodeURIComponent(barcode)}`
       ),
   },
 
