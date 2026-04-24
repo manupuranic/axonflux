@@ -44,6 +44,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     { href: "/customers", label: "Customers", icon: "👥" },
     { href: "/tools/cash-closure", label: "Cash Closure", icon: "💰" },
     { href: "/tools/pamphlet-generator", label: "Pamphlets", icon: "📄" },
+    { href: "/tools/entity-resolution", label: "Entity Resolution", icon: "🔗" },
     { href: "/docs", label: "System Design", icon: "🏗️" },
   ];
 

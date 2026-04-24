@@ -31,6 +31,11 @@ import type {
   PamphletItemUpdate,
   PamphletItem,
   GSheetImportRequest,
+  SuggestionCluster,
+  ConfirmRequest,
+  ConfirmResponse,
+  RejectRequest,
+  AliasListResponse,
 } from "@/types/api";
 
 const BASE = "http://localhost:8000";
@@ -280,6 +285,43 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
+  },
+
+  // Entity Resolution (B3)
+  entityResolution: {
+    suggestions: (params?: { status?: string; min_score?: number; limit?: number; offset?: number }) =>
+      apiFetch<SuggestionCluster[]>(
+        `/api/tools/entity-resolution/suggestions${buildQuery(params ?? {})}`
+      ),
+
+    confirm: (body: ConfirmRequest) =>
+      apiFetch<ConfirmResponse>("/api/tools/entity-resolution/confirm", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+
+    reject: (body: RejectRequest) =>
+      apiFetch<{ ok: boolean }>("/api/tools/entity-resolution/reject", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+
+    aliases: (params?: { canonical_barcode?: string; limit?: number; offset?: number }) =>
+      apiFetch<AliasListResponse>(
+        `/api/tools/entity-resolution/aliases${buildQuery(params ?? {})}`
+      ),
+
+    deleteAlias: (aliasBarcode: string) =>
+      apiFetch<void>(
+        `/api/tools/entity-resolution/aliases/${encodeURIComponent(aliasBarcode)}`,
+        { method: "DELETE" }
+      ),
+
+    recompute: (minScore = 62) =>
+      apiFetch<{ status: string; message: string; pid: number }>(
+        `/api/tools/entity-resolution/recompute${buildQuery({ min_score: minScore })}`,
+        { method: "POST" }
+      ),
   },
 
   // HOTO — Daily Cash Closure

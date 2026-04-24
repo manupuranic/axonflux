@@ -343,6 +343,57 @@ export interface PamphletUpdate {
   cols?: number | null;
 }
 
+// Entity Resolution (B3)
+export interface SuggestionItem {
+  id: string;
+  alias_barcode: string;
+  canonical_candidate: string;
+  alias_name: string | null;
+  canonical_name: string | null;
+  similarity_score: number;
+  status: string;
+}
+
+export interface SuggestionCluster {
+  cluster_key: string;
+  canonical_candidate: string;
+  canonical_name: string | null;
+  members: SuggestionItem[];
+  min_score: number;
+  max_score: number;
+}
+
+export interface AliasResponse {
+  alias_barcode: string;
+  canonical_barcode: string;
+  canonical_name: string | null;
+  similarity_score: number | null;
+  confirmed_at: string | null;
+  confirmed_by_username: string | null;
+  notes: string | null;
+}
+
+export interface ConfirmRequest {
+  alias_barcode: string;
+  canonical_barcode: string;
+  notes?: string | null;
+}
+
+export interface RejectRequest {
+  suggestion_id: string;
+  notes?: string | null;
+}
+
+export interface ConfirmResponse {
+  alias: AliasResponse;
+  pipeline_rebuild_required: boolean;
+}
+
+export interface AliasListResponse {
+  total: number;
+  items: AliasResponse[];
+}
+
 export interface HotoCreate {
   closure_date: string;
   opening_cash?: number | null;

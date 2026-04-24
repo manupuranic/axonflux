@@ -142,11 +142,11 @@ export function ProductDetailContent({
                     </p>
                   </div>
                 </div>
-                {product.suppliers && (
+                {product.suppliers != null && (
                   <div className="mt-5 pt-5 border-t">
                     <p className="text-sm font-medium text-gray-600 mb-2">Procured From</p>
                     <div className="flex flex-wrap gap-2">
-                      {(product.suppliers as string).split(", ").map((s: string) => (
+                      {String(product.suppliers).split(", ").map((s: string) => (
                         <Badge key={s} variant="secondary">{s}</Badge>
                       ))}
                     </div>
