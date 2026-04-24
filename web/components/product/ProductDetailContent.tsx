@@ -142,6 +142,16 @@ export function ProductDetailContent({
                     </p>
                   </div>
                 </div>
+                {product.suppliers && (
+                  <div className="mt-5 pt-5 border-t">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Procured From</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(product.suppliers as string).split(", ").map((s: string) => (
+                        <Badge key={s} variant="secondary">{s}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -162,67 +172,55 @@ export function ProductDetailContent({
           )}
 
           {/* Summary Stats */}
-          {trend.data && trend.data.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-gray-600">
-                    Latest Qty Sold
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {Math.round(trend.data[trend.data.length - 1].quantity_sold * 10) / 10}
-                  </p>
-                </CardContent>
-              </Card>
+          {trend.data && trend.data.length > 0 && (() => {
+            const last = trend.data[trend.data.length - 1];
+            const avgMonthly = product?.avg_monthly_consumption != null
+              ? Number(product.avg_monthly_consumption)
+              : null;
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-gray-600">Avg Monthly (units)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-bold text-gray-900">{avgMonthly != null ? Math.round(avgMonthly * 10) / 10 : "—"}</p>
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-gray-600">
-                    Latest Revenue
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatInr(trend.data[trend.data.length - 1].revenue)}
-                  </p>
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-gray-600">7-Day Average</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {last.last_7_day_avg == null ? "—" : Math.round(last.last_7_day_avg * 10) / 10}
+                    </p>
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-gray-600">
-                    7-Day Average
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {trend.data[trend.data.length - 1].last_7_day_avg == null
-                      ? "—"
-                      : Math.round(trend.data[trend.data.length - 1].last_7_day_avg! * 10) / 10}
-                  </p>
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-gray-600">Predicted Daily</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {last.predicted_daily_demand == null ? "—" : Math.round(last.predicted_daily_demand * 10) / 10}
+                    </p>
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-gray-600">
-                    Predicted Demand
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {trend.data[trend.data.length - 1].predicted_daily_demand == null
-                      ? "—"
-                      : Math.round(
-                          trend.data[trend.data.length - 1].predicted_daily_demand! * 10
-                        ) / 10}
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-gray-600">Latest Qty Sold</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-bold text-gray-900">{Math.round(last.quantity_sold * 10) / 10}</p>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })()}
 
           {/* Frequently Bought Together */}
           {recs.data && recs.data.length > 0 && (

@@ -207,7 +207,18 @@ def get_product(
                 p.hsn_code, p.gst_rate_percent,
                 p.is_active, p.is_reviewed,
                 p.created_at, p.updated_at,
-                ic.mrp, ic.purchase_price, ic.current_stock AS system_stock
+                ic.mrp, ic.purchase_price, ic.current_stock AS system_stock,
+                (
+                    SELECT STRING_AGG(DISTINCT sm.supplier_name, ', ' ORDER BY sm.supplier_name)
+                    FROM derived.product_supplier_mapping sm
+                    WHERE sm.product_id = d.product_id
+                ) AS suppliers,
+                (
+                    SELECT ROUND(SUM(m.quantity_sold)::numeric / 6, 2)
+                    FROM derived.product_daily_metrics m
+                    WHERE m.product_id = d.product_id
+                      AND m.date > CURRENT_DATE - INTERVAL '180 days'
+                ) AS avg_monthly_consumption
             FROM derived.product_dimension d
             LEFT JOIN app.products p ON d.product_id = p.barcode
             LEFT JOIN derived.latest_item_combinations ic ON d.product_id = ic.product_id

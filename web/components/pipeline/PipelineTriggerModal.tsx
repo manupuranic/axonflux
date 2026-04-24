@@ -86,6 +86,9 @@ export function PipelineTriggerModal({ isOpen, onClose }: PipelineTriggerModalPr
   const [isTriggering, setIsTriggering] = useState(false);
   const [showFullLog, setShowFullLog] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
+  const [includeMasters, setIncludeMasters] = useState(false);
   const logRef = useRef<HTMLPreElement>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -140,7 +143,7 @@ export function PipelineTriggerModal({ isOpen, onClose }: PipelineTriggerModalPr
     setActiveRun(null);
     setShowFullLog(false);
     try {
-      const result = await api.pipelineFullRefresh();
+      const result = await api.pipelineFullRefresh(debugMode, includeMasters);
       // Brief delay so the run record is committed
       await new Promise((r) => setTimeout(r, 600));
       const run = await api.pipelineRunById(result.run_id);
@@ -169,6 +172,22 @@ export function PipelineTriggerModal({ isOpen, onClose }: PipelineTriggerModalPr
     }
   };
 
+  const cancelRun = async () => {
+    if (!activeRun) return;
+    setIsCancelling(true);
+    try {
+      await api.pipelineCancel(activeRun.id);
+      // Optimistically reset to idle so user can retry immediately
+      setActiveRun(null);
+      setError(null);
+      api.pipelineLastDataDate().then(setLastDataInfo).catch(() => {});
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to cancel");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   const isRunning = activeRun?.status === "running";
@@ -185,7 +204,7 @@ export function PipelineTriggerModal({ isOpen, onClose }: PipelineTriggerModalPr
     const runningIdx = currentStep ? order.indexOf(currentStep) : -1;
     const stepIdx = order.indexOf(step);
     if (!isRunning && activeRun.status === "success") return "done";
-    if (!isRunning && activeRun.status === "failed") {
+    if (!isRunning && (activeRun.status === "failed" || activeRun.status === "cancelled")) {
       if (stepIdx < runningIdx) return "done";
       if (stepIdx === runningIdx) return "failed";
       return "pending";
@@ -274,6 +293,9 @@ export function PipelineTriggerModal({ isOpen, onClose }: PipelineTriggerModalPr
                 {activeRun.status === "failed" && (
                   <AlertCircle className="h-4 w-4 text-red-500" />
                 )}
+                {activeRun.status === "cancelled" && (
+                  <AlertCircle className="h-4 w-4 text-amber-500" />
+                )}
                 <span className="text-sm font-medium capitalize">
                   {isRunning ? "Running..." : activeRun.status}
                 </span>
@@ -281,6 +303,21 @@ export function PipelineTriggerModal({ isOpen, onClose }: PipelineTriggerModalPr
                   <span className="text-xs text-gray-400 ml-auto">
                     {format(new Date(activeRun.completed_at), "HH:mm:ss")}
                   </span>
+                )}
+                {isRunning && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="ml-auto h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                    onClick={cancelRun}
+                    disabled={isCancelling}
+                  >
+                    {isCancelling ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      "Stop"
+                    )}
+                  </Button>
                 )}
               </div>
 
@@ -323,6 +360,26 @@ export function PipelineTriggerModal({ isOpen, onClose }: PipelineTriggerModalPr
           ) : (
             /* Pre-run: trigger buttons */
             <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includeMasters}
+                    onChange={(e) => setIncludeMasters(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  Include master data <span className="text-gray-400">(suppliers + item combinations)</span>
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={debugMode}
+                    onChange={(e) => setDebugMode(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  Debug mode <span className="text-gray-400">(show browser window)</span>
+                </label>
+              </div>
               <Button
                 onClick={triggerFullRefresh}
                 disabled={isTriggering}
@@ -370,10 +427,20 @@ export function PipelineTriggerModal({ isOpen, onClose }: PipelineTriggerModalPr
           )}
         </CardContent>
 
-        {/* Footer close button — always show when run is done */}
+        {/* Footer — show when run is done */}
         {activeRun && !isRunning && (
-          <div className="shrink-0 border-t p-4">
-            <Button onClick={onClose} className="w-full" variant="outline">
+          <div className="shrink-0 border-t p-4 flex gap-2">
+            {activeRun.status === "cancelled" && (
+              <Button
+                onClick={() => { setActiveRun(null); setError(null); }}
+                className="flex-1"
+                variant="default"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Retry
+              </Button>
+            )}
+            <Button onClick={onClose} className="flex-1" variant="outline">
               Close
             </Button>
           </div>

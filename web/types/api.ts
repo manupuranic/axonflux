@@ -77,6 +77,8 @@ export interface ProductHealthSignal {
   last_30_day_avg: number | null;
   last_60_day_avg: number | null;
   demand_volatility: number | null;
+  avg_monthly_consumption: number | null;
+  suppliers: string | null;
 }
 
 export interface ReplenishmentItem {
@@ -163,7 +165,7 @@ export interface PipelineRun {
   id: string;
   triggered_at: string;
   pipeline_type: "weekly_full" | "weekly_full_with_ingestion" | "full_refresh";
-  status: "running" | "success" | "failed";
+  status: "running" | "success" | "failed" | "cancelled";
   completed_at: string | null;
   log_output?: string | null;
   error_message?: string | null;

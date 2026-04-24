@@ -46,6 +46,8 @@ class ProductHealthSignal(BaseModel):
     last_30_day_avg: float | None
     last_60_day_avg: float | None
     demand_volatility: float | None
+    avg_monthly_consumption: float | None = None
+    suppliers: str | None = None
 
 
 class ReplenishmentItem(BaseModel):

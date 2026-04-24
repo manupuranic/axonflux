@@ -87,6 +87,22 @@ async function apiFetch<T>(
   }
 }
 
+async function downloadWithAuth(path: string, filename: string): Promise<void> {
+  const token = getToken();
+  const res = await fetch(`${BASE}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (res.status === 401) { clearToken(); window.location.href = "/login"; return; }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
   login: (username: string, password: string) =>
     apiFetch<TokenResponse>("/api/auth/login", {
@@ -115,6 +131,22 @@ export const api = {
     apiFetch<PaginatedResponse<ProductHealthSignal>>(
       `/api/analytics/health-signals${buildQuery(params)}`
     ),
+
+  downloadHealthExport: () => {
+    const today = new Date().toISOString().slice(0, 10);
+    return downloadWithAuth(`/api/analytics/health-export`, `product_health_${today}.csv`);
+  },
+  downloadSupplierExport: (supplier?: string) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const qs = supplier ? `?supplier=${encodeURIComponent(supplier)}` : "";
+    const name = supplier
+      ? `supplier_${supplier.replace(/\s+/g, "_").slice(0, 40)}_${today}.csv`
+      : `supplier_report_${today}.csv`;
+    return downloadWithAuth(`/api/analytics/supplier-export${qs}`, name);
+  },
+
+  listSuppliers: () =>
+    apiFetch<{ supplier_name: string; supplier_region: string | null; lead_time_days: number; product_count: number }[]>("/api/suppliers"),
 
   replenishment: (params: ReplenishmentParams) =>
     apiFetch<PaginatedResponse<ReplenishmentItem>>(
@@ -163,14 +195,22 @@ export const api = {
       { method: "POST" }
     ),
 
-  pipelineFullRefresh: () =>
-    apiFetch<FullRefreshResult>("/api/pipeline/full-refresh", { method: "POST" }),
+  pipelineFullRefresh: (debug = false, includeMasters = false) => {
+    const params = new URLSearchParams();
+    if (debug) params.set("debug", "true");
+    if (includeMasters) params.set("include_masters", "true");
+    const qs = params.toString();
+    return apiFetch<FullRefreshResult>(`/api/pipeline/full-refresh${qs ? `?${qs}` : ""}`, { method: "POST" });
+  },
 
   pipelineLastDataDate: () =>
     apiFetch<LastDataDate>("/api/pipeline/last-data-date"),
 
   pipelineStatus: (limit: number = 10) =>
     apiFetch<PipelineRun[]>(`/api/pipeline/status?limit=${limit}`),
+
+  pipelineCancel: (runId: string) =>
+    apiFetch<{ status: string }>(`/api/pipeline/${runId}/cancel`, { method: "POST" }),
 
   // Products
   productSearch: (q: string, limit = 20) =>

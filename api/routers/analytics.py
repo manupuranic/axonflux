@@ -1,6 +1,9 @@
+import csv
+import io
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
@@ -249,7 +252,18 @@ def get_health_signals(
                 h.last_7_day_avg,
                 h.last_30_day_avg,
                 h.last_60_day_avg,
-                h.demand_volatility
+                h.demand_volatility,
+                (
+                    SELECT ROUND(SUM(m.quantity_sold)::numeric / 6, 2)
+                    FROM derived.product_daily_metrics m
+                    WHERE m.product_id = h.product_id
+                      AND m.date > CURRENT_DATE - INTERVAL '180 days'
+                ) AS avg_monthly_consumption,
+                (
+                    SELECT STRING_AGG(DISTINCT sm.supplier_name, ', ' ORDER BY sm.supplier_name)
+                    FROM derived.product_supplier_mapping sm
+                    WHERE sm.product_id = h.product_id
+                ) AS suppliers
             {base_sql}
             ORDER BY h.predicted_daily_demand DESC NULLS LAST
             LIMIT :limit OFFSET :offset
@@ -263,6 +277,142 @@ def get_health_signals(
         "offset": offset,
         "items": [ProductHealthSignal(**dict(r)) for r in rows],
     }
+
+
+_EXPORT_BASE_CTE = """
+    WITH max_date AS (
+        SELECT MAX(date) AS d FROM derived.product_health_signals
+    ),
+    six_month_consumption AS (
+        SELECT product_id,
+               ROUND(SUM(quantity_sold)::numeric / 6, 2) AS avg_monthly_consumption
+        FROM derived.product_daily_metrics
+        WHERE date > CURRENT_DATE - INTERVAL '180 days'
+        GROUP BY product_id
+    ),
+    supplier_agg AS (
+        SELECT product_id,
+               STRING_AGG(DISTINCT supplier_name, ' | ' ORDER BY supplier_name) AS suppliers
+        FROM derived.product_supplier_mapping
+        GROUP BY product_id
+    )
+"""
+
+_HEALTH_EXPORT_SQL = _EXPORT_BASE_CTE + """
+    SELECT
+        d.product_name,
+        h.product_id                                                AS barcode,
+        sa.suppliers,
+        COALESCE(sc.avg_monthly_consumption, 0)                    AS avg_monthly_consumption,
+        ROUND(h.last_30_day_avg::numeric, 3)                       AS avg_daily_demand,
+        ROUND(h.predicted_daily_demand::numeric, 3)                AS predicted_daily_demand,
+        ROUND(h.last_7_day_avg::numeric, 3)                        AS last_7_day_avg,
+        ROUND(h.last_60_day_avg::numeric, 3)                       AS last_60_day_avg,
+        ROUND((h.demand_volatility * 100)::numeric, 1)             AS volatility_pct,
+        CASE
+            WHEN h.fast_moving_flag  THEN 'Fast Moving'
+            WHEN h.slow_moving_flag  THEN 'Slow Moving'
+            WHEN h.dead_stock_flag   THEN 'Dead Stock'
+            WHEN h.demand_spike_flag THEN 'Demand Spike'
+            ELSE 'Normal'
+        END                                                         AS signal
+    FROM derived.product_health_signals h
+    JOIN max_date ON h.date = max_date.d
+    LEFT JOIN derived.product_dimension d ON h.product_id = d.product_id
+    LEFT JOIN six_month_consumption sc  ON h.product_id = sc.product_id
+    LEFT JOIN supplier_agg sa           ON h.product_id = sa.product_id
+    ORDER BY sa.suppliers NULLS LAST, sc.avg_monthly_consumption DESC NULLS LAST
+"""
+
+_HEALTH_EXPORT_HEADERS = [
+    "product_name", "barcode", "suppliers",
+    "avg_monthly_consumption", "avg_daily_demand", "predicted_daily_demand",
+    "last_7_day_avg", "last_60_day_avg", "volatility_pct", "signal",
+]
+
+_SUPPLIER_EXPORT_SQL = _EXPORT_BASE_CTE + """
+    SELECT
+        psm.supplier_name                                           AS supplier,
+        d.product_name,
+        h.product_id                                                AS barcode,
+        ic.mrp,
+        ic.purchase_price,
+        COALESCE(sc.avg_monthly_consumption, 0)                    AS avg_monthly_consumption,
+        ROUND(h.predicted_daily_demand::numeric, 3)                AS predicted_daily_demand,
+        ROUND(ic.current_stock::numeric, 0)                        AS current_stock,
+        CASE
+            WHEN h.fast_moving_flag  THEN 'Fast Moving'
+            WHEN h.slow_moving_flag  THEN 'Slow Moving'
+            WHEN h.dead_stock_flag   THEN 'Dead Stock'
+            WHEN h.demand_spike_flag THEN 'Demand Spike'
+            ELSE 'Normal'
+        END                                                         AS signal
+    FROM derived.product_health_signals h
+    JOIN max_date ON h.date = max_date.d
+    -- one row per supplier (cross join to expand multi-supplier products)
+    JOIN derived.product_supplier_mapping psm          ON h.product_id = psm.product_id
+    LEFT JOIN derived.product_dimension d              ON h.product_id = d.product_id
+    LEFT JOIN derived.latest_item_combinations ic      ON h.product_id = ic.product_id
+    LEFT JOIN six_month_consumption sc                 ON h.product_id = sc.product_id
+    {supplier_filter}
+    ORDER BY psm.supplier_name, sc.avg_monthly_consumption DESC NULLS LAST
+"""
+
+_SUPPLIER_EXPORT_HEADERS = [
+    "supplier", "product_name", "barcode",
+    "mrp", "purchase_price", "current_stock",
+    "avg_monthly_consumption", "predicted_daily_demand", "signal",
+]
+
+
+@router.get("/health-export")
+def export_health_signals(
+    conn: Connection = Depends(get_conn),
+    _: CurrentUser = Depends(get_current_user),
+):
+    """Download all product health signals as CSV, sorted by supplier then consumption."""
+    rows = conn.execute(text(_HEALTH_EXPORT_SQL)).mappings().all()
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=_HEALTH_EXPORT_HEADERS, extrasaction="ignore")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(dict(row))
+    filename = f"product_health_{date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/supplier-export")
+def export_supplier_report(
+    supplier: str = Query(default=None, description="Filter to a single supplier (exact name)"),
+    conn: Connection = Depends(get_conn),
+    _: CurrentUser = Depends(get_current_user),
+):
+    """Supplier-wise report: one row per product per supplier. Filter with ?supplier=NAME."""
+    if supplier:
+        sql = _SUPPLIER_EXPORT_SQL.format(supplier_filter="WHERE psm.supplier_name = :supplier")
+        params: dict = {"supplier": supplier}
+        safe_name = supplier.replace(" ", "_").replace("/", "-")[:40]
+        filename = f"supplier_{safe_name}_{date.today().isoformat()}.csv"
+    else:
+        sql = _SUPPLIER_EXPORT_SQL.format(supplier_filter="")
+        params = {}
+        filename = f"supplier_report_{date.today().isoformat()}.csv"
+
+    rows = conn.execute(text(sql), params).mappings().all()
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=_SUPPLIER_EXPORT_HEADERS, extrasaction="ignore")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(dict(row))
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/replenishment", response_model=dict)

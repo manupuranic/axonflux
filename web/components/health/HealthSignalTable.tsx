@@ -17,7 +17,7 @@ import { ExternalLink } from "lucide-react";
 
 interface HealthSignalTableProps {
   items: ProductHealthSignal[];
-  onViewTrend?: (barcode: string, name: string) => void;
+  onViewTrend?: (barcode: string, name: string, suppliers: string | null, avgMonthly: number | null) => void;
 }
 
 export function HealthSignalTable({ items, onViewTrend }: HealthSignalTableProps) {
@@ -42,7 +42,7 @@ export function HealthSignalTable({ items, onViewTrend }: HealthSignalTableProps
             <TableRow
               key={item.product_id}
               className="hover:bg-gray-50 cursor-pointer"
-              onClick={() => onViewTrend?.(item.product_id, item.product_name || item.product_id)}
+              onClick={() => onViewTrend?.(item.product_id, item.product_name || item.product_id, item.suppliers ?? null, item.avg_monthly_consumption ?? null)}
             >
               <TableCell className="font-medium text-gray-900">
                 {item.product_name || "—"}

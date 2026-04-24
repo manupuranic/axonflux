@@ -14,9 +14,11 @@ interface ProductDrawerProps {
   productName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  suppliers?: string | null;
+  avgMonthlyConsumption?: number | null;
 }
 
-export function ProductDrawer({ barcode, productName, open, onOpenChange }: ProductDrawerProps) {
+export function ProductDrawer({ barcode, productName, open, onOpenChange, suppliers, avgMonthlyConsumption }: ProductDrawerProps) {
   const trend = useFetch(() => api.demandTrend(barcode, 60), [barcode, open]);
   const recs  = useFetch(() => api.productRecommendations(barcode, 6), [barcode, open]);
 
@@ -40,16 +42,28 @@ export function ProductDrawer({ barcode, productName, open, onOpenChange }: Prod
           {last && (
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: "Qty Sold (latest)", value: Math.round(last.quantity_sold * 10) / 10 },
-                { label: "Revenue (latest)",  value: `₹${Math.round(last.revenue).toLocaleString("en-IN")}` },
-                { label: "7-Day Avg",         value: last.last_7_day_avg == null ? "—" : Math.round(last.last_7_day_avg * 10) / 10 },
-                { label: "Predicted Demand",  value: last.predicted_daily_demand == null ? "—" : Math.round(last.predicted_daily_demand * 10) / 10 },
+                { label: "Avg Monthly (units)", value: avgMonthlyConsumption != null ? Math.round(avgMonthlyConsumption * 10) / 10 : "—" },
+                { label: "Predicted Daily",     value: last.predicted_daily_demand == null ? "—" : Math.round(last.predicted_daily_demand * 10) / 10 },
+                { label: "Qty Sold (latest)",   value: Math.round(last.quantity_sold * 10) / 10 },
+                { label: "7-Day Avg",           value: last.last_7_day_avg == null ? "—" : Math.round(last.last_7_day_avg * 10) / 10 },
               ].map(({ label, value }) => (
                 <div key={label} className="rounded-lg border bg-card px-4 py-3">
                   <p className="text-[11px] text-muted-foreground mb-1">{label}</p>
                   <p className="text-xl font-bold tracking-tight">{value}</p>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Suppliers */}
+          {suppliers && (
+            <div className="rounded-lg border bg-card px-4 py-3">
+              <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wider font-semibold">Procured From</p>
+              <div className="flex flex-wrap gap-1.5">
+                {suppliers.split(", ").map((s) => (
+                  <Badge key={s} variant="secondary" className="text-xs font-normal">{s}</Badge>
+                ))}
+              </div>
             </div>
           )}
 

@@ -11,15 +11,16 @@ SELECT DISTINCT ON (barcode)
 FROM raw.raw_item_combinations
 ORDER BY barcode, imported_at DESC;
 
--- supplier location:
+-- supplier location: latest batch only, one row per supplier name
 CREATE OR REPLACE VIEW derived.supplier_location AS
-SELECT
+SELECT DISTINCT ON (supplier_name_raw)
     supplier_name_raw AS supplier_name,
     CASE
         WHEN city_raw = 'Bellary' THEN 'BELLARY'
         ELSE 'OUTSIDE'
     END AS supplier_region
-FROM raw.raw_supplier_master;
+FROM raw.raw_supplier_master
+ORDER BY supplier_name_raw, imported_at DESC;
 
 -- product_supplier_mapping: 
 CREATE OR REPLACE VIEW derived.product_supplier_mapping AS

@@ -22,6 +22,10 @@ _INGEST_SCRIPT   = _PROJECT_ROOT / "scripts" / "ingest_all.py"
 
 _LOG_FLUSH_EVERY = 3    # lines between DB flushes during live run
 
+# Active subprocess registry: run_id → Popen (cleared on finish/cancel)
+_active_procs: dict[str, "subprocess.Popen[str]"] = {}
+_active_procs_lock = threading.Lock()
+
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -79,28 +83,38 @@ def _finish_run(run_id: str, status: str, lines: list[str]) -> None:
         session.close()
 
 
-def _stream_proc(cmd: list, cwd: Path, env: dict, on_line) -> int:
+def _stream_proc(cmd: list, cwd: Path, env: dict, on_line, run_id: str | None = None) -> int:
     """Run a subprocess, call on_line(str) for each stdout line. Returns exit code."""
     proc = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=str(cwd),
         env=env,
     )
-    for raw in iter(proc.stdout.readline, ""):
-        line = raw.rstrip()
-        if line:
-            on_line(line)
-    proc.stdout.close()
-    proc.wait()
+    if run_id is not None:
+        with _active_procs_lock:
+            _active_procs[run_id] = proc
+    try:
+        for raw in iter(proc.stdout.readline, ""):
+            line = raw.rstrip()
+            if line:
+                on_line(line)
+        proc.stdout.close()
+        proc.wait()
+    finally:
+        if run_id is not None:
+            with _active_procs_lock:
+                _active_procs.pop(run_id, None)
     return proc.returncode
 
 
 # ── Background tasks ───────────────────────────────────────────────────────────
 
-def _run_full_refresh(run_id: str, days_to_export: int) -> None:
+def _run_full_refresh(run_id: str, days_to_export: int, debug: bool = False, include_masters: bool = False) -> None:
     """Export Er4u data → ingest → rebuild derived tables. Streams logs live."""
     lines: list[str] = []
     counter = [0]
@@ -111,38 +125,55 @@ def _run_full_refresh(run_id: str, days_to_export: int) -> None:
         if counter[0] % _LOG_FLUSH_EVERY == 0:
             _flush_logs(run_id, lines[:])
 
-    base_env = {**os.environ, "PYTHONPATH": str(_PROJECT_ROOT), "PYTHONIOENCODING": "utf-8"}
+    try:
+        base_env = {**os.environ, "PYTHONPATH": str(_PROJECT_ROOT), "PYTHONIOENCODING": "utf-8"}
 
-    # ── Step 1: Export ──────────────────────────────────────────────────────
-    emit(f"[STEP 1/3] Exporting Er4u data — {days_to_export} day(s)...")
-    export_env = {**base_env, "ER4U_EXPORT_DAYS": str(days_to_export)}
-    rc = _stream_proc([sys.executable, str(_EXPORT_SCRIPT)], _PROJECT_ROOT, export_env, emit)
-    _flush_logs(run_id, lines[:])
-    if rc != 0:
-        emit(f"[FAILED] Er4u export exited with code {rc}")
+        # ── Step 1: Export ──────────────────────────────────────────────────────
+        emit(f"[STEP 1/3] Exporting Er4u data — {days_to_export} day(s){'  [DEBUG: headless=False]' if debug else ''}...")
+        export_env = {**base_env, "ER4U_EXPORT_DAYS": str(days_to_export)}
+        export_cmd = [sys.executable, str(_EXPORT_SCRIPT)]
+        if debug:
+            export_cmd.append("--no-headless")
+        if include_masters:
+            export_cmd.append("--include-masters")
+        rc = _stream_proc(export_cmd, _PROJECT_ROOT, export_env, emit, run_id)
+        _flush_logs(run_id, lines[:])
+        if rc != 0:
+            status = "cancelled" if rc == -1 else "failed"
+            emit(f"[{'CANCELLED' if status == 'cancelled' else 'FAILED'}] Er4u export exited with code {rc}")
+            _finish_run(run_id, status, lines)
+            return
+
+        # ── Step 2: Ingest ──────────────────────────────────────────────────────
+        emit("\n[STEP 2/3] Ingesting exported files...")
+        rc = _stream_proc([sys.executable, "-u", str(_INGEST_SCRIPT)], _PROJECT_ROOT, base_env, emit, run_id)
+        _flush_logs(run_id, lines[:])
+        if rc != 0:
+            status = "cancelled" if rc == -1 else "failed"
+            emit(f"[{'CANCELLED' if status == 'cancelled' else 'FAILED'}] Ingestion exited with code {rc}")
+            _finish_run(run_id, status, lines)
+            return
+
+        # ── Step 3: Rebuild ─────────────────────────────────────────────────────
+        emit("\n[STEP 3/3] Rebuilding derived tables...")
+        rc = _stream_proc([sys.executable, "-u", str(_PIPELINE_SCRIPT)], _PROJECT_ROOT, base_env, emit, run_id)
+        _flush_logs(run_id, lines[:])
+
+        if rc == 0:
+            status = "success"
+            emit("\n[DONE] All steps complete. Dashboard data is now fresh.")
+        elif rc == -1:
+            status = "cancelled"
+            emit("[CANCELLED] Pipeline was stopped.")
+        else:
+            status = "failed"
+            emit(f"[FAILED] Pipeline rebuild exited with code {rc}")
+        _finish_run(run_id, status, lines)
+
+    except Exception as exc:
+        import traceback
+        emit(f"\n[ERROR] Unhandled exception in pipeline runner:\n{traceback.format_exc()}")
         _finish_run(run_id, "failed", lines)
-        return
-
-    # ── Step 2: Ingest ──────────────────────────────────────────────────────
-    emit("\n[STEP 2/3] Ingesting exported files...")
-    rc = _stream_proc([sys.executable, str(_INGEST_SCRIPT)], _PROJECT_ROOT, base_env, emit)
-    _flush_logs(run_id, lines[:])
-    if rc != 0:
-        emit(f"[FAILED] Ingestion exited with code {rc}")
-        _finish_run(run_id, "failed", lines)
-        return
-
-    # ── Step 3: Rebuild ─────────────────────────────────────────────────────
-    emit("\n[STEP 3/3] Rebuilding derived tables...")
-    rc = _stream_proc([sys.executable, str(_PIPELINE_SCRIPT)], _PROJECT_ROOT, base_env, emit)
-    _flush_logs(run_id, lines[:])
-
-    status = "success" if rc == 0 else "failed"
-    if rc != 0:
-        emit(f"[FAILED] Pipeline rebuild exited with code {rc}")
-    else:
-        emit("\n[DONE] All steps complete. Dashboard data is now fresh.")
-    _finish_run(run_id, status, lines)
 
 
 def _run_pipeline(run_id: str, run_ingestion: bool = False) -> None:
@@ -156,13 +187,26 @@ def _run_pipeline(run_id: str, run_ingestion: bool = False) -> None:
         if counter[0] % _LOG_FLUSH_EVERY == 0:
             _flush_logs(run_id, lines[:])
 
-    base_env = {**os.environ, "PYTHONPATH": str(_PROJECT_ROOT), "PYTHONIOENCODING": "utf-8"}
-    cmd = [sys.executable, str(_PIPELINE_SCRIPT)]
-    if run_ingestion:
-        cmd.append("--run-ingestion")
+    try:
+        base_env = {**os.environ, "PYTHONPATH": str(_PROJECT_ROOT), "PYTHONIOENCODING": "utf-8"}
+        cmd = [sys.executable, "-u", str(_PIPELINE_SCRIPT)]
+        if run_ingestion:
+            cmd.append("--run-ingestion")
 
-    rc = _stream_proc(cmd, _PROJECT_ROOT, base_env, emit)
-    _finish_run(run_id, "success" if rc == 0 else "failed", lines)
+        rc = _stream_proc(cmd, _PROJECT_ROOT, base_env, emit, run_id)
+        if rc == 0:
+            status = "success"
+        elif rc == -1:
+            status = "cancelled"
+            emit("[CANCELLED] Pipeline was stopped.")
+        else:
+            status = "failed"
+        _finish_run(run_id, status, lines)
+
+    except Exception:
+        import traceback
+        emit(f"\n[ERROR] Unhandled exception in pipeline runner:\n{traceback.format_exc()}")
+        _finish_run(run_id, "failed", lines)
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
@@ -170,6 +214,8 @@ def _run_pipeline(run_id: str, run_ingestion: bool = False) -> None:
 @router.post("/full-refresh", status_code=202)
 def trigger_full_refresh(
     background_tasks: BackgroundTasks,
+    debug: bool = Query(False, description="Run browser in non-headless mode for debugging"),
+    include_masters: bool = Query(False, description="Also export supplier master and item combinations"),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ):
@@ -196,13 +242,15 @@ def trigger_full_refresh(
     run_id = str(run.id)
     db.commit()
 
-    background_tasks.add_task(_run_full_refresh, run_id, days_to_export)
+    background_tasks.add_task(_run_full_refresh, run_id, days_to_export, debug, include_masters)
 
     return {
         "run_id": run_id,
         "status": "running",
         "days_to_export": days_to_export,
         "last_data_date": last_date.isoformat() if last_date else None,
+        "debug": debug,
+        "include_masters": include_masters,
     }
 
 
@@ -301,6 +349,47 @@ def get_pipeline_status(
         }
         for r in runs
     ]
+
+
+@router.post("/{run_id}/cancel", status_code=200)
+def cancel_pipeline_run(
+    run_id: str,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    """Kill a running pipeline subprocess and mark the run as cancelled."""
+    from fastapi import HTTPException
+
+    with _active_procs_lock:
+        proc = _active_procs.get(run_id)
+
+    if proc is None:
+        # Check if it's already finished in DB
+        run = db.query(AppPipelineRun).filter(AppPipelineRun.id == run_id).first()
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+        if run.status != "running":
+            return {"status": run.status, "message": "Run already finished"}
+        # Running in DB but no proc registered — mark cancelled defensively
+        run.status = "cancelled"
+        run.completed_at = datetime.now(timezone.utc)
+        db.commit()
+        return {"status": "cancelled", "message": "Marked cancelled (process not tracked)"}
+
+    try:
+        proc.kill()
+    except OSError:
+        pass  # already dead
+
+    # DB will be updated by _finish_run when the background thread exits,
+    # but pre-emptively mark it so the UI reflects immediately
+    run = db.query(AppPipelineRun).filter(AppPipelineRun.id == run_id).first()
+    if run and run.status == "running":
+        run.status = "cancelled"
+        run.completed_at = datetime.now(timezone.utc)
+        db.commit()
+
+    return {"status": "cancelled"}
 
 
 @router.get("/last-data-date")
