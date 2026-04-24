@@ -20,9 +20,15 @@ WITH date_spine AS (
         INTERVAL '1 day'
     )::DATE AS date
 ),
+-- Alias map: alias barcodes remap to their canonical so metrics accumulate correctly
+alias_map AS (
+    SELECT alias_barcode, canonical_barcode FROM app.product_aliases
+),
 products AS (
-    SELECT DISTINCT barcode AS product_id
-    FROM raw.raw_sales_itemwise
+    -- Use canonical barcode where an alias exists; alias barcodes fold into canonical
+    SELECT DISTINCT COALESCE(al.canonical_barcode, rsi.barcode) AS product_id
+    FROM raw.raw_sales_itemwise rsi
+    LEFT JOIN alias_map al ON rsi.barcode = al.alias_barcode
 ),
 itemwise_norm AS (
     -- Normalize raw datetime: ensure space at position 11, then branch 12h vs 24h.
@@ -42,22 +48,24 @@ itemwise_norm AS (
 ),
 sales_agg AS (
     SELECT
-        CASE WHEN dt ~* '(AM|PM)\s*$'
-             THEN TO_TIMESTAMP(dt, 'DD-MM-YYYY HH12:MI AM')
-             ELSE TO_TIMESTAMP(dt, 'DD-MM-YYYY HH24:MI')
+        CASE WHEN i.dt ~* '(AM|PM)\s*$'
+             THEN TO_TIMESTAMP(i.dt, 'DD-MM-YYYY HH12:MI AM')
+             ELSE TO_TIMESTAMP(i.dt, 'DD-MM-YYYY HH24:MI')
         END::DATE AS date,
-        barcode AS product_id,
-        SUM(COALESCE(sale_qty,0) + COALESCE(free_qty,0)) AS quantity_sold,
-        SUM(COALESCE(net_total,0)) AS revenue
-    FROM itemwise_norm
+        COALESCE(al.canonical_barcode, i.barcode) AS product_id,
+        SUM(COALESCE(i.sale_qty,0) + COALESCE(i.free_qty,0)) AS quantity_sold,
+        SUM(COALESCE(i.net_total,0)) AS revenue
+    FROM itemwise_norm i
+    LEFT JOIN alias_map al ON i.barcode = al.alias_barcode
     GROUP BY 1,2
 ),
 purchase_agg AS (
     SELECT
-        TO_DATE(purchase_date_raw, 'DD-MM-YYYY') AS date,
-        barcode AS product_id,
-        SUM(COALESCE(total_qty,0)) AS purchase_quantity
-    FROM raw.raw_purchase_itemwise
+        TO_DATE(rpi.purchase_date_raw, 'DD-MM-YYYY') AS date,
+        COALESCE(al.canonical_barcode, rpi.barcode) AS product_id,
+        SUM(COALESCE(rpi.total_qty,0)) AS purchase_quantity
+    FROM raw.raw_purchase_itemwise rpi
+    LEFT JOIN alias_map al ON rpi.barcode = al.alias_barcode
     GROUP BY 1,2
 ),
 dense_grid AS (

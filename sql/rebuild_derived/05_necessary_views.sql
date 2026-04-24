@@ -30,29 +30,37 @@ SELECT DISTINCT
 FROM raw.raw_purchase_itemwise;
 
 -- product_dimension_view: Recency-aware product identity with app.products overrides
+-- Alias-aware: barcodes in app.product_aliases are remapped to their canonical_barcode
+-- before DISTINCT ON, so alias barcodes never appear as independent product rows.
 CREATE OR REPLACE VIEW derived.product_dimension AS
-WITH item_master_names AS (
-    -- Most recent name from item master (raw_item_combinations)
-    SELECT DISTINCT ON (barcode)
-        barcode,
-        item_name_raw,
-        imported_at
-    FROM raw.raw_item_combinations
-    WHERE item_name_raw IS NOT NULL AND item_name_raw != ''
-    ORDER BY barcode, imported_at DESC
+WITH alias_map AS (
+    -- Confirmed barcode aliases: alias_barcode → canonical_barcode
+    SELECT alias_barcode, canonical_barcode FROM app.product_aliases
+),
+item_master_names AS (
+    -- Most recent name from item master, alias barcodes remapped to canonical
+    SELECT DISTINCT ON (COALESCE(al.canonical_barcode, ric.barcode))
+        COALESCE(al.canonical_barcode, ric.barcode) AS barcode,
+        ric.item_name_raw,
+        ric.imported_at
+    FROM raw.raw_item_combinations ric
+    LEFT JOIN alias_map al ON ric.barcode = al.alias_barcode
+    WHERE ric.item_name_raw IS NOT NULL AND ric.item_name_raw != ''
+    ORDER BY COALESCE(al.canonical_barcode, ric.barcode), ric.imported_at DESC
 ),
 sales_names AS (
-    -- Most recent name from sales (raw_sales_itemwise)
-    SELECT DISTINCT ON (barcode)
-        barcode,
-        item_name_raw,
-        imported_at
-    FROM raw.raw_sales_itemwise
-    WHERE item_name_raw IS NOT NULL AND item_name_raw != ''
-    ORDER BY barcode, imported_at DESC
+    -- Most recent name from sales, alias barcodes remapped to canonical
+    SELECT DISTINCT ON (COALESCE(al.canonical_barcode, rsi.barcode))
+        COALESCE(al.canonical_barcode, rsi.barcode) AS barcode,
+        rsi.item_name_raw,
+        rsi.imported_at
+    FROM raw.raw_sales_itemwise rsi
+    LEFT JOIN alias_map al ON rsi.barcode = al.alias_barcode
+    WHERE rsi.item_name_raw IS NOT NULL AND rsi.item_name_raw != ''
+    ORDER BY COALESCE(al.canonical_barcode, rsi.barcode), rsi.imported_at DESC
 ),
 all_barcodes AS (
-    -- Union of all barcodes from sales and item master
+    -- Union of canonical barcodes only (alias barcodes already folded in above)
     SELECT DISTINCT barcode FROM sales_names
     UNION
     SELECT DISTINCT barcode FROM item_master_names

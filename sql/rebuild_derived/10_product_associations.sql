@@ -25,28 +25,46 @@ INSERT INTO derived.product_associations (
     confidence_b_to_a,
     lift
 )
-WITH total_bills AS (
+WITH alias_map AS (
+    -- Remap alias barcodes to canonical before co-occurrence analysis
+    SELECT alias_barcode, canonical_barcode FROM app.product_aliases
+),
+total_bills AS (
     SELECT COUNT(DISTINCT bill_no)::numeric AS n
     FROM raw.raw_sales_itemwise
     WHERE bill_no IS NOT NULL
 ),
 item_bills AS (
-    SELECT barcode, COUNT(DISTINCT bill_no) AS bill_count
-    FROM raw.raw_sales_itemwise
-    WHERE barcode IS NOT NULL AND bill_no IS NOT NULL
-    GROUP BY barcode
+    -- Alias barcodes count under their canonical barcode
+    SELECT
+        COALESCE(al.canonical_barcode, rsi.barcode) AS barcode,
+        COUNT(DISTINCT bill_no) AS bill_count
+    FROM raw.raw_sales_itemwise rsi
+    LEFT JOIN alias_map al ON rsi.barcode = al.alias_barcode
+    WHERE rsi.barcode IS NOT NULL AND rsi.bill_no IS NOT NULL
+    GROUP BY 1
 ),
 pairs AS (
     SELECT
-        LEAST(a.barcode, b.barcode)    AS barcode_a,
-        GREATEST(a.barcode, b.barcode) AS barcode_b,
-        COUNT(DISTINCT a.bill_no)      AS co_occurrences
+        LEAST(
+            COALESCE(al_a.canonical_barcode, a.barcode),
+            COALESCE(al_b.canonical_barcode, b.barcode)
+        ) AS barcode_a,
+        GREATEST(
+            COALESCE(al_a.canonical_barcode, a.barcode),
+            COALESCE(al_b.canonical_barcode, b.barcode)
+        ) AS barcode_b,
+        COUNT(DISTINCT a.bill_no) AS co_occurrences
     FROM raw.raw_sales_itemwise a
+    LEFT JOIN alias_map al_a ON a.barcode = al_a.alias_barcode
     JOIN raw.raw_sales_itemwise b
         ON  a.bill_no  = b.bill_no
         AND a.barcode != b.barcode
+    LEFT JOIN alias_map al_b ON b.barcode = al_b.alias_barcode
     WHERE a.barcode IS NOT NULL AND b.barcode IS NOT NULL
       AND a.bill_no  IS NOT NULL
+      -- Exclude pairs where alias and canonical appear in the same bill (same product)
+      AND COALESCE(al_a.canonical_barcode, a.barcode) != COALESCE(al_b.canonical_barcode, b.barcode)
     GROUP BY 1, 2
     HAVING COUNT(DISTINCT a.bill_no) >= 5
 )
