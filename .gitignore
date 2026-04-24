@@ -1,6 +1,9 @@
 # ---- Claude Code working directory ----
 .claude/
 
+# ---- Git worktrees ----
+.worktrees/
+
 # ---- Python ----
 __pycache__/
 *.py[cod]
