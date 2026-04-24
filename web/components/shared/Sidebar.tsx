@@ -69,9 +69,9 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         ].join(" ")}
       >
         {/* Header */}
-        <div className="p-6">
-          <h1 className="text-2xl font-bold text-gray-900">AxonFlux</h1>
-          <p className="text-sm text-gray-600">Analytics Dashboard</p>
+        <div className="px-5 py-4">
+          <img src="/logo.png" alt="AxonFlux" className="h-10 w-auto" />
+          <p className="text-xs text-gray-500 mt-1">Analytics Dashboard</p>
         </div>
 
         <Separator />
