@@ -1,5 +1,6 @@
 alembic==1.18.4
 rapidfuzz>=3.0
+holidays>=0.95
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.13.0

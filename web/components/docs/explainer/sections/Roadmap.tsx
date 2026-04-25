@@ -27,7 +27,7 @@ const PHASES: {
     title: "Phase B — ML upgrade",
     blurb: "Replace SQL heuristics with validated models. Ship intelligence that teaches the retailer.",
     items: [
-      { name: "B1 · ML demand forecasting", detail: "XGBoost/ARIMA in ml/, MLflow tracking. Promote to derived.demand_predictions.", status: "in-flight" },
+      { name: "B1 · ML demand forecasting", detail: "Data-eng complete: calendar_dim (Indian holidays + festivals), stockout_proxy censoring, app.ml_demand_predictions schema. LightGBM quantile model (P10/P50/P90) in ml/ — next.", status: "in-flight" },
       { name: "B2 · Basket analysis", detail: "30,018 pairs in derived.product_associations. Frequently Bought Together UI.", status: "shipped" },
       { name: "B3 · Product entity resolution", detail: "RapidFuzz clustering, staff review UI, alias remap at aggregation source.", status: "shipped" },
     ],

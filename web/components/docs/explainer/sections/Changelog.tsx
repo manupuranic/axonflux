@@ -13,6 +13,12 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    date: "2026-04-26",
+    title: "B1 pre-flight: calendar dim + stockout censoring + ML predictions schema",
+    detail: "derived.calendar_dim seeded (2,192 rows, 2024–2029) with Indian official holidays + 12 retail festivals with pre/post windows. step 02 restructured to CTE — adds stockout_proxy (80K censored rows), is_holiday, days_to_next_festival. Migration 007: app.ml_demand_predictions(date, product_id, p10, p50, p90).",
+    type: "feature",
+  },
+  {
     date: "2026-04-25",
     title: "Project Explainer (interactive)",
     detail: "Replaced static system design page with component-driven explainer — animations, scroll-spy, flip cards, interactive pipeline stepper, SQL deep dive tabs, interview mode.",

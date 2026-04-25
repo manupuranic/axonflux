@@ -5,7 +5,7 @@ import { fadeInUp, m, stagger } from "../motion";
 const STATS = [
   { label: "Raw rows", value: "auditable", note: "every row → batch_id + file" },
   { label: "Derived rows", value: "~2.3M", note: "dense (date × product) series" },
-  { label: "Pipeline steps", value: "10", note: "deterministic SQL chain" },
+  { label: "Pipeline steps", value: "11", note: "deterministic SQL chain" },
   { label: "Source of truth", value: "raw.*", note: "append-only, never mutated" },
 ];
 
@@ -28,7 +28,7 @@ export function Hero() {
         <m.div variants={fadeInUp}>
           <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/70 backdrop-blur px-3 py-1 text-xs font-medium text-blue-700">
             <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
-            Living document · v1.0 · 2026-04-25
+            Living document · v1.1 · 2026-04-26
           </span>
         </m.div>
 
