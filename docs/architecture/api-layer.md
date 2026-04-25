@@ -54,8 +54,15 @@ api/
 # From project root (D:\projects\axonflux)
 pip install -r api/requirements.txt
 
-# Run migrations (first time only)
+# Fresh DB only: create raw.* and derived.* schemas (not managed by Alembic)
+psql -U postgres -d axonflux -f sql/raw_tables.sql
+psql -U postgres -d axonflux -f sql/derived_tables.sql
+
+# Run app migrations (app.* schema only — safe on live DB)
 alembic upgrade head
+
+# After first ingestion: install raw dedup triggers
+python scripts/setup_raw_triggers.py
 
 # Start dev server
 uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
