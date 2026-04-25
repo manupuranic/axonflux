@@ -1,5 +1,6 @@
--- latest_item_combinations: 
-CREATE OR REPLACE VIEW derived.latest_item_combinations AS
+-- latest_item_combinations:
+DROP VIEW IF EXISTS derived.latest_item_combinations CASCADE;
+CREATE VIEW derived.latest_item_combinations AS
 SELECT DISTINCT ON (barcode)
     barcode AS product_id,
     purchase_price,
@@ -12,7 +13,8 @@ FROM raw.raw_item_combinations
 ORDER BY barcode, imported_at DESC;
 
 -- supplier location: latest batch only, one row per supplier name
-CREATE OR REPLACE VIEW derived.supplier_location AS
+DROP VIEW IF EXISTS derived.supplier_location CASCADE;
+CREATE VIEW derived.supplier_location AS
 SELECT DISTINCT ON (supplier_name_raw)
     supplier_name_raw AS supplier_name,
     CASE
@@ -22,8 +24,9 @@ SELECT DISTINCT ON (supplier_name_raw)
 FROM raw.raw_supplier_master
 ORDER BY supplier_name_raw, imported_at DESC;
 
--- product_supplier_mapping: 
-CREATE OR REPLACE VIEW derived.product_supplier_mapping AS
+-- product_supplier_mapping:
+DROP VIEW IF EXISTS derived.product_supplier_mapping CASCADE;
+CREATE VIEW derived.product_supplier_mapping AS
 SELECT DISTINCT
     barcode AS product_id,
     supplier_name_raw AS supplier_name
@@ -32,7 +35,8 @@ FROM raw.raw_purchase_itemwise;
 -- product_dimension_view: Recency-aware product identity with app.products overrides
 -- Alias-aware: barcodes in app.product_aliases are remapped to their canonical_barcode
 -- before DISTINCT ON, so alias barcodes never appear as independent product rows.
-CREATE OR REPLACE VIEW derived.product_dimension AS
+DROP VIEW IF EXISTS derived.product_dimension CASCADE;
+CREATE VIEW derived.product_dimension AS
 WITH alias_map AS (
     -- Confirmed barcode aliases: alias_barcode → canonical_barcode
     SELECT alias_barcode, canonical_barcode FROM app.product_aliases
