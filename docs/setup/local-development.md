@@ -3,160 +3,209 @@
 ## Related Guides
 
 - [Git & Remote Strategy](./git-strategy.md) — two-remote setup, what's safe to push, daily workflow
-- [Demo Data Setup](./demo-data.md) — running with synthetic data, switching between demo/real DB
+- [Demo Data Setup](./demo-data.md) — running a separate demo database alongside production
 
 ## Prerequisites
 
 - Python 3.13+
-- PostgreSQL (running locally on port 5432)
-- Node.js 20+ (for the Next.js frontend, when ready)
-- The `.env` file in the project root with DB credentials
+- PostgreSQL running locally on port 5432
+- Node.js 20+
+- Git Bash (Windows) — all shell commands below use Unix syntax
 
-## First-Time Setup
+## Fresh Machine Setup (with demo data)
 
-### 1. Install API dependencies
+All commands run from the **project root** (`axonflux/`). `PYTHONPATH=.` is required for any script that imports from `config/`, `db/`, `raw_ingestion/` etc.
 
-```bash
-# From project root
-pip install -r api/requirements.txt
+---
+
+### 1. Create `.env`
+
+Create `.env` in the project root:
+
 ```
-
-The pipeline's `requirements.txt` and the API's `requirements.txt` can share the same virtual environment. There are no conflicts.
-
-### 2. Add SECRET_KEY to .env
-
-Open `.env` and add:
-```
+user=postgres
+password=your_postgres_password
+host=localhost
+port=5432
+dbname=axonflux
 SECRET_KEY=generate-a-long-random-string-here
 ```
 
-Generate one with:
+Generate `SECRET_KEY`:
 ```bash
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-### 3. Run database migrations
+---
 
-Creates the `app.*` schema and all application tables. Safe to run on a live database — all DDL uses `IF NOT EXISTS`.
+### 2. Install Python dependencies
+
+```bash
+pip install -r api/requirements.txt
+```
+
+The pipeline and API share the same virtualenv — no conflicts.
+
+---
+
+### 3. Create the database
+
+```bash
+createdb -U postgres axonflux
+```
+
+---
+
+### 4. Create raw + derived schemas
+
+`raw.*` and `derived.*` are not managed by Alembic — run once on a fresh database:
+
+```bash
+psql -U postgres -d axonflux -f sql/raw_tables.sql
+psql -U postgres -d axonflux -f sql/derived_tables.sql
+```
+
+If you see errors and need to retry (e.g. after pulling a fix), drop and recreate:
+
+```bash
+psql -U postgres -d axonflux -c "DROP SCHEMA IF EXISTS raw CASCADE; DROP SCHEMA IF EXISTS derived CASCADE;"
+psql -U postgres -d axonflux -f sql/raw_tables.sql
+psql -U postgres -d axonflux -f sql/derived_tables.sql
+```
+
+---
+
+### 5. Run app migrations
+
+Creates `app.*` schema and all application tables:
 
 ```bash
 alembic upgrade head
 ```
 
-### 3b. Load data + install raw dedup triggers
+---
 
-No data yet? Use demo data to populate `raw.*` — see [Demo Data Setup](./demo-data.md) for the full flow.
+### 6. Generate demo data
 
-Once `raw.*` tables exist, install the dedup triggers:
+Generates 6 months of synthetic FMCG sales + purchase data into `data/sample/`:
+
+```bash
+python scripts/generate_demo_data.py
+```
+
+Output:
+- `data/sample/sales_itemwise/sales_itemwise_demo.csv`
+- `data/sample/sales_billwise/sales_billwise_demo.csv`
+- `data/sample/purchase_billwise/purchase_billwise_demo.csv`
+
+---
+
+### 7. Copy demo CSVs to incoming
+
+```bash
+mkdir -p data/incoming/sales_itemwise data/incoming/sales_billwise data/incoming/purchase_billwise
+cp data/sample/sales_itemwise/sales_itemwise_demo.csv     data/incoming/sales_itemwise/
+cp data/sample/sales_billwise/sales_billwise_demo.csv     data/incoming/sales_billwise/
+cp data/sample/purchase_billwise/purchase_billwise_demo.csv data/incoming/purchase_billwise/
+```
+
+---
+
+### 8. Run ingestion
+
+Loads CSVs into `raw.*` tables:
+
+```bash
+PYTHONPATH=. python scripts/ingest_all.py
+```
+
+---
+
+### 9. Install raw dedup triggers
+
+Must run after ingestion (raw tables must exist first):
 
 ```bash
 python scripts/setup_raw_triggers.py
 ```
 
-Idempotent — safe to re-run. Installs indexes + BEFORE INSERT dedup triggers on the four raw transaction tables. Alembic does not manage `raw.*`; this script does.
+---
 
-### 4. Create the first admin user
+### 10. Rebuild derived tables
+
+Runs the full 10-step SQL pipeline:
+
+```bash
+PYTHONPATH=. python pipelines/weekly_pipeline.py
+```
+
+---
+
+### 11. Create admin user
 
 ```bash
 python scripts/create_admin.py
 ```
 
-(See `docs/architecture/api-layer.md` for the script content if it doesn't exist yet.)
+---
 
-### 5. Install frontend dependencies
+### 12. Install frontend dependencies
 
 ```bash
-cd web
-npm install
+cd web && npm install
 ```
 
-### 6. Start the API
+---
+
+### 13. Start the stack
+
+Two terminals from project root:
 
 ```bash
-# From project root
+# Terminal 1 — API
 python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2 — Frontend
+cd web && npm run dev
 ```
 
-API docs: http://localhost:8000/api/docs
+- API docs: http://localhost:8000/api/docs
+- Dashboard: http://localhost:3000
 
-### 7. Start the frontend (separate terminal)
-
-```bash
-cd web
-npm run dev
-```
-
-Frontend: http://localhost:3000
+---
 
 ## Process Ports
 
-| Process | Port | Notes |
-|---|---|---|
-| PostgreSQL | 5432 | Existing, no change |
-| FastAPI (uvicorn) | 8000 | `uvicorn api.main:app` |
-| Next.js dev | 3000 | `npm run dev` in `web/` |
-| MLflow UI | 5001 | `mlflow server ...` in `ml/` |
+| Process | Port |
+|---|---|
+| PostgreSQL | 5432 |
+| FastAPI (uvicorn) | 8000 |
+| Next.js dev | 3000 |
+| MLflow UI | 5001 |
 
-## Running the Full Stack (Production)
+---
 
-```bash
-# Start all processes with PM2
-pm2 start ecosystem.config.js
-```
+## Accessing from Another Device on the Same WiFi
 
-(Ecosystem config to be added in Phase 9.)
-
-## Accessing from Other Devices on the Same WiFi
-
-To access the web app from another device (phone, tablet, laptop) on the same WiFi network:
-
-### Step 1: Find your machine's IP address
-
-**Windows PowerShell:**
+Find your machine's local IP:
 ```powershell
-ipconfig
-# Look for IPv4 Address under your WiFi adapter (e.g., 192.168.x.x)
+ipconfig   # look for IPv4 under WiFi adapter, e.g. 192.168.1.42
 ```
 
-Or from the terminal:
-```bash
-hostname -I
-```
-
-Example: `192.168.1.42`
-
-### Step 2: Update the API URL (one-time)
-
-Edit `web/lib/api.ts` and change:
+Edit `web/lib/api.ts`:
 ```typescript
-const BASE = "http://localhost:8000";
+const BASE = "http://192.168.1.42:8000";  // replace with your IP
 ```
 
-To:
-```typescript
-const BASE = "http://192.168.1.42:8000";  // Replace with your actual IP
-```
+Restart `npm run dev`. Access from other device at `http://192.168.1.42:3000`.
 
-Then restart the Next.js dev server (`npm run dev`).
+**Firewall:** Allow Python and Node.js incoming connections when prompted.
 
-### Step 3: Access from another device
-
-On the other device, open a browser and navigate to:
-```
-http://192.168.1.42:3000
-```
-
-Replace `192.168.1.42` with your actual IP address from Step 1.
-
-### Tips
-
-- **Firewall**: Ensure your Windows firewall allows Python and Node.js to accept incoming connections. You may get a prompt — click "Allow."
-- **Static IP**: For consistent access, consider setting a static IP for your dev machine, or note the IP in a bookmark.
-- **Testing**: From the same machine, you can test with `http://localhost:3000` (frontend) and `http://localhost:8000/api/docs` (API).
-- **Mobile testing**: This is ideal for testing the dashboard on a tablet or phone on the same network.
+---
 
 ## Important Notes
 
-- Run all commands from the **project root** (`D:\projects\axonflux`) so that Python can resolve `from config.db import engine` etc.
-- The existing pipeline scripts (`scripts/`, `pipelines/`) are completely unaffected. They run independently.
-- Alembic only manages `app.*` tables. It will never touch `raw.*`, `derived.*`, or `recon.*`.
+- Run all commands from project root so Python resolves `from config.db import engine` etc.
+- `PYTHONPATH=.` is required for pipeline scripts and `ingest_all.py`.
+- Alembic only manages `app.*`. It never touches `raw.*` or `derived.*`.
+- `raw.*` and `derived.*` schemas created by `sql/raw_tables.sql` and `sql/derived_tables.sql` respectively.

@@ -35,27 +35,32 @@ createdb axonflux_demo
 cp .env .env.demo
 # Edit .env.demo: change  dbname=axonflux  →  dbname=axonflux_demo
 
-# 3. Run migrations (swap env file temporarily)
+# 3. Create raw + derived schemas (one-time, not managed by Alembic)
+psql -U postgres -d axonflux_demo -f sql/raw_tables.sql
+psql -U postgres -d axonflux_demo -f sql/derived_tables.sql
+
+# 4. Run app migrations (swap env file temporarily)
 cp .env .env.real && cp .env.demo .env
 alembic upgrade head
 cp .env.real .env  # restore
 
-# 4. Copy sample CSVs to incoming
-cp -r data/sample/sales_itemwise    data/incoming/
-cp -r data/sample/sales_billwise    data/incoming/
-cp -r data/sample/purchase_billwise data/incoming/
-cp -r data/sample/supplier_master   data/incoming/
+# 5. Copy sample CSVs to incoming
+# generate_demo_data.py produces only these three report types
+mkdir -p data/incoming/sales_itemwise data/incoming/sales_billwise data/incoming/purchase_billwise
+cp data/sample/sales_itemwise/sales_itemwise_demo.csv       data/incoming/sales_itemwise/
+cp data/sample/sales_billwise/sales_billwise_demo.csv       data/incoming/sales_billwise/
+cp data/sample/purchase_billwise/purchase_billwise_demo.csv data/incoming/purchase_billwise/
 
-# 5. Run ingestion
+# 6. Run ingestion
 PYTHONPATH=. python scripts/ingest_all.py
 
-# 5b. Install raw dedup triggers (raw tables must exist first)
+# 7. Install raw dedup triggers (raw tables must exist first)
 python scripts/setup_raw_triggers.py
 
-# 6. Rebuild all derived tables
+# 8. Rebuild all derived tables
 PYTHONPATH=. python pipelines/weekly_pipeline.py
 
-# 7. Create demo user
+# 9. Create demo user
 python scripts/create_admin.py
 # Suggested: username=demo  password=demo123
 ```

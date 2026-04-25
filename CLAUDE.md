@@ -33,6 +33,10 @@ python scripts/create_admin.py
 # Install API deps (separate requirements file, shares same venv)
 pip install -r api/requirements.txt
 
+# Fresh DB only: create raw.* and derived.* schemas (not managed by Alembic)
+psql -U postgres -d axonflux -f sql/raw_tables.sql
+psql -U postgres -d axonflux -f sql/derived_tables.sql
+
 # Run database migrations (app.* schema only — safe on live DB)
 alembic upgrade head
 

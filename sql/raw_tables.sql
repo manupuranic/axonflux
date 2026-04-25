@@ -1,6 +1,3 @@
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
 CREATE SCHEMA IF NOT EXISTS raw;
 
 CREATE TABLE raw.ingestion_batches (
@@ -20,7 +17,7 @@ CREATE TABLE raw.ingestion_batches (
 
 
 CREATE TABLE raw.raw_item_combinations (
-  id uuid NOT NULL DEFAULT extensions.uuid_generate_v4(),
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
   import_batch_id uuid NOT NULL,
   source_file_name text NOT NULL,
   imported_at timestamp DEFAULT now(),
@@ -47,7 +44,7 @@ CREATE TABLE raw.raw_item_combinations (
 );
 
 CREATE TABLE raw.raw_purchase_billwise (
-  id uuid NOT NULL DEFAULT extensions.uuid_generate_v4(),
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
   import_batch_id uuid NOT NULL,
   source_file_name text NOT NULL,
   imported_at timestamp DEFAULT now(),
@@ -86,7 +83,7 @@ CREATE TABLE raw.raw_purchase_billwise (
 );
 
 CREATE TABLE raw.raw_purchase_itemwise (
-  id uuid NOT NULL DEFAULT extensions.uuid_generate_v4(),
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
   import_batch_id uuid NOT NULL,
   source_file_name text NOT NULL,
   imported_at timestamp DEFAULT now(),
@@ -127,7 +124,7 @@ CREATE TABLE raw.raw_purchase_itemwise (
 );
 
 CREATE TABLE raw.raw_sales_billwise (
-  id uuid NOT NULL DEFAULT extensions.uuid_generate_v4(),
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
   import_batch_id uuid NOT NULL,
   source_file_name text NOT NULL,
   imported_at timestamp DEFAULT now(),
@@ -231,7 +228,7 @@ CREATE TABLE raw.raw_sales_billwise (
 );
 
 CREATE TABLE raw.raw_sales_itemwise (
-  id uuid NOT NULL DEFAULT extensions.uuid_generate_v4(),
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
   import_batch_id uuid NOT NULL,
   source_file_name text NOT NULL,
   imported_at timestamp DEFAULT now(),
@@ -288,7 +285,7 @@ CREATE TABLE raw.raw_sales_itemwise (
 );
 
 CREATE TABLE raw.raw_supplier_master (
-  id uuid NOT NULL DEFAULT extensions.uuid_generate_v4(),
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
   import_batch_id uuid NOT NULL,
   source_file_name text NOT NULL,
   imported_at timestamp DEFAULT now(),
