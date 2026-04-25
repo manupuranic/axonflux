@@ -46,6 +46,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     { href: "/tools/pamphlet-generator", label: "Pamphlets", icon: "📄" },
     { href: "/tools/entity-resolution", label: "Entity Resolution", icon: "🔗" },
     { href: "/docs", label: "System Design", icon: "🏗️" },
+    { href: "/docs/library", label: "Docs Library", icon: "📚" },
   ];
 
   return (

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.core.config import settings
-from api.routers import auth, analytics, customers, products, suppliers, pipeline
+from api.routers import auth, analytics, customers, products, suppliers, pipeline, docs
 from api.tools import register_tools, _registered_manifests, get_manifests
 from api.tools.base import ToolManifest
 
@@ -35,6 +35,7 @@ app.include_router(customers.router)
 app.include_router(products.router)
 app.include_router(suppliers.router)
 app.include_router(pipeline.router)
+app.include_router(docs.router)
 
 # ---------------------------------------------------------------------------
 # Tool plugin routers (auto-discovered)

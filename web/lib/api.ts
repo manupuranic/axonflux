@@ -330,6 +330,19 @@ export const api = {
       ),
   },
 
+  // Docs — markdown library browser
+  docs: {
+    list: () =>
+      apiFetch<Array<{ category: string; slug: string; filename: string; title: string }>>(
+        "/api/documentation"
+      ),
+
+    get: (slug: string) =>
+      apiFetch<{ slug: string; content: string }>(
+        `/api/documentation/${slug}`
+      ),
+  },
+
   // HOTO — Daily Cash Closure
   hoto: {
     getByDate: (date: string) =>
