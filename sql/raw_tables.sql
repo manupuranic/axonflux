@@ -317,7 +317,4 @@ CREATE TABLE raw.raw_supplier_master (
   CONSTRAINT raw_supplier_master_pkey PRIMARY KEY (id)
 );
 
-SELECT table_name
-FROM information_schema.tables
-WHERE table_schema = 'raw';
 

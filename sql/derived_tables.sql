@@ -522,24 +522,6 @@ FROM derived.product_daily_metrics;
 CREATE INDEX IF NOT EXISTS idx_stock_product_date
 ON derived.product_stock_position (product_id, date);
 
--- Current Stock Snapshot
-SELECT *
-FROM derived.product_stock_position
-WHERE date = (
-    SELECT MAX(date)
-    FROM derived.product_stock_position
-);
-
--- Dead Stock Detector (Improved)
-SELECT product_id, pseudo_stock
-FROM derived.product_stock_position
-WHERE date = (
-    SELECT MAX(date)
-    FROM derived.product_stock_position
-)
-AND pseudo_stock > 0
-ORDER BY pseudo_stock DESC;
-
 -- Few derived views for further restock recommendations
 
 -- latest_item_combinations: 
