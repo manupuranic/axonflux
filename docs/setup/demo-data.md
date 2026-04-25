@@ -49,6 +49,9 @@ cp -r data/sample/supplier_master   data/incoming/
 # 5. Run ingestion
 PYTHONPATH=. python scripts/ingest_all.py
 
+# 5b. Install raw dedup triggers (raw tables must exist first)
+python scripts/setup_raw_triggers.py
+
 # 6. Rebuild all derived tables
 PYTHONPATH=. python pipelines/weekly_pipeline.py
 

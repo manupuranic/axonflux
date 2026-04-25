@@ -36,6 +36,9 @@ pip install -r api/requirements.txt
 # Run database migrations (app.* schema only — safe on live DB)
 alembic upgrade head
 
+# Install raw dedup triggers (run AFTER first ingestion on a new machine)
+python scripts/setup_raw_triggers.py
+
 # Start dev server
 python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
 # Docs: http://localhost:8000/api/docs

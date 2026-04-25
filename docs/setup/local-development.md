@@ -43,6 +43,18 @@ Creates the `app.*` schema and all application tables. Safe to run on a live dat
 alembic upgrade head
 ```
 
+### 3b. Load data + install raw dedup triggers
+
+No data yet? Use demo data to populate `raw.*` — see [Demo Data Setup](./demo-data.md) for the full flow.
+
+Once `raw.*` tables exist, install the dedup triggers:
+
+```bash
+python scripts/setup_raw_triggers.py
+```
+
+Idempotent — safe to re-run. Installs indexes + BEFORE INSERT dedup triggers on the four raw transaction tables. Alembic does not manage `raw.*`; this script does.
+
 ### 4. Create the first admin user
 
 ```bash
