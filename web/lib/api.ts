@@ -39,8 +39,7 @@ import type {
   ProductDetail,
 } from "@/types/api";
 
-const BASE = "http://localhost:8000";
-// const BASE = "http://192.168.1.20:8000"
+const BASE = process.env.API_BASE_URL || "";
 
 function buildQuery(params: Record<string, unknown>): string {
   const filtered = Object.entries(params)
