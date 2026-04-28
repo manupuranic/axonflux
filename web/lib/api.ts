@@ -39,7 +39,7 @@ import type {
   ProductDetail,
 } from "@/types/api";
 
-const BASE = process.env.API_BASE_URL || "";
+const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 function buildQuery(params: Record<string, unknown>): string {
   const filtered = Object.entries(params)
