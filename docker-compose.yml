@@ -10,7 +10,7 @@ services:
     environment:
       POSTGRES_DB: axonflux
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -24,8 +24,7 @@ services:
       timeout: 5s
       retries: 10
 
-    ports:
-      - "5432:5432"
+  
 
 
   api:
@@ -61,7 +60,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=http://api:8000
     depends_on:
       - api
 
