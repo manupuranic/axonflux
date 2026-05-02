@@ -152,7 +152,16 @@ def get_customer_history(
         text("""
             SELECT
                 bill_no,
-                TO_TIMESTAMP(bill_datetime_raw, 'DD-MM-YYYYHH12:MI AM')::DATE AS bill_date,
+                TO_TIMESTAMP(
+                    CASE WHEN SUBSTRING(bill_datetime_raw, 11, 1) = ' '
+                         THEN bill_datetime_raw
+                         ELSE SUBSTRING(bill_datetime_raw, 1, 10) || ' ' || SUBSTRING(bill_datetime_raw, 11)
+                    END,
+                    CASE WHEN bill_datetime_raw ~* '(AM|PM)\s*$'
+                         THEN 'DD-MM-YYYY HH12:MI AM'
+                         ELSE 'DD-MM-YYYY HH24:MI'
+                    END
+                )::DATE AS bill_date,
                 net_total,
                 total_discount,
                 COALESCE(actual_cash, cash_amount, 0)                                    AS cash_total,
