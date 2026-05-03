@@ -74,3 +74,7 @@ secrets/
 
 # ---- Node (if added later) ----
 node_modules/
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+*.exe
