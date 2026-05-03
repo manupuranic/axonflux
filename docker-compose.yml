@@ -63,5 +63,11 @@ services:
       api:
         condition: service_started
 
+  seed:
+    build: .
+    command: python scripts/demo_reset.py --yes
+    depends_on:
+      - db
+
 volumes:
   pgdata:
