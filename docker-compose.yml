@@ -50,12 +50,15 @@ services:
       uvicorn api.main:app --host 0.0.0.0 --port 8000
       "
   web:
-    build: ./web
+    build:
+      context: ./web
+      args:
+        INTERNAL_API_URL: http://api:8000   # BUILD TIME FIX
     container_name: axonflux-web
     ports:
       - "3000:3000"
     environment:
-      - INTERNAL_API_URL=http://api:8000
+      - INTERNAL_API_URL=http://api:8000   # (optional runtime, harmless)
     depends_on:
       api:
         condition: service_started
