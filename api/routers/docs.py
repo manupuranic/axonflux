@@ -14,6 +14,7 @@ _DOCS_ROOT = Path(__file__).resolve().parents[2] / "docs"
 _CATEGORIES = {
     "architecture": "Architecture",
     "decisions": "Design Decisions",
+    "setup": "Setup Guides",
 }
 
 

@@ -1,5 +1,4 @@
 services:
-
   db:
     image: postgres:16
     container_name: axonflux-db
@@ -23,9 +22,6 @@ services:
       timeout: 5s
       retries: 10
 
-  
-
-
   api:
     build: .
     container_name: axonflux-api
@@ -38,6 +34,7 @@ services:
 
     environment:
       PYTHONPATH: /app
+      host: db
 
     volumes:
       - ./data/incoming:/app/data/incoming
@@ -50,7 +47,6 @@ services:
       sh -c "
       alembic upgrade head &&
       python scripts/setup_raw_triggers.py &&
-      python scripts/create_admin.py &&
       uvicorn api.main:app --host 0.0.0.0 --port 8000
       "
   web:
@@ -59,10 +55,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://api:8000
+      - INTERNAL_API_URL=http://api:8000
     depends_on:
-      - api
-
+      api:
+        condition: service_started
 
 volumes:
   pgdata:
