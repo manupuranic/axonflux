@@ -7,6 +7,9 @@ RUN npm install
 
 COPY . .
 
+ARG INTERNAL_API_URL
+ENV INTERNAL_API_URL=$INTERNAL_API_URL
+
 RUN npm run build
 
 EXPOSE 3000
