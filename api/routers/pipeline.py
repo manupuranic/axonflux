@@ -44,8 +44,21 @@ def _get_last_data_date() -> date | None:
     try:
         with engine.connect() as conn:
             row = conn.execute(text(
-                "SELECT TO_TIMESTAMP(MAX(bill_datetime_raw), 'DD-MM-YYYYHH12:MI AM')::date "
-                "FROM raw.raw_sales_billwise WHERE bill_datetime_raw IS NOT NULL"
+                """
+                SELECT MAX(TO_TIMESTAMP(
+                    CASE WHEN SUBSTRING(bill_datetime_raw, 11, 1) = ' '
+                         THEN bill_datetime_raw
+                         ELSE SUBSTRING(bill_datetime_raw, 1, 10) || ' ' || SUBSTRING(bill_datetime_raw, 11)
+                    END,
+                    CASE WHEN bill_datetime_raw ~* '(AM|PM)\\s*$'
+                         THEN 'DD-MM-YYYY HH12:MI AM'
+                         ELSE 'DD-MM-YYYY HH24:MI'
+                    END
+                )::date)
+                FROM raw.raw_sales_billwise
+                WHERE bill_datetime_raw IS NOT NULL
+                  AND bill_datetime_raw ~ '^\\d{2}-\\d{2}-\\d{4}'
+                """
             )).fetchone()
             return row[0] if row and row[0] else None
     except Exception:

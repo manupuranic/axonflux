@@ -100,11 +100,45 @@ NAME_VARIANTS = {
 }
 
 # ── Customers ─────────────────────────────────────────────────────────────────
-REGULAR_CUSTOMERS = [
-    (f"98765{str(i).zfill(5)}", f"Customer {i:03d}") for i in range(1, 201)
+_FIRST_NAMES = [
+    # Male — North Karnataka / general South Indian
+    "Ravi", "Suresh", "Mahesh", "Ramesh", "Naresh", "Sanjay", "Vijay", "Arun",
+    "Kiran", "Sunil", "Manoj", "Rakesh", "Dinesh", "Ganesh", "Praveen", "Naveen",
+    "Vinod", "Deepak", "Girish", "Lokesh", "Umesh", "Anand", "Prasad", "Ashok",
+    "Shivakumar", "Basavaraj", "Manjunath", "Venkatesha", "Siddesh", "Rajesh",
+    "Harish", "Santosh", "Vishal", "Rohan", "Amit", "Sachin", "Abhishek", "Nikhil",
+    "Akash", "Rahul",
+    # Female
+    "Lakshmi", "Savitha", "Pushpa", "Meena", "Sunitha", "Kavitha", "Priya",
+    "Rekha", "Anitha", "Shobha", "Radha", "Usha", "Suma", "Rashmi", "Hema",
+    "Nalini", "Vidya", "Geeta", "Saritha", "Padmavathi", "Swathi", "Deepa",
+    "Pooja", "Sneha", "Divya", "Asha", "Nirmala", "Shanthi", "Bharathi", "Yamuna",
 ]
-WALK_IN_NAMES = ["WALK-IN", "CASH", "RETAIL", "GENERAL", "CASH CUSTOMER"]
+_LAST_NAMES = [
+    "Kumar", "Reddy", "Naidu", "Gowda", "Murthy", "Rao", "Shetty", "Hegde",
+    "Nayak", "Sharma", "Patil", "Kamath", "Pai", "Bhat", "Desai", "Joshi",
+    "Pillai", "Menon", "Iyer", "Nair", "Verma", "Singh", "Gupta", "Mishra",
+    "Patel", "Shah", "Mehta", "Tiwari", "Yadav", "Trivedi",
+]
+# Isolated RNG — does not disturb the main random.seed(42) state used in generate()
+_name_rng = random.Random(99)
+REGULAR_CUSTOMERS = [
+    (
+        f"98765{str(i).zfill(5)}",
+        f"{_name_rng.choice(_FIRST_NAMES)} {_name_rng.choice(_LAST_NAMES)}",
+    )
+    for i in range(1, 201)
+]
+WALK_IN_NAMES = [
+    "WALK-IN", "CASH", "RETAIL", "GENERAL", "CASH CUSTOMER",
+    "X", "MR", "PTF", "SUNDRY", "GENERAL CUSTOMER",
+    "WALK IN", "WALKIN", "RETAIL CUSTOMER", "CUSTOMER",
+]
 OPERATORS = ["ADMIN", "OPERATOR1", "OPERATOR2"]
+
+# Every 7th regular customer is a loyalty member (~28 of 200).
+# Membership is inferred downstream via membercard_discount > 0 — no explicit flag in source data.
+MEMBER_MOBILES = {m for m, _ in REGULAR_CUSTOMERS[::7]}
 
 VELOCITY_WEIGHTS = {"fast": 1.0, "normal": 0.4, "slow": 0.1, "dead": 0.01}
 
@@ -121,13 +155,46 @@ FESTIVAL_DATES = {
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def fmt_sales_date(dt: date, hour: int, minute: int, ampm: str) -> str:
-    """Replicates the Er4u quirky format: DD-MM-YYYYHH:MI AM (no space before time)."""
-    return f"{dt.strftime('%d-%m-%Y')}{hour:02d}:{minute:02d} {ampm}"
+def fmt_sales_date(dt: date, raw_hour: int, minute: int) -> str:
+    """Emit one of three real-world Er4u date format variants seen in production exports.
+
+    Old (70%): "04-04-202507:29 AM"   — no space between date and time
+    New 12h (20%): "04-04-2025 07:29 AM" — space added, still 12-hour
+    New 24h (10%): "04-04-2025 19:29"    — space added, 24-hour clock
+    """
+    date_part = dt.strftime('%d-%m-%Y')
+    ampm = "AM" if raw_hour < 12 else "PM"
+    disp_hour = raw_hour if raw_hour <= 12 else raw_hour - 12
+    if disp_hour == 0:
+        disp_hour = 12
+    r = random.random()
+    if r < 0.70:
+        return f"{date_part}{disp_hour:02d}:{minute:02d} {ampm}"    # old: no space (the bug)
+    elif r < 0.90:
+        return f"{date_part} {disp_hour:02d}:{minute:02d} {ampm}"   # new: space + 12h
+    else:
+        return f"{date_part} {raw_hour:02d}:{minute:02d}"            # new: space + 24h
 
 
 def fmt_purchase_date(dt: date) -> str:
     return dt.strftime("%d-%m-%Y")
+
+
+def fmt_mobile(mobile: str) -> str:
+    """Randomly apply one of four real-world Indian mobile number formats, plus occasional garbage."""
+    if not mobile:
+        return mobile
+    r = random.random()
+    if r < 0.60:
+        return mobile                           # plain 10-digit (most common)
+    elif r < 0.75:
+        return f"+91{mobile}"                  # international prefix with +
+    elif r < 0.87:
+        return f"0{mobile}"                    # domestic trunk prefix
+    elif r < 0.95:
+        return f"91{mobile}"                   # country code without +
+    else:
+        return str(random.randint(100, 9999))  # garbage/too-short → NULL after normalization
 
 
 def pick_name(barcode: str, base_name: str) -> str:
@@ -171,18 +238,17 @@ def generate(start: date, end: date):
         for _ in range(n_bills):
             if random.random() < 0.6:
                 cust_mobile, cust_name = "", random.choice(WALK_IN_NAMES)
+                is_member = False
             else:
-                cust_mobile, cust_name = random.choice(REGULAR_CUSTOMERS)
+                raw_mobile, cust_name = random.choice(REGULAR_CUSTOMERS)
+                is_member = raw_mobile in MEMBER_MOBILES
+                cust_mobile = fmt_mobile(raw_mobile)
 
             operator = random.choice(OPERATORS)
 
             # Random time during store hours (9 AM - 9 PM)
             raw_hour = random.randint(9, 20)
             minute = random.randint(0, 59)
-            ampm = "AM" if raw_hour < 12 else "PM"
-            disp_hour = raw_hour if raw_hour <= 12 else raw_hour - 12
-            if disp_hour == 0:
-                disp_hour = 12
 
             bill_str = f"BILL-{dt.strftime('%Y%m%d')}-{bill_seq:04d}"
             bill_seq += 1
@@ -218,7 +284,7 @@ def generate(start: date, end: date):
 
                 actual_barcode = pick_barcode(pbarcode)
                 actual_name = pick_name(pbarcode, pname)
-                sale_dt_str = fmt_sales_date(dt, disp_hour, minute, ampm)
+                sale_dt_str = fmt_sales_date(dt, raw_hour, minute)
 
                 itemwise_rows.append({
                     "Store Name":          "Demo Supermarket",
@@ -267,7 +333,8 @@ def generate(start: date, end: date):
                 bill_qty += qty
 
             bill_net = round(bill_net, 2)
-            sale_dt_str = fmt_sales_date(dt, disp_hour, minute, ampm)
+            membercard_disc = round(bill_net * random.choice([0.02, 0.03, 0.05]), 2) if is_member else 0.0
+            sale_dt_str = fmt_sales_date(dt, raw_hour, minute)
 
             billwise_rows.append({
                 "Location":          "Main Store",
@@ -294,7 +361,7 @@ def generate(start: date, end: date):
                 "Cust Disc %":       0, "Cust Discount":    0,
                 "Bill Discount %":   0, "Bill Discount":    0,
                 "Extra Discount %":  0, "Extra Discount":   0,
-                "Membercard Disc.":  0,
+                "Membercard Disc.":  membercard_disc,
                 "Total Discount":    0,
                 "Taxable Amt.":      0,
                 "GST-0": 0, "GST-3": 0, "GST-5": 0, "GST-12": 0,
@@ -367,7 +434,7 @@ def generate(start: date, end: date):
 def write_csv(rows: list, path: Path, totals_row: bool = False):
     path.parent.mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame(rows)
-    if totals_row:
+    if totals_row and not df.empty:
         totals = {col: "" for col in df.columns}
         totals[df.columns[0]] = "TOTAL"
         df = pd.concat([df, pd.DataFrame([totals])], ignore_index=True)

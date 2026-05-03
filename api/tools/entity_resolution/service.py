@@ -276,7 +276,16 @@ def get_product_detail(conn: Connection, barcode: str) -> ProductDetail | None:
     # Sales aggregates
     sales = conn.execute(text("""
         SELECT SUM(sale_qty) AS total_qty,
-               MAX(TO_TIMESTAMP(sale_datetime_raw, 'DD-MM-YYYYHH12:MI AM')) AS last_sold
+               MAX(TO_TIMESTAMP(
+                   CASE WHEN SUBSTRING(sale_datetime_raw, 11, 1) = ' '
+                        THEN sale_datetime_raw
+                        ELSE SUBSTRING(sale_datetime_raw, 1, 10) || ' ' || SUBSTRING(sale_datetime_raw, 11)
+                   END,
+                   CASE WHEN sale_datetime_raw ~* '(AM|PM)\s*$'
+                        THEN 'DD-MM-YYYY HH12:MI AM'
+                        ELSE 'DD-MM-YYYY HH24:MI'
+                   END
+               )) AS last_sold
         FROM raw.raw_sales_itemwise
         WHERE barcode = :barcode
     """), {"barcode": barcode}).fetchone()

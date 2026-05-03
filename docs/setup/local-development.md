@@ -121,7 +121,17 @@ PYTHONPATH=. python scripts/ingest_all.py
 
 ---
 
-### 9. Install raw dedup triggers
+### 9. Seed the calendar dimension
+
+`derived.calendar_dim` (Indian public holidays + retail festivals) is required by the pipeline (step 02 LEFT JOINs it). Idempotent — safe to repeat.
+
+```bash
+PYTHONPATH=. python scripts/seed_calendar.py
+```
+
+---
+
+### 10. Install raw dedup triggers
 
 Must run after ingestion (raw tables must exist first):
 
@@ -131,7 +141,7 @@ python scripts/setup_raw_triggers.py
 
 ---
 
-### 10. Rebuild derived tables
+### 11. Rebuild derived tables
 
 Runs the full 10-step SQL pipeline:
 
@@ -141,7 +151,7 @@ PYTHONPATH=. python pipelines/weekly_pipeline.py
 
 ---
 
-### 11. Create admin user
+### 12. Create admin user
 
 ```bash
 python scripts/create_admin.py
@@ -149,7 +159,7 @@ python scripts/create_admin.py
 
 ---
 
-### 12. Install frontend dependencies
+### 13. Install frontend dependencies
 
 ```bash
 cd web && npm install

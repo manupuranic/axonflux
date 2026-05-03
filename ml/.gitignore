@@ -1,0 +1,9 @@
+model/demand_model.json
+model/product_encoder.json
+model/run_id.txt
+model/last_run_metrics.json
+model/last_predict_stats.json
+mlruns/
+mlflow.db
+*.pyc
+__pycache__/
