@@ -128,11 +128,11 @@ def main() -> None:
         ]
 
     if missing:
-        print("Raw tables not found — run ingestion first:")
+        print("Raw tables not found — skipping trigger setup (run ingestion first):")
         for t in missing:
             print(f"  raw.{t}")
-        sys.exit(1)
-
+        return
+        
     with engine.begin() as conn:
         conn.execute(text(_SQL))
 

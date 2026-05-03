@@ -52,7 +52,7 @@ api/
 
 ```bash
 # From project root (D:\projects\axonflux)
-pip install -r api/requirements.txt
+pip install -r requirements.txt
 
 # Fresh DB only: create raw.* and derived.* schemas (not managed by Alembic)
 psql -U postgres -d axonflux -f sql/raw_tables.sql

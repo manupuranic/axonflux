@@ -41,7 +41,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 ### 2. Install Python dependencies
 
 ```bash
-pip install -r api/requirements.txt
+pip install -r requirements.txt
 ```
 
 The pipeline and API share the same virtualenv — no conflicts.
