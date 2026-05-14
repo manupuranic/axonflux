@@ -9,10 +9,21 @@ CREATE TABLE IF NOT EXISTS derived.product_daily_features (
     lag_1_qty NUMERIC,
     lag_7_qty NUMERIC,
 
+    -- Operational rolling stats: INCLUDE today's value
+    -- correct for current-state queries (Step 03 WMA, replenishment decisions)
+    -- DO NOT use as ML training features when target is today's quantity_sold
     last_7_day_avg NUMERIC,
     last_30_day_avg NUMERIC,
     last_60_day_avg NUMERIC,
     last_7_day_stddev NUMERIC,
+
+    -- ML-safe rolling stats: EXCLUDE today's value (lag by 1)
+    -- use these as features when training models with today's qty as target
+    -- prevents data leakage; matches information available at prediction time
+    last_7_day_avg_lagged NUMERIC,
+    last_30_day_avg_lagged NUMERIC,
+    last_60_day_avg_lagged NUMERIC,
+    last_7_day_stddev_lagged NUMERIC,
 
     day_of_week INTEGER,
 
@@ -33,7 +44,11 @@ ALTER TABLE derived.product_daily_features
     ADD COLUMN IF NOT EXISTS stockout_proxy          BOOLEAN NOT NULL DEFAULT FALSE,
     ADD COLUMN IF NOT EXISTS is_holiday              BOOLEAN,
     ADD COLUMN IF NOT EXISTS days_to_next_festival   INTEGER,
-    ADD COLUMN IF NOT EXISTS days_since_last_festival INTEGER;
+    ADD COLUMN IF NOT EXISTS days_since_last_festival INTEGER,
+    ADD COLUMN IF NOT EXISTS last_7_day_avg_lagged   NUMERIC,
+    ADD COLUMN IF NOT EXISTS last_30_day_avg_lagged  NUMERIC,
+    ADD COLUMN IF NOT EXISTS last_60_day_avg_lagged  NUMERIC,
+    ADD COLUMN IF NOT EXISTS last_7_day_stddev_lagged NUMERIC;
 
 TRUNCATE TABLE derived.product_daily_features;
 
@@ -56,6 +71,7 @@ WITH windowed AS (
             ORDER BY m.date
         ) AS lag_7_qty,
 
+        -- Operational rolling stats — include today (used by Step 03 WMA)
         AVG(m.quantity_sold) OVER (
             PARTITION BY m.product_id
             ORDER BY m.date
@@ -80,11 +96,46 @@ WITH windowed AS (
             ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
         ) AS last_7_day_stddev,
 
+        -- ML-safe rolling stats — exclude today (use as ML features)
+        -- frame ends at 1 PRECEDING so today's value never enters the aggregate
+        AVG(m.quantity_sold) OVER (
+            PARTITION BY m.product_id
+            ORDER BY m.date
+            ROWS BETWEEN 7 PRECEDING AND 1 PRECEDING
+        ) AS last_7_day_avg_lagged,
+
+        AVG(m.quantity_sold) OVER (
+            PARTITION BY m.product_id
+            ORDER BY m.date
+            ROWS BETWEEN 30 PRECEDING AND 1 PRECEDING
+        ) AS last_30_day_avg_lagged,
+
+        AVG(m.quantity_sold) OVER (
+            PARTITION BY m.product_id
+            ORDER BY m.date
+            ROWS BETWEEN 60 PRECEDING AND 1 PRECEDING
+        ) AS last_60_day_avg_lagged,
+
+        STDDEV(m.quantity_sold) OVER (
+            PARTITION BY m.product_id
+            ORDER BY m.date
+            ROWS BETWEEN 7 PRECEDING AND 1 PRECEDING
+        ) AS last_7_day_stddev_lagged,
+
         EXTRACT(DOW FROM m.date) AS day_of_week
 
     FROM derived.product_daily_metrics m
 )
-INSERT INTO derived.product_daily_features
+INSERT INTO derived.product_daily_features (
+    date, product_id,
+    quantity_sold, revenue, purchase_quantity,
+    lag_1_qty, lag_7_qty,
+    last_7_day_avg, last_30_day_avg, last_60_day_avg, last_7_day_stddev,
+    last_7_day_avg_lagged, last_30_day_avg_lagged, last_60_day_avg_lagged, last_7_day_stddev_lagged,
+    day_of_week,
+    stockout_proxy,
+    is_holiday, days_to_next_festival, days_since_last_festival
+)
 SELECT
     w.date,
     w.product_id,
@@ -97,12 +148,17 @@ SELECT
     w.last_30_day_avg,
     w.last_60_day_avg,
     w.last_7_day_stddev,
+    w.last_7_day_avg_lagged,
+    w.last_30_day_avg_lagged,
+    w.last_60_day_avg_lagged,
+    w.last_7_day_stddev_lagged,
     w.day_of_week,
 
-    -- stockout proxy: product was active, zero sold today, no restock
+    -- stockout proxy: product was active before today, sold zero today, no restock
+    -- uses lagged avg so today's zero doesn't suppress the "was recently active" signal
     CASE
         WHEN w.quantity_sold = 0
-         AND COALESCE(w.last_7_day_avg, 0) > 0.5
+         AND COALESCE(w.last_7_day_avg_lagged, 0) > 0.5
          AND w.purchase_quantity = 0
         THEN TRUE
         ELSE FALSE
