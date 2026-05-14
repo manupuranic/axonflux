@@ -1,0 +1,2255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AxonFlux — Engineering Understanding Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #faf6ee;
+  --bg-tint: #f3ede0;
+  --surface: #fbf8f1;
+  --ink: #1c1f2a;
+  --ink-soft: #2d3142;
+  --muted: #6b6f7d;
+  --rule: #d6cdba;
+  --rule-soft: #e8e0cd;
+  --accent: #8a3324;
+  --accent-soft: #b85a3e;
+  --sage: #4a6b5a;
+  --gold: #a07d2b;
+  --serif: 'Source Serif 4', Georgia, serif;
+  --display: 'Fraunces', 'Source Serif 4', serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.7;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle paper texture */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(138,51,36,0.02) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(74,107,90,0.02) 0%, transparent 40%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* PROGRESS */
+#progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; z-index: 1000;
+  background: transparent;
+}
+#progress-fill {
+  height: 100%; width: 0%;
+  background: var(--accent);
+  transition: width 0.1s ease-out;
+}
+
+/* SIDEBAR */
+#sidebar {
+  position: fixed; left: 0; top: 0; height: 100vh; width: 240px;
+  padding: 48px 32px;
+  background: var(--bg);
+  border-right: 1px solid var(--rule-soft);
+  overflow-y: auto;
+  z-index: 50;
+}
+#sidebar .mark {
+  font-family: var(--display);
+  font-weight: 600;
+  font-style: italic;
+  font-size: 22px;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+#sidebar .submark {
+  font-family: var(--serif);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+#sidebar nav { display: flex; flex-direction: column; }
+#sidebar nav .group { margin-bottom: 18px; }
+#sidebar nav .group-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+#sidebar nav a {
+  display: block;
+  font-family: var(--serif);
+  font-size: 14px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 4px 0;
+  transition: color 0.2s;
+  line-height: 1.4;
+}
+#sidebar nav a:hover { color: var(--accent); }
+#sidebar nav a.active {
+  color: var(--accent);
+  font-style: italic;
+}
+#sidebar nav a.active::before {
+  content: '— ';
+  font-style: normal;
+}
+
+/* MAIN CONTAINER */
+#main {
+  margin-left: 240px;
+  position: relative;
+  z-index: 1;
+}
+
+/* COVER PAGE */
+.cover {
+  min-height: 100vh;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 80px 90px;
+  max-width: 1100px;
+  position: relative;
+}
+.cover-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 28px;
+}
+.cover-eyebrow::after {
+  content: '';
+  display: inline-block;
+  width: 48px; height: 1px;
+  background: var(--accent);
+  margin-left: 14px;
+  vertical-align: middle;
+}
+h1.cover-title {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(48px, 7vw, 92px);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  margin-bottom: 32px;
+  max-width: 850px;
+  font-variation-settings: "opsz" 144;
+}
+h1.cover-title em {
+  font-style: italic;
+  color: var(--accent);
+  font-weight: 400;
+}
+.cover-sub {
+  font-family: var(--display);
+  font-size: 20px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  max-width: 620px;
+  font-style: italic;
+  font-weight: 400;
+  margin-bottom: 56px;
+}
+.cover-meta {
+  display: flex; gap: 64px;
+  padding-top: 36px;
+  border-top: 1px solid var(--rule);
+  max-width: 720px;
+  flex-wrap: wrap;
+}
+.cover-meta div { display: flex; flex-direction: column; gap: 4px; }
+.cover-meta .label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cover-meta .value {
+  font-family: var(--display);
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--ink);
+  font-feature-settings: "lnum";
+}
+
+/* DECORATIVE FLOURISH */
+.flourish {
+  font-family: var(--display);
+  font-size: 28px;
+  color: var(--rule);
+  text-align: center;
+  margin: 60px 0;
+  letter-spacing: 0.4em;
+  user-select: none;
+}
+
+/* SECTION */
+.section {
+  padding: 100px 90px;
+  max-width: 1100px;
+  position: relative;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+.section.visible { opacity: 1; transform: none; }
+.section + .section { border-top: 1px solid var(--rule-soft); }
+
+.section-head {
+  margin-bottom: 56px;
+  max-width: 760px;
+}
+.section-number {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 14px;
+  display: block;
+}
+h2.section-title {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 52px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin-bottom: 24px;
+  font-variation-settings: "opsz" 100;
+}
+h2.section-title em { font-style: italic; color: var(--accent); font-weight: 400; }
+.section-lead {
+  font-family: var(--display);
+  font-size: 20px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  font-style: italic;
+  font-weight: 400;
+  max-width: 680px;
+}
+
+/* PROSE */
+.prose { max-width: 720px; }
+.prose p { margin-bottom: 20px; font-size: 17px; line-height: 1.75; }
+.prose p:first-of-type::first-letter {
+  font-family: var(--display);
+  font-size: 64px;
+  font-weight: 500;
+  float: left;
+  line-height: 0.85;
+  padding-right: 10px;
+  padding-top: 6px;
+  color: var(--accent);
+}
+.prose strong { font-weight: 600; color: var(--ink); }
+.prose em { font-style: italic; }
+
+h3.sub {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 56px 0 20px;
+  max-width: 760px;
+}
+h3.sub::before {
+  content: '§';
+  font-style: italic;
+  color: var(--accent);
+  margin-right: 12px;
+  font-weight: 400;
+}
+
+h4.sub-sub {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--ink);
+  margin: 24px 0 10px;
+}
+
+/* DIAGRAM — STATIC SVG-LIKE FLOW */
+.diagram {
+  margin: 40px 0;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 40px;
+}
+.diagram-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--rule);
+}
+.diagram-row {
+  display: flex; gap: 8px; align-items: stretch;
+  margin-bottom: 6px;
+}
+.diagram-row > * { flex: 1; }
+.diagram-box {
+  padding: 14px 18px;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  transition: border-color 0.25s, transform 0.25s;
+}
+.diagram-box:hover {
+  border-color: var(--accent-soft);
+  transform: translateY(-1px);
+}
+.diagram-box .db-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.diagram-box .db-name {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.diagram-box .db-note { font-size: 13px; color: var(--muted); line-height: 1.4; }
+.diagram-arrow {
+  text-align: center;
+  color: var(--rule);
+  font-size: 18px;
+  padding: 4px 0;
+  font-family: var(--display);
+  user-select: none;
+}
+.diagram-box.is-accent {
+  background: rgba(138,51,36,0.04);
+  border-color: var(--accent-soft);
+}
+.diagram-box.is-accent .db-name { color: var(--accent); }
+.diagram-box.is-sage {
+  background: rgba(74,107,90,0.05);
+  border-color: var(--sage);
+}
+.diagram-box.is-sage .db-name { color: var(--sage); }
+
+/* LAYER LIST (Part 1) */
+.layer-list { margin-top: 40px; }
+.layer {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 48px;
+  padding: 32px 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.layer:last-child { border-bottom: none; }
+.layer-side .ll-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.layer-side h3 {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 1.2;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.layer-body p { font-size: 16px; line-height: 1.7; color: var(--ink-soft); margin-bottom: 14px; }
+.layer-body p:last-child { margin-bottom: 0; }
+.layer-body code {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--bg-tint);
+  padding: 1px 6px;
+  border-radius: 2px;
+  color: var(--accent);
+}
+.warn {
+  margin-top: 14px;
+  padding: 12px 18px;
+  background: rgba(160,125,43,0.06);
+  border-left: 2px solid var(--gold);
+  font-size: 14px;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+.warn::before {
+  content: 'Failure mode — ';
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-style: normal;
+  font-weight: 500;
+}
+
+/* SQL STEPS GRID */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0;
+  margin-top: 32px;
+  border-top: 1px solid var(--rule-soft);
+  border-left: 1px solid var(--rule-soft);
+}
+.step {
+  border-right: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--rule-soft);
+  padding: 28px 32px;
+  position: relative;
+  transition: background 0.2s;
+}
+.step:hover { background: var(--surface); }
+.step-num {
+  position: absolute;
+  top: 24px; right: 28px;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 42px;
+  color: var(--rule);
+  line-height: 1;
+  font-feature-settings: "lnum";
+}
+.step h4 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--ink);
+  margin-bottom: 6px;
+  padding-right: 60px;
+}
+.step h4 em { color: var(--accent); font-style: italic; font-weight: 500; }
+.step p {
+  font-size: 14px;
+  color: var(--ink-soft);
+  line-height: 1.55;
+  margin-bottom: 8px;
+}
+.step .step-note {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--sage);
+  font-style: normal;
+}
+
+/* KNOWLEDGE GAPS */
+.gap-section { margin-top: 48px; }
+.gap-section:first-child { margin-top: 0; }
+.gap-section h3 {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 24px;
+  color: var(--ink);
+  margin-bottom: 18px;
+  display: flex; align-items: baseline; gap: 16px;
+}
+.gap-section h3::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px dotted var(--rule);
+  position: relative; top: -6px;
+}
+.gap-section h3 span {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+}
+.gap-items {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px 32px;
+}
+.gap-item {
+  font-size: 15px;
+  color: var(--ink-soft);
+  padding: 6px 0;
+  display: flex; align-items: baseline; gap: 12px;
+  border-bottom: 1px dotted var(--rule-soft);
+}
+.gap-item .num {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+  min-width: 20px;
+}
+
+/* TIERS */
+.tiers-rows {
+  display: flex; flex-direction: column;
+  margin-top: 32px;
+}
+.tier-row {
+  padding: 36px 0;
+  border-bottom: 1px solid var(--rule-soft);
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 48px;
+}
+.tier-row:last-child { border-bottom: none; }
+.tier-side .tier-mark {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 2px;
+  margin-bottom: 10px;
+}
+.tier-row.t1 .tier-mark { background: var(--accent); color: var(--bg); }
+.tier-row.t2 .tier-mark { background: var(--sage); color: var(--bg); }
+.tier-row.t3 .tier-mark { background: var(--rule); color: var(--ink); }
+.tier-side h3 {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.tier-side p {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.tier-items { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 32px; }
+.tier-item-c {
+  padding-left: 14px;
+  border-left: 1px solid var(--rule);
+}
+.tier-item-c h4 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+  margin-bottom: 3px;
+}
+.tier-item-c p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+/* TIMELINE */
+.timeline {
+  margin-top: 32px;
+  position: relative;
+  padding-left: 48px;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 8px; top: 12px; bottom: 12px;
+  width: 1px;
+  background: var(--rule);
+}
+.tl-week-head {
+  font-family: var(--display);
+  font-weight: 500;
+  font-style: italic;
+  font-size: 24px;
+  color: var(--accent);
+  margin: 36px 0 16px -48px;
+  padding-left: 48px;
+  position: relative;
+}
+.tl-week-head::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--accent);
+}
+.tl-week-head:first-child { margin-top: 0; }
+.tl-day {
+  padding: 18px 0 18px 24px;
+  border-left: 1px dashed transparent;
+  margin-left: -24px;
+  position: relative;
+  transition: border-color 0.25s;
+}
+.tl-day::before {
+  content: '';
+  position: absolute;
+  left: -44px; top: 26px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+}
+.tl-day:hover { border-left-color: var(--rule); }
+.tl-day .tl-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.tl-day h4 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.tl-day p { font-size: 15px; color: var(--ink-soft); line-height: 1.6; }
+
+/* DEEP DIVES */
+.dives { margin-top: 32px; }
+.dive {
+  border-bottom: 1px solid var(--rule-soft);
+  transition: background 0.3s;
+}
+.dive.open { background: var(--surface); }
+.dive-head {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  align-items: baseline;
+  padding: 28px 0;
+  cursor: pointer;
+  gap: 24px;
+}
+.dive-num {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 22px;
+  color: var(--accent);
+  font-style: italic;
+}
+.dive-head h3 {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  line-height: 1.2;
+}
+.dive-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dive-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.5s ease;
+}
+.dive.open .dive-body { max-height: 3000px; }
+.dive-content {
+  padding: 0 0 36px 84px;
+  max-width: 780px;
+}
+.dive-content p { margin-bottom: 16px; font-size: 16px; line-height: 1.75; color: var(--ink-soft); }
+.dive-content p strong { color: var(--ink); font-weight: 600; }
+.dive-section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 24px 0 8px;
+  display: block;
+}
+.analogy {
+  margin: 18px 0;
+  padding: 14px 22px;
+  border-left: 2px solid var(--sage);
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink-soft);
+  background: rgba(74,107,90,0.04);
+}
+.analogy strong {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--sage);
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+.mistake {
+  margin: 18px 0;
+  padding: 14px 22px;
+  border-left: 2px solid var(--gold);
+  font-size: 14px;
+  color: var(--ink-soft);
+  background: rgba(160,125,43,0.04);
+  line-height: 1.6;
+}
+.mistake strong {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--gold);
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+pre {
+  background: var(--bg-tint);
+  border: 1px solid var(--rule-soft);
+  border-radius: 2px;
+  padding: 18px 22px;
+  margin: 18px 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--ink);
+  overflow-x: auto;
+}
+pre .c { color: var(--muted); font-style: italic; }
+pre .k { color: var(--accent); font-weight: 500; }
+pre .s { color: var(--sage); }
+pre .n { color: var(--ink); font-weight: 500; }
+code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  color: var(--accent);
+}
+.tags-inline {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin: 10px 0;
+}
+.tags-inline span {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  padding: 2px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: var(--surface);
+}
+
+/* AUDIT */
+.audit { margin-top: 32px; display: grid; grid-template-columns: 1fr; gap: 0; }
+.audit-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 32px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--rule-soft);
+  align-items: start;
+}
+.audit-status {
+  display: flex; align-items: center; gap: 10px;
+  padding-top: 4px;
+}
+.audit-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.audit-row.r-red .audit-dot { background: var(--accent); }
+.audit-row.r-yellow .audit-dot { background: var(--gold); }
+.audit-row.r-green .audit-dot { background: var(--sage); }
+.audit-row .status-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.audit-body h4 {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 19px;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.audit-body p { font-size: 15px; color: var(--ink-soft); line-height: 1.6; }
+.audit-body .audit-fix {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--sage);
+}
+.audit-body .audit-fix::before { content: '→ '; }
+
+/* MATURITY */
+.maturity { margin-top: 36px; }
+.mat-row {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 32px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--rule-soft);
+  align-items: center;
+}
+.mat-row h4 {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 17px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.mat-row .mat-note { font-size: 14px; color: var(--muted); line-height: 1.5; }
+.mat-bar {
+  display: flex; align-items: center; gap: 12px;
+}
+.mat-bar-track {
+  flex: 1; height: 4px;
+  background: var(--rule-soft);
+  border-radius: 0;
+  overflow: hidden;
+}
+.mat-bar-fill {
+  height: 100%;
+  transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 0%;
+}
+.mat-bar-fill.strong { background: var(--sage); }
+.mat-bar-fill.mid { background: var(--gold); }
+.mat-bar-fill.weak { background: var(--accent); }
+.mat-pct {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* WEEKEND */
+.weekend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  margin-top: 32px;
+}
+.day {
+  border-top: 2px solid var(--accent);
+  padding-top: 24px;
+}
+.day-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 24px;
+}
+.day-head h3 {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 36px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  font-style: italic;
+}
+.day-head .day-theme {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.slot {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.slot:last-child { border-bottom: none; }
+.slot-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.slot h4 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.slot p { font-size: 14px; color: var(--ink-soft); line-height: 1.6; }
+.slot ul { padding-left: 18px; font-size: 14px; color: var(--ink-soft); line-height: 1.65; }
+.slot ul li { margin: 4px 0; }
+
+/* PULL QUOTES / INSIGHTS */
+.pullquote {
+  margin: 48px 0;
+  padding: 32px 40px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  position: relative;
+}
+.pullquote::before {
+  content: '“';
+  position: absolute;
+  top: -8px; left: 16px;
+  font-family: var(--display);
+  font-size: 80px;
+  font-weight: 500;
+  color: var(--accent);
+  line-height: 1;
+  font-style: italic;
+}
+.pullquote .pq-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+  padding-left: 50px;
+}
+.pullquote p {
+  font-family: var(--display);
+  font-size: 19px;
+  font-style: italic;
+  line-height: 1.55;
+  color: var(--ink);
+  padding-left: 50px;
+  font-weight: 400;
+}
+.pullquote p strong { font-style: normal; color: var(--accent); font-weight: 500; }
+
+/* RESPONSIVE */
+@media (max-width: 1000px) {
+  #sidebar { display: none; }
+  #main { margin-left: 0; }
+  .cover, .section { padding: 60px 32px; }
+  .layer, .tier-row { grid-template-columns: 1fr; gap: 16px; }
+  .tier-items, .weekend, .gap-items, .steps { grid-template-columns: 1fr; }
+  .dive-head { grid-template-columns: 40px 1fr; }
+  .dive-head .dive-tag { grid-column: 2; }
+  .dive-content { padding-left: 0; }
+  .audit-row, .mat-row { grid-template-columns: 1fr; gap: 12px; }
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+::selection { background: rgba(138,51,36,0.2); }
+</style>
+</head>
+<body>
+
+<div id="progress"><div id="progress-fill"></div></div>
+
+<aside id="sidebar">
+  <div class="mark">Engineering<br>Understanding Map</div>
+  <div class="submark">AxonFlux · v1</div>
+  <nav>
+    <div class="group">
+      <div class="group-label">Volume I</div>
+      <a href="#cover">Frontispiece</a>
+    </div>
+    <div class="group">
+      <div class="group-label">Part One</div>
+      <a href="#p1">System Map</a>
+      <a href="#p1b">SQL Pipeline</a>
+    </div>
+    <div class="group">
+      <div class="group-label">Part Two</div>
+      <a href="#p2">Knowledge Gaps</a>
+    </div>
+    <div class="group">
+      <div class="group-label">Part Three</div>
+      <a href="#p3">Priority Tiers</a>
+    </div>
+    <div class="group">
+      <div class="group-label">Part Four</div>
+      <a href="#p4">Learning Order</a>
+    </div>
+    <div class="group">
+      <div class="group-label">Part Five</div>
+      <a href="#p5">Deep Dives</a>
+    </div>
+    <div class="group">
+      <div class="group-label">Part Six</div>
+      <a href="#p6">Ownership Audit</a>
+    </div>
+    <div class="group">
+      <div class="group-label">Part Seven</div>
+      <a href="#p7">Maturity Map</a>
+    </div>
+    <div class="group">
+      <div class="group-label">Part Eight</div>
+      <a href="#p8">Weekend Plan</a>
+    </div>
+  </nav>
+</aside>
+
+<main id="main">
+
+<!-- COVER -->
+<section class="cover" id="cover">
+  <div class="cover-eyebrow">A Reverse-Engineering Field Guide</div>
+  <h1 class="cover-title">The Engineering <em>Understanding</em> Map</h1>
+  <p class="cover-sub">A senior engineer's audit of the AxonFlux retail analytics platform — every layer, abstraction, ML pattern, and architectural decision mapped, prioritized, and tied to the implementation you already wrote.</p>
+  <div class="cover-meta">
+    <div><span class="label">Parts</span><span class="value">Eight</span></div>
+    <div><span class="label">Concepts</span><span class="value">47</span></div>
+    <div><span class="label">SQL Steps</span><span class="value">10</span></div>
+    <div><span class="label">Schemas</span><span class="value">Three</span></div>
+  </div>
+  <div class="flourish">· · · ✦ · · ·</div>
+</section>
+
+<!-- PART 1: SYSTEM MAP -->
+<section class="section" id="p1">
+  <div class="section-head">
+    <span class="section-number">Part One · System Map</span>
+    <h2 class="section-title">The architecture<br>you need to <em>own</em>.</h2>
+    <p class="section-lead">Every layer — its purpose, dependencies, failure points, and hidden complexity. The architecture you need before you can debug it under pressure.</p>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-title">Data flow · Source → Surface</div>
+    <div class="diagram-row">
+      <div class="diagram-box is-accent">
+        <div class="db-label">External</div>
+        <div class="db-name">Er4u Billing Software</div>
+        <div class="db-note">No API. Staff export CSV/XLS manually.</div>
+      </div>
+    </div>
+    <div class="diagram-arrow">↓</div>
+    <div class="diagram-row">
+      <div class="diagram-box">
+        <div class="db-label">Automation</div>
+        <div class="db-name">er4u_export.py</div>
+        <div class="db-note">Playwright headless browser</div>
+      </div>
+      <div class="diagram-box">
+        <div class="db-label">Staging</div>
+        <div class="db-name">data/incoming/</div>
+        <div class="db-note">Six report-type folders</div>
+      </div>
+      <div class="diagram-box">
+        <div class="db-label">Dispatch</div>
+        <div class="db-name">ingest_all.py</div>
+        <div class="db-note">SHA-256 dedup, batch UUID</div>
+      </div>
+    </div>
+    <div class="diagram-arrow">↓</div>
+    <div class="diagram-row">
+      <div class="diagram-box is-accent">
+        <div class="db-label">Layer 1 — Source of truth</div>
+        <div class="db-name">raw.* schema</div>
+        <div class="db-note">Append-only. Six tables + ingestion_batches. Never updated, never deleted.</div>
+      </div>
+    </div>
+    <div class="diagram-arrow">↓</div>
+    <div class="diagram-row">
+      <div class="diagram-box is-sage">
+        <div class="db-label">Orchestration</div>
+        <div class="db-name">weekly_pipeline.py</div>
+        <div class="db-note">Ten-step SQL rebuild. TRUNCATE + INSERT each run. Spawned as subprocess by API.</div>
+      </div>
+    </div>
+    <div class="diagram-arrow">↓</div>
+    <div class="diagram-row">
+      <div class="diagram-box is-sage">
+        <div class="db-label">Layer 2 — Analytics</div>
+        <div class="db-name">derived.* schema</div>
+        <div class="db-note">Fully rebuilt every run. ~2.3M rows. Feature-engineered, ML-ready.</div>
+      </div>
+    </div>
+    <div class="diagram-arrow">↓</div>
+    <div class="diagram-row">
+      <div class="diagram-box">
+        <div class="db-label">API</div>
+        <div class="db-name">FastAPI</div>
+        <div class="db-note">REST · :8000</div>
+      </div>
+      <div class="diagram-box">
+        <div class="db-label">Layer 3</div>
+        <div class="db-name">app.* schema</div>
+        <div class="db-note">Survives rebuilds</div>
+      </div>
+      <div class="diagram-box">
+        <div class="db-label">Interface</div>
+        <div class="db-name">Next.js dashboard</div>
+        <div class="db-note">React 19 · :3000</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer-list">
+    <div class="layer">
+      <div class="layer-side">
+        <div class="ll-tag">Ingestion</div>
+        <h3>Raw Ingestion Layer</h3>
+      </div>
+      <div class="layer-body">
+        <p>Converts binary Er4u exports into structured database rows. A generic <code>ingest_raw_table()</code> handles all six report types through a HEADER_MAP plus reader function pattern. Chunked at 2000 rows — this is a memory bound, not a performance tuning.</p>
+        <div class="warn">HEADER_MAP drift. Er4u changes a column name silently and ingestion fails without alerting downstream.</div>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="layer-side">
+        <div class="ll-tag">Raw Schema</div>
+        <h3>The Immutable Source of Truth</h3>
+      </div>
+      <div class="layer-body">
+        <p>Append-only audit log. Every row tagged with <code>import_batch_id</code> (UUID) and <code>source_file_name</code>. SHA-256 deduplication at the file level. No foreign keys between raw tables — by design. Raw data is dirty; the raw layer stores reality as exported, not as it should be.</p>
+        <div class="warn">No row-level validation. A negative quantity or zero price enters silently and propagates through every downstream calculation.</div>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="layer-side">
+        <div class="ll-tag">Derived Schema</div>
+        <h3>The Rebuildable Analytics Layer</h3>
+      </div>
+      <div class="layer-body">
+        <p>Ten-step SQL rebuild. <code>TRUNCATE</code> then <code>INSERT</code> on every run. Step 01's dense product×date grid is the foundation — every step that follows depends on it. Window functions compute features. Business rules become SQL flags. No application state lives here.</p>
+        <div class="warn">No transaction wraps the full rebuild. If the pipeline crashes at step four, you have partially rebuilt tables and a confused frontend.</div>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="layer-side">
+        <div class="ll-tag">API</div>
+        <h3>The FastAPI Backend</h3>
+      </div>
+      <div class="layer-body">
+        <p>Two connection patterns deliberately split: raw <code>text()</code> SQL for derived.* and raw.* reads, SQLAlchemy ORM for app.* writes. The pipeline is never imported — it runs as a subprocess. JWT auth with 480-minute expiry. Tool plugin auto-discovery means new tools mount without touching <code>main.py</code>.</p>
+        <div class="warn">A subprocess pipeline crash isn't surfaced unless the frontend polls logs. Silent failures are possible.</div>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="layer-side">
+        <div class="ll-tag">App Schema</div>
+        <h3>The Application State Layer</h3>
+      </div>
+      <div class="layer-body">
+        <p>Human-authored data that must survive pipeline rebuilds. Canonical product names, alias mappings, run history, cash closures, pamphlets. The <code>COALESCE</code> enrichment pattern is critical: app data overrides derived at query time, never by modifying derived tables.</p>
+        <div class="warn">A confirmed bad alias permanently corrupts all historical metrics for that barcode. No undo mechanism.</div>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="layer-side">
+        <div class="ll-tag">Frontend</div>
+        <h3>The Next.js Dashboard</h3>
+      </div>
+      <div class="layer-body">
+        <p>App Router, React 19, two route groups: <code>(auth)</code> public, <code>(internal)</code> protected. No global state manager — fetch per page with JWT from localStorage. Recharts for time series. shadcn/ui components copied into the repo (not a library; a code generator).</p>
+        <div class="warn">JWT in localStorage is XSS-exposed. httpOnly cookies would be safer.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PART 1B: SQL PIPELINE -->
+<section class="section" id="p1b">
+  <div class="section-head">
+    <span class="section-number">Part One, continued</span>
+    <h2 class="section-title">The ten-step<br>SQL <em>pipeline</em>.</h2>
+    <p class="section-lead">Each step feeds the next. Step 00 anchors the date range; Step 01 is the foundation everything builds on. Break any step, break everything downstream.</p>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">00</div>
+      <h4>Daily Sales Summary</h4>
+      <p>Aggregates raw_sales_itemwise and billwise. One row per day — revenue, bills, items sold.</p>
+      <p class="step-note">→ Anchors MIN(date) for Step 01's date spine</p>
+    </div>
+    <div class="step">
+      <div class="step-num">01</div>
+      <h4>Product Daily Metrics <em>★</em></h4>
+      <p>Dense grid: every product × every date. Cross-join generates zeros for no-sale days. Alias remapping folds duplicate barcodes. ~2.3M rows.</p>
+      <p class="step-note">→ Foundation for every downstream step</p>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <h4>Product Daily Features</h4>
+      <p>lag_1, lag_7, rolling 7/30/60-day average, stddev, stockout_proxy, calendar joins (holidays, festival distance).</p>
+      <p class="step-note">⚠ Data leakage: CURRENT ROW window includes today</p>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <h4>Health Signals</h4>
+      <p>Weighted demand forecast: 0.6 × last7 + 0.3 × last30 + 0.1 × last60. Four flags: fast / slow / dead / spike. Floor at 0.02.</p>
+      <p class="step-note">→ Drives every replenishment recommendation</p>
+    </div>
+    <div class="step">
+      <div class="step-num">04</div>
+      <h4>Stock Position</h4>
+      <p>Cumulative SUM(purchases) − SUM(sales) via unbounded window. Pseudo-stock can go negative; no opening stock known.</p>
+      <p class="step-note">→ Used by Step 06 for days-of-cover calculation</p>
+    </div>
+    <div class="step">
+      <div class="step-num">05</div>
+      <h4>Necessary Views</h4>
+      <p>Dimension views: product_dimension, supplier_location, latest_item_combinations, product_supplier_mapping.</p>
+      <p class="step-note">→ Referenced by Steps 06, 07, 08</p>
+    </div>
+    <div class="step">
+      <div class="step-num">06</div>
+      <h4>Supplier Restock Recommendations</h4>
+      <p>Days of cover = stock ÷ demand. Min stock = 7× demand. Max = 30× demand. Lead times: 7d for Bellary, 15d others — hardcoded.</p>
+      <p class="step-note">→ The replenishment sheet staff uses every week</p>
+    </div>
+    <div class="step">
+      <div class="step-num">07</div>
+      <h4>Payment Breakdown</h4>
+      <p>Cash, card, UPI, PhonePe, Paytm, credit — aggregated by day from raw_sales_billwise.</p>
+      <p class="step-note">→ Payment method dashboard chart</p>
+    </div>
+    <div class="step">
+      <div class="step-num">08</div>
+      <h4>Customer Dimension</h4>
+      <p>Normalizes four-plus mobile formats. Walk-in classification: NULL or names in CASH/WALK-IN/SUNDRY list → synthetic key 'WALK-IN'.</p>
+      <p class="step-note">→ Foundation for Step 09</p>
+    </div>
+    <div class="step">
+      <div class="step-num">09</div>
+      <h4>Customer Metrics</h4>
+      <p>Per-customer spend, frequency, recency, preferred payment. One row per normalized mobile plus one WALK-IN row.</p>
+      <p class="step-note">→ Customer analytics page</p>
+    </div>
+    <div class="step">
+      <div class="step-num">10</div>
+      <h4>Product Associations</h4>
+      <p>Basket analysis: self-join on bill_no. co_occurrences, support, confidence, lift. Minimum five co-occurrences. 30,018 pairs.</p>
+      <p class="step-note">→ "Frequently bought together" recommendations</p>
+    </div>
+    <div class="step" style="grid-column: 1 / -1; background: var(--bg-tint);">
+      <h4 style="padding-right:0">The critical dependency chain</h4>
+      <p>Step 01's dense grid is not optional. It ensures no gaps in the time series so window functions see exactly the right rows. If Step 01 has a bug, Steps 02 through 10 produce silently wrong results. Every replenishment recommendation, every health flag, every demand forecast flows from that cross-join.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PART 2: KNOWLEDGE GAPS -->
+<section class="section" id="p2">
+  <div class="section-head">
+    <span class="section-number">Part Two · Knowledge Gap Map</span>
+    <h2 class="section-title">What you<br>must <em>learn</em>.</h2>
+    <p class="section-lead">Every concept, framework, theory, and pattern you need to truly own this system. Organized by domain, not difficulty.</p>
+  </div>
+
+  <div class="gap-section">
+    <h3>Database &amp; SQL <span>13 items</span></h3>
+    <div class="gap-items">
+      <div class="gap-item"><span class="num">01</span> PostgreSQL window functions</div>
+      <div class="gap-item"><span class="num">02</span> Dense time series, date spines</div>
+      <div class="gap-item"><span class="num">03</span> CTEs — recursive vs non-recursive</div>
+      <div class="gap-item"><span class="num">04</span> TRUNCATE + INSERT rebuild pattern</div>
+      <div class="gap-item"><span class="num">05</span> Multi-schema design (raw / derived / app)</div>
+      <div class="gap-item"><span class="num">06</span> DISTINCT ON, ordering sensitivity</div>
+      <div class="gap-item"><span class="num">07</span> Cumulative windows — UNBOUNDED PRECEDING</div>
+      <div class="gap-item"><span class="num">08</span> Basket analysis via SQL self-join</div>
+      <div class="gap-item"><span class="num">09</span> PostgreSQL indexing — B-tree, partial</div>
+      <div class="gap-item"><span class="num">10</span> NULL propagation, COALESCE behavior</div>
+      <div class="gap-item"><span class="num">11</span> OLAP concepts — fact vs dimension</div>
+      <div class="gap-item"><span class="num">12</span> PostgreSQL triggers</div>
+      <div class="gap-item"><span class="num">13</span> generate_series for date generation</div>
+    </div>
+  </div>
+
+  <div class="gap-section">
+    <h3>Python &amp; Backend <span>10 items</span></h3>
+    <div class="gap-items">
+      <div class="gap-item"><span class="num">14</span> FastAPI dependency injection</div>
+      <div class="gap-item"><span class="num">15</span> SQLAlchemy 2.0 — ORM vs Core</div>
+      <div class="gap-item"><span class="num">16</span> Pydantic v2 — validation &amp; settings</div>
+      <div class="gap-item"><span class="num">17</span> JWT internals — HS256, expiry</div>
+      <div class="gap-item"><span class="num">18</span> Python subprocess management</div>
+      <div class="gap-item"><span class="num">19</span> Chunked insert, transaction granularity</div>
+      <div class="gap-item"><span class="num">20</span> bcrypt — work factor, timing safety</div>
+      <div class="gap-item"><span class="num">21</span> Generator dependencies, yield cleanup</div>
+      <div class="gap-item"><span class="num">22</span> CORS — preflight, whitelist</div>
+      <div class="gap-item"><span class="num">23</span> Alembic migration internals</div>
+    </div>
+  </div>
+
+  <div class="gap-section">
+    <h3>Machine Learning &amp; Forecasting <span>13 items</span></h3>
+    <div class="gap-items">
+      <div class="gap-item"><span class="num">24</span> Weighted moving average</div>
+      <div class="gap-item"><span class="num">25</span> Exponential smoothing (ETS)</div>
+      <div class="gap-item"><span class="num">26</span> Time-series feature engineering</div>
+      <div class="gap-item"><span class="num">27</span> Data leakage — CURRENT ROW problem</div>
+      <div class="gap-item"><span class="num">28</span> Walk-forward validation</div>
+      <div class="gap-item"><span class="num">29</span> XGBoost — gradient boosting internals</div>
+      <div class="gap-item"><span class="num">30</span> MAPE / RMSE / MAE — when each matters</div>
+      <div class="gap-item"><span class="num">31</span> Demand forecasting as business problem</div>
+      <div class="gap-item"><span class="num">32</span> Stockout proxy &amp; imputation assumptions</div>
+      <div class="gap-item"><span class="num">33</span> Basket analysis — support / confidence / lift</div>
+      <div class="gap-item"><span class="num">34</span> RapidFuzz — ratio variants</div>
+      <div class="gap-item"><span class="num">35</span> MLflow experiment tracking</div>
+      <div class="gap-item"><span class="num">36</span> Model drift detection</div>
+    </div>
+  </div>
+
+  <div class="gap-section">
+    <h3>Data Engineering <span>6 items</span></h3>
+    <div class="gap-items">
+      <div class="gap-item"><span class="num">37</span> Append-only / immutable architecture</div>
+      <div class="gap-item"><span class="num">38</span> SHA-256 content-addressable dedup</div>
+      <div class="gap-item"><span class="num">39</span> Pipeline idempotency</div>
+      <div class="gap-item"><span class="num">40</span> Batch tracking with UUIDs</div>
+      <div class="gap-item"><span class="num">41</span> Schema-swap rebuild pattern</div>
+      <div class="gap-item"><span class="num">42</span> Table partitioning for scale</div>
+    </div>
+  </div>
+
+  <div class="gap-section">
+    <h3>Systems &amp; Frontend <span>5 items</span></h3>
+    <div class="gap-items">
+      <div class="gap-item"><span class="num">43</span> Subprocess vs async workers</div>
+      <div class="gap-item"><span class="num">44</span> Plugin / registry pattern</div>
+      <div class="gap-item"><span class="num">45</span> Next.js App Router, route groups</div>
+      <div class="gap-item"><span class="num">46</span> localStorage JWT — security tradeoffs</div>
+      <div class="gap-item"><span class="num">47</span> COALESCE enrichment pattern</div>
+    </div>
+  </div>
+</section>
+
+<!-- PART 3: TIERS -->
+<section class="section" id="p3">
+  <div class="section-head">
+    <span class="section-number">Part Three · Priority Tiers</span>
+    <h2 class="section-title">Where to <em>invest</em><br>your mental energy.</h2>
+    <p class="section-lead">Not everything deserves equal depth. The tier matters more than the topic list — without tiering, every concept feels urgent and nothing actually gets learned.</p>
+  </div>
+
+  <div class="tiers-rows">
+    <div class="tier-row t1">
+      <div class="tier-side">
+        <div class="tier-mark">Tier I</div>
+        <h3>Must understand deeply</h3>
+        <p>Debugging blindness without these. The cost of shallow understanding is operational confusion.</p>
+      </div>
+      <div class="tier-items">
+        <div class="tier-item-c">
+          <h4>PostgreSQL window functions</h4>
+          <p>Six of ten SQL steps are this. Can't debug analytics without it.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>Dense time series, date spine</h4>
+          <p>Step 01 is the foundation. Without it, mysterious gaps everywhere.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>Data leakage in time series</h4>
+          <p>The CURRENT ROW bug will corrupt B1 silently. Fix before XGBoost.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>Cumulative window functions</h4>
+          <p>Pseudo-stock drives replenishment. Every reorder quantity depends on it.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>Walk-forward validation</h4>
+          <p>Without it, B1 looks great in validation, fails in production.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>FastAPI dependency injection</h4>
+          <p>Every endpoint uses Depends(). Auth and connection bugs require this.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>WMA — formula and limits</h4>
+          <p>Current demand forecast. Every replenishment number flows from it.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>Append-only + rebuild pattern</h4>
+          <p>Misunderstand this, you'll add state to derived.* and break everything.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="tier-row t2">
+      <div class="tier-side">
+        <div class="tier-mark">Tier II</div>
+        <h3>Conceptually fluent</h3>
+        <p>Operational understanding required. Don't need to rebuild from first principles.</p>
+      </div>
+      <div class="tier-items">
+        <div class="tier-item-c">
+          <h4>SQLAlchemy 2.0 — ORM vs Core</h4>
+          <p>You use both. Need to know when each applies and session lifecycle.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>Alembic migrations</h4>
+          <p>Run on live DB. Need version chain understanding plus rollback awareness.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>JWT internals</h4>
+          <p>Token structure, expiry, localStorage risk, the 480-minute choice.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>XGBoost intuition</h4>
+          <p>B1 is next. Need gradient boosting intuition before implementation.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>Basket analysis math</h4>
+          <p>Lift / confidence / support. Need to know when lift &gt; 1 is meaningful.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>Subprocess management</h4>
+          <p>Pipeline runs as child process. Lifecycle understanding for debugging hangs.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>Pydantic v2</h4>
+          <p>Every API request/response validated here. Schema mismatch errors.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>RapidFuzz clustering</h4>
+          <p>Entity resolution. Why score = 78 for this specific catalog.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="tier-row t3">
+      <div class="tier-side">
+        <div class="tier-mark">Tier III</div>
+        <h3>Can stay abstracted</h3>
+        <p>Use correctly. Don't study internals. There are better places to spend time.</p>
+      </div>
+      <div class="tier-items">
+        <div class="tier-item-c">
+          <h4>shadcn/ui</h4>
+          <p>Code generator. Components are in your repo. Customize when needed.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>Recharts</h4>
+          <p>Know the component API. D3/SVG internals not required.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>pdfjs-dist</h4>
+          <p>Pamphlet PNG export only. Correctly abstracted already.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>Docker internals</h4>
+          <p>Know compose up/down. Container runtime not required.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>Playwright</h4>
+          <p>Run with --debug to diagnose. Browser automation internals not required.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>bcrypt</h4>
+          <p>Used correctly already. Don't implement Blowfish cipher.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>Framer Motion</h4>
+          <p>Animation in explainer page only. Visual, not systemic.</p>
+        </div>
+        <div class="tier-item-c">
+          <h4>Next.js build internals</h4>
+          <p>Understand App Router patterns. Not webpack or Turbopack.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PART 4: LEARNING ORDER -->
+<section class="section" id="p4">
+  <div class="section-head">
+    <span class="section-number">Part Four · Learning Order</span>
+    <h2 class="section-title">The path,<br>not a <em>syllabus</em>.</h2>
+    <p class="section-lead">Theory for thirty minutes, then immediately touch your codebase. Never study window functions without Step 02 open. Never study XGBoost without product_daily_features open.</p>
+  </div>
+
+  <div class="timeline">
+    <div class="tl-week-head">Week one — The Derived Layer</div>
+    <div class="tl-day">
+      <div class="tl-label">Day 1</div>
+      <h4>PostgreSQL window functions</h4>
+      <p>Read Steps 01 and 02 line by line. Run individual CTEs in psql. Pick one product barcode, query it across both tables, trace each feature back to raw data. Modify one window frame and observe what changes.</p>
+    </div>
+    <div class="tl-day">
+      <div class="tl-label">Day 2</div>
+      <h4>Dense time series, date spine</h4>
+      <p>Understand the cross-join in Step 01. Run just the date_series CTE manually. Find a product with zero weekend sales — those rows were generated by the cross-join. Understand why gaps break rolling averages.</p>
+    </div>
+    <div class="tl-day">
+      <div class="tl-label">Day 3</div>
+      <h4>Feature engineering &amp; data leakage</h4>
+      <p>Read Step 02 with "what would break this ML model" mindset. Find the CURRENT ROW leakage. Write the fix (ROWS BETWEEN 7 PRECEDING AND 1 PRECEDING). Understand the stockout proxy assumption — when is it wrong?</p>
+    </div>
+    <div class="tl-day">
+      <div class="tl-label">Day 4</div>
+      <h4>Business rules as code (Step 03)</h4>
+      <p>Trace the WMA formula. Manually compute predicted_demand for one product in Python — verify against the SQL output. Find three products that switched between fast / slow / dead over the last sixty days.</p>
+    </div>
+    <div class="tl-day">
+      <div class="tl-label">Day 5</div>
+      <h4>Cumulative stock position</h4>
+      <p>Query product_stock_position for five products. Find one with negative pseudo-stock. Trace why (purchases fell behind sales, or missing historical data). Understand ROWS BETWEEN UNBOUNDED PRECEDING.</p>
+    </div>
+
+    <div class="tl-week-head">Week two — The ML Layer</div>
+    <div class="tl-day">
+      <div class="tl-label">Day 6</div>
+      <h4>Time-series forecasting landscape</h4>
+      <p>WMA → exponential smoothing → ARIMA → ML-based. Understand the progression. What does the current WMA get wrong for this supermarket? Festivals? New products? Discontinued items?</p>
+    </div>
+    <div class="tl-day">
+      <div class="tl-label">Day 7</div>
+      <h4>Walk-forward validation design</h4>
+      <p>Design the train/test split for B1 on your data. Minimum training window: ninety days. How many folds with current data volume? Write pseudocode for the walk-forward loop — no Python yet.</p>
+    </div>
+    <div class="tl-day">
+      <div class="tl-label">Day 8</div>
+      <h4>XGBoost intuition, no code</h4>
+      <p>Gradient boosting as "many bad models that correct each other's mistakes." Why trees outperform linear models on tabular data. Feature importance. Don't code — build the mental model first.</p>
+    </div>
+    <div class="tl-day">
+      <div class="tl-label">Day 9</div>
+      <h4>Basket analysis math</h4>
+      <p>Support, confidence, lift — compute by hand. Read Step 10 SQL, trace the self-join. Find three product pairs with lift &gt; 3. Are they plausible (tea + sugar) or spurious (paracetamol + juice)?</p>
+    </div>
+    <div class="tl-day">
+      <div class="tl-label">Day 10</div>
+      <h4>Feature engineering for ML</h4>
+      <p>Re-read Step 02 with ML hat on. Which features are likely most predictive? Which could cause leakage? Which are missing — day of month, price elasticity, competitor events, weather?</p>
+    </div>
+
+    <div class="tl-week-head">Week three — The API Layer</div>
+    <div class="tl-day">
+      <div class="tl-label">Day 11</div>
+      <h4>FastAPI dependency injection</h4>
+      <p>Trace a full request: get_current_user → router → get_conn → SQL → response. Understand Depends(). What happens at the yield in get_conn? What happens after the response is sent?</p>
+    </div>
+    <div class="tl-day">
+      <div class="tl-label">Day 12</div>
+      <h4>Two connection patterns</h4>
+      <p>get_conn() vs get_db(). Why derived.* uses raw SQL, app.* uses ORM. What happens if you mix them?</p>
+    </div>
+    <div class="tl-day">
+      <div class="tl-label">Day 13</div>
+      <h4>SQLAlchemy ORM vs Core</h4>
+      <p>Session lifecycle. The lazy-loading trap. When bulk_insert_mappings is faster than adding ORM objects one by one. Why ingest_core uses Core, not ORM.</p>
+    </div>
+    <div class="tl-day">
+      <div class="tl-label">Day 14</div>
+      <h4>JWT + auth flow</h4>
+      <p>Token structure. Statelessness. localStorage risk vs httpOnly cookies. The 480-minute expiry choice. Why this works for staff tooling but not consumer apps.</p>
+    </div>
+    <div class="tl-day">
+      <div class="tl-label">Day 15</div>
+      <h4>Pipeline subprocess + tool plugins</h4>
+      <p>Why POST /api/pipeline/trigger spawns a subprocess instead of running inline. Process lifecycle, log streaming, cancellation edge cases. How register_tools() discovers plugins without touching main.py.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PART 5: DEEP DIVES -->
+<section class="section" id="p5">
+  <div class="section-head">
+    <span class="section-number">Part Five · Deep Dives</span>
+    <h2 class="section-title">Intuition <em>first</em>,<br>then mechanics.</h2>
+    <p class="section-lead">Each concept tied directly to your implementation. Click to expand the chapter.</p>
+  </div>
+
+  <div class="dives">
+
+    <article class="dive" data-dive>
+      <header class="dive-head">
+        <span class="dive-num">i.</span>
+        <h3>PostgreSQL Window Functions</h3>
+        <span class="dive-tag">Tier I · SQL</span>
+      </header>
+      <div class="dive-body"><div class="dive-content">
+        <p><strong>Intuition.</strong> Normal SQL groups rows and collapses them (GROUP BY). Window functions look at neighboring rows without collapsing. Every input row produces one output row that can see its context.</p>
+        <div class="analogy"><strong>Analogy</strong>A spreadsheet column of daily sales where you want a "7-day rolling average" column next to each row. You don't want one average — you want each row to keep its identity while knowing its neighborhood.</div>
+        <span class="dive-section-label">Why it matters in AxonFlux</span>
+        <p>Steps 02, 03, 04 are entirely window functions. On 2.3 million rows, SQL window functions run in milliseconds. Equivalent Python loops would take minutes.</p>
+        <pre><span class="k">AVG</span>(quantity_sold) <span class="k">OVER</span> (
+  <span class="k">PARTITION BY</span> product_id      <span class="c">-- reset window per product</span>
+  <span class="k">ORDER BY</span> sale_date           <span class="c">-- define sequence</span>
+  <span class="k">ROWS BETWEEN</span> 6 <span class="k">PRECEDING</span>    <span class="c">-- 7 rows including current</span>
+    <span class="k">AND CURRENT ROW</span>
+)</pre>
+        <span class="dive-section-label">A critical distinction</span>
+        <p><code>ROWS BETWEEN 6 PRECEDING AND CURRENT ROW</code> = 7 values <em>including</em> today. For ML features, you need <code>ROWS BETWEEN 7 PRECEDING AND 1 PRECEDING</code> — 7 values <em>excluding</em> today. This is the data leakage bug in Step 02.</p>
+        <div class="mistake"><strong>Common mistake</strong>Confusing ROWS BETWEEN (physical row count) with RANGE BETWEEN (value-based). For time series, almost always use ROWS — RANGE on dates can behave unexpectedly when there are ties.</div>
+      </div></div>
+    </article>
+
+    <article class="dive" data-dive>
+      <header class="dive-head">
+        <span class="dive-num">ii.</span>
+        <h3>Dense Time Series &amp; the Date Spine</h3>
+        <span class="dive-tag">Tier I · SQL</span>
+      </header>
+      <div class="dive-body"><div class="dive-content">
+        <p><strong>Intuition.</strong> If a product had no sales on Sunday, there's no row for that product on Sunday. When you compute "7-day rolling average," Sunday's window has only six real days. The math is quietly wrong. Solution: generate a complete date list, cross-join with all products, LEFT JOIN actual sales. Products with no sales get quantity_sold = 0.</p>
+        <div class="analogy"><strong>Analogy</strong>A school attendance register. If you only record students who came, the register has gaps. To know "attended X of last 7 days," you need a full 7-day roster — including absent days.</div>
+        <span class="dive-section-label">The pattern, in Step 01</span>
+        <pre><span class="k">WITH</span> date_series <span class="k">AS</span> (
+  <span class="k">SELECT</span> generate_series(
+    <span class="k">MIN</span>(sale_date), <span class="k">CURRENT_DATE</span>, <span class="s">'1 day'</span>::interval
+  )::date <span class="k">AS</span> d
+  <span class="k">FROM</span> derived.daily_sales_summary
+),
+products <span class="k">AS</span> (
+  <span class="k">SELECT DISTINCT</span> barcode <span class="k">FROM</span> raw.raw_sales_itemwise
+),
+dense_grid <span class="k">AS</span> (
+  <span class="k">SELECT</span> d, barcode <span class="k">FROM</span> date_series <span class="k">CROSS JOIN</span> products
+)
+<span class="k">SELECT</span> g.d, g.barcode,
+  <span class="k">COALESCE</span>(s.quantity_sold, 0) <span class="k">AS</span> quantity_sold
+<span class="k">FROM</span> dense_grid g
+<span class="k">LEFT JOIN</span> aggregated_sales s
+  <span class="k">ON</span> s.sale_date = g.d <span class="k">AND</span> s.barcode = g.barcode</pre>
+        <div class="mistake"><strong>Common mistake</strong>INNER JOIN instead of LEFT JOIN when attaching sales data. The inner join silently drops zero-sales days and breaks every window function downstream.</div>
+      </div></div>
+    </article>
+
+    <article class="dive" data-dive>
+      <header class="dive-head">
+        <span class="dive-num">iii.</span>
+        <h3>Data Leakage in Time Series <em style="font-style:italic;color:var(--sage);font-size:0.7em;font-weight:500">— resolved</em></h3>
+        <span class="dive-tag">Tier I · ML</span>
+      </header>
+      <div class="dive-body"><div class="dive-content">
+        <p><strong>Intuition.</strong> Leakage means your model trained with information it wouldn't have had at prediction time. In time series, the classic form is using future data to compute features for the past.</p>
+        <div class="analogy"><strong>Analogy</strong>Giving students the exam answers the night before, then being impressed they scored well. The test <em>looks</em> passed. Reality hasn't been tested.</div>
+        <span class="dive-section-label">The original problem</span>
+        <p>In <code>02_product_daily_features.sql</code>, the rolling averages used <code>ROWS BETWEEN 6 PRECEDING AND CURRENT ROW</code> — seven values <em>including</em> today. When training a model with today's quantity as target, today's value sits inside the feature. The model trivially memorizes the answer.</p>
+        <span class="dive-section-label">The fix — additive, not replacing</span>
+        <p>Replacing the existing columns would have broken Step 03's operational WMA (which correctly uses today's value for current-state replenishment decisions — that's <em>not</em> leakage when there's no future target). So the fix added a parallel set of lagged columns alongside the originals:</p>
+        <pre><span class="c">-- Operational stats — include today (Step 03 WMA, replenishment)</span>
+<span class="k">AVG</span>(quantity_sold) <span class="k">OVER</span> (
+  <span class="k">PARTITION BY</span> product_id <span class="k">ORDER BY</span> date
+  <span class="k">ROWS BETWEEN</span> 6 <span class="k">PRECEDING AND CURRENT ROW</span>
+) <span class="k">AS</span> last_7_day_avg
+
+<span class="c">-- ML-safe stats — exclude today (B1 training features)</span>
+<span class="k">AVG</span>(quantity_sold) <span class="k">OVER</span> (
+  <span class="k">PARTITION BY</span> product_id <span class="k">ORDER BY</span> date
+  <span class="k">ROWS BETWEEN</span> 7 <span class="k">PRECEDING AND</span> 1 <span class="k">PRECEDING</span>
+) <span class="k">AS</span> last_7_day_avg_lagged</pre>
+        <p>Same pattern applied for <code>last_30_day_avg_lagged</code>, <code>last_60_day_avg_lagged</code>, and <code>last_7_day_stddev_lagged</code>. The <code>stockout_proxy</code> was switched to the lagged 7-day average — today's zero should not suppress the "recently active" signal it depends on.</p>
+        <span class="dive-section-label">Verification on live data</span>
+        <p>After rebuild: 2.92M rows in <code>product_daily_features</code>. 2.91M have lagged values populated (NULLs only on each product's first observed day — expected). 268,377 rows show a meaningful difference between current and lagged windows — the proof that the frames compute different things.</p>
+        <p>Spot-check on barcode <code>8909106084568</code>, May 1 2026 with qty=128:</p>
+        <div class="tags-inline">
+          <span>avg7 (inclusive) = 28.86</span>
+          <span>avg7_lag = 10.57</span>
+          <span>delta = 18.29</span>
+        </div>
+        <p>Without the fix, a model training to predict 128 would have been handed 28.86 as its "feature" — almost a third of the answer baked in. With the lagged column, it gets 10.57, which is what was actually knowable before May 1.</p>
+        <span class="dive-section-label">The general principle, restated</span>
+        <p>Two different consumers, two different windows. Operations needs the inclusive frame because "today's running average through right now" is a legitimate signal for current-state decisions. ML training needs the lagged frame because the target itself sits at "today" and any feature touching today is leakage. Keeping both in the same table — clearly named — makes the distinction explicit at every query site.</p>
+        <div class="mistake"><strong>What changed downstream</strong>Step 03 still references <code>last_7_day_avg</code> (non-lagged). WMA predictions are byte-identical to before. Frontend dashboards, replenishment sheet, health flags — all unchanged. The only difference is that B1 now has clean features to train on.</div>
+      </div></div>
+    </article>
+
+    <article class="dive" data-dive>
+      <header class="dive-head">
+        <span class="dive-num">iv.</span>
+        <h3>Walk-Forward Validation</h3>
+        <span class="dive-tag">Tier I · ML</span>
+      </header>
+      <div class="dive-body"><div class="dive-content">
+        <p><strong>Intuition.</strong> You can't randomly split test data for time series forecasting. If January is your test set, you have December in training. In production you'd never predict January using data from both November AND March. Random splits break temporal causality.</p>
+        <div class="analogy"><strong>Analogy</strong>Stock market backtesting. You simulate as if you only knew the past. Any peekback at future prices makes the backtest useless — even if it makes the strategy look brilliant.</div>
+        <span class="dive-section-label">The correct approach</span>
+        <pre><span class="c"># Walk-forward (expanding window)</span>
+Train: Jan–Jun  | Test: Jul
+Train: Jan–Jul  | Test: Aug
+Train: Jan–Aug  | Test: Sep
+...
+
+<span class="c"># Each fold expands training forward.</span>
+<span class="c"># Test is always strictly after train.</span>
+<span class="c"># sklearn.model_selection.TimeSeriesSplit</span></pre>
+        <p>For B1 specifically: minimum 90 days training (lag_60 plus buffer). With 730 days of data, ~8 folds. The average MAPE across folds is your honest error rate.</p>
+        <div class="mistake"><strong>Critical mistake</strong>Using sklearn.model_selection.train_test_split on time series. It shuffles randomly. The model will look accurate and completely fail in production.</div>
+      </div></div>
+    </article>
+
+    <article class="dive" data-dive>
+      <header class="dive-head">
+        <span class="dive-num">v.</span>
+        <h3>Weighted Moving Average — Mechanics &amp; Limits</h3>
+        <span class="dive-tag">Tier I · ML</span>
+      </header>
+      <div class="dive-body"><div class="dive-content">
+        <p><strong>The formula in Step 03:</strong></p>
+        <pre>predicted_demand = GREATEST(
+  0.6 × last_7_day_avg
+  + 0.3 × last_30_day_avg
+  + 0.1 × last_60_day_avg,
+  0.02  <span class="c">-- floor to avoid division by zero in Step 06</span>
+)</pre>
+        <div class="analogy"><strong>Analogy</strong>Asking three advisors what temperature to dress for. You trust the one who checked this morning (0.6) more than the one who looked at last year's averages (0.1).</div>
+        <span class="dive-section-label">What the 0.02 floor actually does</span>
+        <p>Prevents division by zero when computing days_of_cover = stock ÷ demand in Step 06. But a consequence: a permanently discontinued product still generates reorder recommendations forever. Staff following the sheet blindly will order things no longer sold. This is an embedded business decision, not just a math fix.</p>
+        <span class="dive-section-label">What WMA gets wrong</span>
+        <div class="tags-inline">
+          <span>No seasonality capture</span>
+          <span>Weights not validated</span>
+          <span>New products inflated</span>
+          <span>Can't distinguish stockout from price-too-high</span>
+          <span>Misses step changes from promotions</span>
+        </div>
+      </div></div>
+    </article>
+
+    <article class="dive" data-dive>
+      <header class="dive-head">
+        <span class="dive-num">vi.</span>
+        <h3>FastAPI Dependency Injection</h3>
+        <span class="dive-tag">Tier I · Backend</span>
+      </header>
+      <div class="dive-body"><div class="dive-content">
+        <p><strong>Intuition.</strong> <code>Depends()</code> is FastAPI's way of saying: before this endpoint runs, run this other function first and inject the result. It's declarative middleware per-endpoint. The power is composability — chain dependencies, share logic, handle cleanup automatically.</p>
+        <pre><span class="c"># Two patterns in AxonFlux</span>
+<span class="k">async def</span> <span class="n">get_conn</span>():
+    <span class="c"># Generator: code before yield = setup, after = cleanup</span>
+    conn = engine.connect()
+    <span class="k">try</span>:
+        <span class="k">yield</span> conn         <span class="c"># request handler runs here</span>
+    <span class="k">finally</span>:
+        conn.close()      <span class="c"># after response is sent</span>
+
+<span class="k">async def</span> <span class="n">get_current_user</span>(token = <span class="n">Depends</span>(oauth2_scheme)):
+    payload = jwt.decode(token, SECRET_KEY)
+    <span class="k">return</span> payload</pre>
+        <span class="dive-section-label">Why two connection patterns</span>
+        <p><code>get_conn()</code> returns a raw engine connection — used for derived.* and raw.* queries written as <code>text()</code> SQL. <code>get_db()</code> returns a SQLAlchemy ORM session — used for app.* writes where type safety and relationship management matter.</p>
+        <div class="mistake"><strong>Failure mode</strong>If an exception occurs inside a request and the dependency uses try/finally, FastAPI still runs the finally. But if the dependency uses plain return (not yield), the connection is never closed on exception. Connection leak waiting to happen.</div>
+      </div></div>
+    </article>
+
+    <article class="dive" data-dive>
+      <header class="dive-head">
+        <span class="dive-num">vii.</span>
+        <h3>Basket Analysis — Support / Confidence / Lift</h3>
+        <span class="dive-tag">Tier II · ML</span>
+      </header>
+      <div class="dive-body"><div class="dive-content">
+        <p><strong>Intuition.</strong> Which products are bought together? Count co-occurrences in transaction records. No fancy algorithm needed at this scale — just a SQL self-join on bill_no.</p>
+        <span class="dive-section-label">The SQL pattern in Step 10</span>
+        <pre><span class="k">SELECT</span> a.barcode <span class="k">AS</span> barcode_a, b.barcode <span class="k">AS</span> barcode_b,
+       <span class="k">COUNT</span>(*) <span class="k">AS</span> co_occurrences
+<span class="k">FROM</span> raw.raw_sales_itemwise a
+<span class="k">JOIN</span> raw.raw_sales_itemwise b
+  <span class="k">ON</span> a.bill_no = b.bill_no   <span class="c">-- same transaction</span>
+ <span class="k">AND</span> a.barcode &lt; b.barcode   <span class="c">-- avoid duplicates</span>
+<span class="k">GROUP BY</span> a.barcode, b.barcode
+<span class="k">HAVING COUNT</span>(*) &gt;= 5</pre>
+        <span class="dive-section-label">Metrics</span>
+        <p><strong>Support(A,B)</strong> = count(A∩B) ÷ total_transactions — how common is this pair overall.<br>
+        <strong>Confidence(A→B)</strong> = count(A∩B) ÷ count(A) — if bought A, what % also bought B.<br>
+        <strong>Lift(A,B)</strong> = confidence ÷ support(B) — how much more likely is B given A vs B in general.</p>
+        <p>Lift = 1.0 means independent. Lift > 1.0 means positive association. <strong>Lift > 3.0 is usually a strong signal worth recommending.</strong></p>
+        <div class="mistake"><strong>Hidden assumption</strong>The self-join on bill_no assumes bill_no is unique per shopping trip. If Er4u reuses bill numbers across days, associations become meaningless noise. Worth verifying with a simple count query.</div>
+      </div></div>
+    </article>
+
+    <article class="dive" data-dive>
+      <header class="dive-head">
+        <span class="dive-num">viii.</span>
+        <h3>The COALESCE Enrichment Pattern</h3>
+        <span class="dive-tag">Tier I · Architecture</span>
+      </header>
+      <div class="dive-body"><div class="dive-content">
+        <p><strong>Intuition.</strong> app.* data should override derived.* at query time — never by modifying derived tables (which get truncated every rebuild). <code>COALESCE</code> picks the first non-NULL value, so if app.products has a canonical_name, use it; otherwise fall back to the derived name.</p>
+        <pre><span class="c">-- Every product query in the API uses this pattern</span>
+<span class="k">COALESCE</span>(p.canonical_name, d.product_name) <span class="k">AS</span> display_name
+<span class="c">-- p = app.products (human-authored, may be NULL)</span>
+<span class="c">-- d = derived.product_dimension (always populated)</span></pre>
+        <span class="dive-section-label">Why not just update derived.*?</span>
+        <p>Because derived.* is truncated on every pipeline run. Any direct edits are lost. The three-schema separation exists precisely so that human-authored overrides live in app.*, which Alembic manages and which survives rebuilds.</p>
+        <div class="analogy"><strong>Analogy</strong>A library catalog (derived) with sticky notes (app overrides). The catalog gets reprinted every week. The sticky notes survive — they're in a separate folder. When looking up a book, you check the sticky note first.</div>
+        <div class="mistake"><strong>Dangerous assumption</strong>If you ever write UPDATE statements on derived.* tables directly (bypassing the pipeline), those changes are silently wiped on the next rebuild. No warning. This is why "never modify derived.*" is non-negotiable.</div>
+      </div></div>
+    </article>
+
+    <article class="dive" data-dive>
+      <header class="dive-head">
+        <span class="dive-num">ix.</span>
+        <h3>Append-Only + Full Rebuild Architecture</h3>
+        <span class="dive-tag">Tier I · Data Engineering</span>
+      </header>
+      <div class="dive-body"><div class="dive-content">
+        <p><strong>Intuition.</strong> Two fundamental patterns in deliberate tension. raw.* is append-only (no updates, ever). derived.* is truncate-and-rebuild (wiped clean, rebuilt from scratch on every run). Together they create a system that is both auditable AND always consistent.</p>
+        <span class="dive-section-label">Why append-only for raw.*?</span>
+        <p>Every ingestion creates an immutable audit trail. You can always answer "what data did we have on March 15?" by querying raw.* with import_batch_id created before that date. If you UPDATE or DELETE from raw.*, this auditability is destroyed forever.</p>
+        <span class="dive-section-label">Why full rebuild for derived.*?</span>
+        <p>Analytics tables have complex dependencies (01 → 02 → 03 → 06). If you try to incrementally update them ("add only today's rows"), you face every edge case: what if a historical row changed? What if an alias was remapped? What if a formula changed? Full rebuild avoids it all — throw away derived.* and recompute.</p>
+        <div class="analogy"><strong>Analogy</strong>raw.* is the court transcript — append-only, legally unchangeable. derived.* is the lawyer's summary notes — thrown away and rewritten before each hearing, always derived fresh from the transcript.</div>
+        <p>This works at 2.3M rows in minutes. At 10× volume or with daily rebuild requirements, you'd need incremental processing (dbt, Spark, partitioned rebuilds). The current architecture is correct for the scale — but know when it stops working.</p>
+      </div></div>
+    </article>
+
+    <article class="dive" data-dive>
+      <header class="dive-head">
+        <span class="dive-num">x.</span>
+        <h3>The Pipeline Subprocess Pattern</h3>
+        <span class="dive-tag">Tier II · Systems</span>
+      </header>
+      <div class="dive-body"><div class="dive-content">
+        <p><strong>Intuition.</strong> The weekly pipeline is long-running, file-touching, DB-heavy. If it ran inside the FastAPI event loop it would block every other API request for minutes. By running it as a subprocess, it gets its own memory, process space, and error scope — and the API stays responsive.</p>
+        <pre><span class="c"># api/routers/pipeline.py (simplified)</span>
+process = subprocess.<span class="n">Popen</span>(
+    [<span class="s">"python"</span>, <span class="s">"pipelines/weekly_pipeline.py"</span>],
+    stdout=subprocess.<span class="n">PIPE</span>,
+    stderr=subprocess.<span class="n">STDOUT</span>
+)
+<span class="c"># Store PID in DB for status polling + cancellation</span>
+run_id = store_run(pid=process.pid, status=<span class="s">"running"</span>)</pre>
+        <span class="dive-section-label">Why not async?</span>
+        <p>FastAPI is async, but the pipeline uses synchronous psycopg2 and pandas (both blocking). Running a blocking operation in an async event loop blocks every other request on that thread. Subprocess sidesteps the issue entirely.</p>
+        <div class="mistake"><strong>Failure scenario</strong>If the pipeline crashes at Step 4, TRUNCATE for steps 0–3 has committed but INSERT for 4–10 hasn't run. derived.product_health_signals is empty. The next frontend load shows zero replenishment items. Staff think the system is broken. Fix: wrap the rebuild in one transaction, or use a schema-swap pattern (build into derived_staging, then RENAME).</div>
+      </div></div>
+    </article>
+
+    <article class="dive" data-dive>
+      <header class="dive-head">
+        <span class="dive-num">xi.</span>
+        <h3>SQLAlchemy 2.0 — ORM vs Core</h3>
+        <span class="dive-tag">Tier II · Backend</span>
+      </header>
+      <div class="dive-body"><div class="dive-content">
+        <p><strong>Intuition.</strong> SQLAlchemy has two modes. ORM maps Python classes to database tables — you work with objects, relationships, the ORM emits SQL. Core is lower-level — you write SQL expressions (or raw text()) and get rows back. AxonFlux uses both, deliberately.</p>
+        <span class="dive-section-label">ORM — for app.* writes</span>
+        <pre>product = db.<span class="n">query</span>(AppProduct).<span class="n">filter</span>(
+    AppProduct.barcode == barcode
+).<span class="n">first</span>()
+<span class="k">if not</span> product:
+    product = AppProduct(barcode=barcode)
+    db.<span class="n">add</span>(product)
+product.canonical_name = new_name
+db.<span class="n">commit</span>()</pre>
+        <span class="dive-section-label">Core — for derived.* reads</span>
+        <pre>result = conn.<span class="n">execute</span>(<span class="n">text</span>(<span class="s">"""
+  SELECT p.barcode, COALESCE(a.canonical_name, p.product_name)
+  FROM derived.product_health_signals p
+  LEFT JOIN app.products a ON a.barcode = p.barcode
+  WHERE p.flag = :flag
+"""</span>), {<span class="s">"flag"</span>: flag})</pre>
+        <p>derived.* tables are rebuilt on every pipeline run — keeping ORM models in sync with them would mean model changes every time a column is added. Raw text() SQL is more flexible for analytics reads. ORM adds safety where you actually need mutations (app.*).</p>
+        <div class="mistake"><strong>Lazy loading trap</strong>Accessing a relationship attribute on an ORM object after the session closes raises DetachedInstanceError. Example: load a Product, close session, access product.aliases — SQLAlchemy tries to query with a closed session. Fix: use eager loading (joinedload) or access attributes while session is open.</div>
+      </div></div>
+    </article>
+
+  </div>
+</section>
+
+<!-- PART 6: AUDIT -->
+<section class="section" id="p6">
+  <div class="section-head">
+    <span class="section-number">Part Six · Code Ownership Audit</span>
+    <h2 class="section-title">What you <em>haven't</em><br>actually written.</h2>
+    <p class="section-lead">Brutally honest assessment of what you likely don't truly own yet. Red — likely a black box. Amber — partially understood. Green — probably solid.</p>
+  </div>
+
+  <div class="audit">
+    <div class="audit-row r-red">
+      <div class="audit-status"><span class="audit-dot"></span><span class="status-label">Black box</span></div>
+      <div class="audit-body">
+        <h4>The dense grid cross-join (Step 01)</h4>
+        <p>The cross-join + date_series CTE pattern is almost certainly LLM-generated. Most engineers haven't seen this before. You need to rebuild it manually before you own it.</p>
+        <div class="audit-fix">Exercise — three products × seven days, write the cross-join from scratch.</div>
+      </div>
+    </div>
+    <div class="audit-row r-red">
+      <div class="audit-status"><span class="audit-dot"></span><span class="status-label">Black box</span></div>
+      <div class="audit-body">
+        <h4>ROWS vs RANGE in window frames</h4>
+        <p>Do you know why ROWS BETWEEN is used in Step 02 instead of RANGE BETWEEN? The distinction is subtle and matters for correctness. If unsure, this is opaque.</p>
+        <div class="audit-fix">Read — PostgreSQL docs on frame_clause. Test both on one product.</div>
+      </div>
+    </div>
+    <div class="audit-row r-red">
+      <div class="audit-status"><span class="audit-dot"></span><span class="status-label">Black box</span></div>
+      <div class="audit-body">
+        <h4>DISTINCT ON ordering sensitivity (Step 06)</h4>
+        <p>DISTINCT ON (date, product_id) with ORDER BY determines which supplier row survives when a product has multiple suppliers. Change the ORDER BY and the recommendations change silently.</p>
+        <div class="audit-fix">Find a multi-supplier product. Change ORDER BY. Observe which supplier wins.</div>
+      </div>
+    </div>
+    <div class="audit-row r-red">
+      <div class="audit-status"><span class="audit-dot"></span><span class="status-label">Black box</span></div>
+      <div class="audit-body">
+        <h4>FastAPI yield-based cleanup</h4>
+        <p>get_conn() uses yield. Code after yield runs after the response is sent. Without understanding this, you cannot debug connection leaks or know when connections close.</p>
+        <div class="audit-fix">Add a print after yield in get_conn. Observe when it fires.</div>
+      </div>
+    </div>
+    <div class="audit-row r-yellow">
+      <div class="audit-status"><span class="audit-dot"></span><span class="status-label">Partial</span></div>
+      <div class="audit-body">
+        <h4>chunk_size = 2000 in ingest_core</h4>
+        <p>Can you explain why 2000 specifically? What happens at chunk_size = 1 (correct, slow)? At chunk_size = 100000 (memory risk on large files)? The tradeoff is memory bound, not performance.</p>
+        <div class="audit-fix">Run ingestion at chunk_size = 100 and 5000. Compare memory and time.</div>
+      </div>
+    </div>
+    <div class="audit-row r-yellow">
+      <div class="audit-status"><span class="audit-dot"></span><span class="status-label">Partial</span></div>
+      <div class="audit-body">
+        <h4>The 0.02 floor in WMA (Step 03)</h4>
+        <p>GREATEST(predicted_demand, 0.02) prevents division by zero. But it means discontinued products still get reorder recommendations forever. Known tradeoff or accidental side effect?</p>
+        <div class="audit-fix">Query — products where last_60_day_avg = 0 but still appear in replenishment.</div>
+      </div>
+    </div>
+    <div class="audit-row r-yellow">
+      <div class="audit-status"><span class="audit-dot"></span><span class="status-label">Partial</span></div>
+      <div class="audit-body">
+        <h4>Lead time hardcoding (Step 06)</h4>
+        <p>Bellary = 7 days, others = 15 days. Hardcoded in SQL. No table drives this. If any supplier region changes, the lead-time calc silently produces wrong reorder timing.</p>
+        <div class="audit-fix">Design — what table would make lead times configurable?</div>
+      </div>
+    </div>
+    <div class="audit-row r-yellow">
+      <div class="audit-status"><span class="audit-dot"></span><span class="status-label">Partial</span></div>
+      <div class="audit-body">
+        <h4>Stockout proxy assumption (Step 02)</h4>
+        <p>sold = 0 AND recent_avg > 0.5 AND no_restock → assumed stockout. But zero sales could mean Sunday, holiday, price-too-high, product recalled. The assumption is embedded in ML features as if it were truth.</p>
+        <div class="audit-fix">Find ten rows with stockout_proxy = TRUE. Are they all genuine stockouts?</div>
+      </div>
+    </div>
+    <div class="audit-row r-yellow">
+      <div class="audit-status"><span class="audit-dot"></span><span class="status-label">Partial</span></div>
+      <div class="audit-body">
+        <h4>Pipeline transaction scope</h4>
+        <p>If weekly_pipeline.py crashes at Step 4, Steps 0–3 have already committed. The derived tables are partially rebuilt. No rollback mechanism for the full 10-step run.</p>
+        <div class="audit-fix">Design — schema-swap pattern to make rebuilds atomic.</div>
+      </div>
+    </div>
+    <div class="audit-row r-green">
+      <div class="audit-status"><span class="audit-dot"></span><span class="status-label">Solid</span></div>
+      <div class="audit-body">
+        <h4>Three-schema separation architecture</h4>
+        <p>raw / derived / app split is well-understood. The COALESCE enrichment pattern (app overrides derived at query time) is clean and intentional.</p>
+        <div class="audit-fix">Can explain to a colleague why derived.* is truncated every run.</div>
+      </div>
+    </div>
+    <div class="audit-row r-green">
+      <div class="audit-status"><span class="audit-dot"></span><span class="status-label">Solid</span></div>
+      <div class="audit-body">
+        <h4>SHA-256 deduplication</h4>
+        <p>File hash → check ingestion_batches → skip if seen. Content-addressable approach. Idempotent re-runs.</p>
+        <div class="audit-fix">Know — editing one cell in Excel changes the hash, causing re-ingestion.</div>
+      </div>
+    </div>
+    <div class="audit-row r-green">
+      <div class="audit-status"><span class="audit-dot"></span><span class="status-label">Solid</span></div>
+      <div class="audit-body">
+        <h4>Tool plugin auto-discovery</h4>
+        <p>register_tools() scans api/tools/ folders for MANIFEST + router. Dynamic sidebar populated from /api/tools. New tools without touching main.py.</p>
+        <div class="audit-fix">Could add a new tool without assistance.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pullquote">
+    <div class="pq-label">Rebuild Exercise</div>
+    <p>If you can <strong>rebuild it from scratch without reference</strong>, you own it. If you can't, you're borrowing it. Pick one — mini date spine, WMA in Python, or lift by hand. Do it before B1.</p>
+  </div>
+</section>
+
+<!-- PART 7: MATURITY -->
+<section class="section" id="p7">
+  <div class="section-head">
+    <span class="section-number">Part Seven · Engineering Maturity</span>
+    <h2 class="section-title">Where you<br>stand <em>today</em>.</h2>
+    <p class="section-lead">Honest assessment based on what's visible in the codebase. Strengths, weaknesses, and the gap between you and a strong ML systems engineer.</p>
+  </div>
+
+  <div class="prose" style="max-width:760px; margin-bottom:24px">
+    <p>You're past junior. The architecture choices are correct — three-schema separation, COALESCE enrichment, SQL-native feature engineering at scale. Senior engineers spend years before designing these correctly. But you're not yet at the level where you can <strong>debug this system under failure pressure</strong>. "The replenishment sheet has wrong numbers" would currently require someone who deeply understands all ten SQL steps end-to-end. That's the gap to close.</p>
+  </div>
+
+  <div class="maturity">
+    <div class="mat-row">
+      <div>
+        <h4>Designing data layers</h4>
+        <p class="mat-note">Three-schema separation is correct, intentional.</p>
+      </div>
+      <div class="mat-bar"><div class="mat-bar-track"><div class="mat-bar-fill strong" data-pct="85"></div></div><span class="mat-pct">85%</span></div>
+    </div>
+    <div class="mat-row">
+      <div>
+        <h4>Writing SQL analytics</h4>
+        <p class="mat-note">Window functions and CTEs used correctly throughout.</p>
+      </div>
+      <div class="mat-bar"><div class="mat-bar-track"><div class="mat-bar-fill strong" data-pct="75"></div></div><span class="mat-pct">75%</span></div>
+    </div>
+    <div class="mat-row">
+      <div>
+        <h4>Plugin / extensibility patterns</h4>
+        <p class="mat-note">Tool plugin system is clean and extensible.</p>
+      </div>
+      <div class="mat-bar"><div class="mat-bar-track"><div class="mat-bar-fill strong" data-pct="80"></div></div><span class="mat-pct">80%</span></div>
+    </div>
+    <div class="mat-row">
+      <div>
+        <h4>Debugging window function errors</h4>
+        <p class="mat-note">Can read, can't yet diagnose under pressure.</p>
+      </div>
+      <div class="mat-bar"><div class="mat-bar-track"><div class="mat-bar-fill mid" data-pct="45"></div></div><span class="mat-pct">45%</span></div>
+    </div>
+    <div class="mat-row">
+      <div>
+        <h4>Debugging data quality issues</h4>
+        <p class="mat-note">No monitoring, no assertions, no data quality layer.</p>
+      </div>
+      <div class="mat-bar"><div class="mat-bar-track"><div class="mat-bar-fill weak" data-pct="25"></div></div><span class="mat-pct">25%</span></div>
+    </div>
+    <div class="mat-row">
+      <div>
+        <h4>Building ML pipelines from scratch</h4>
+        <p class="mat-note">Architecture planned, not yet executed.</p>
+      </div>
+      <div class="mat-bar"><div class="mat-bar-track"><div class="mat-bar-fill weak" data-pct="20"></div></div><span class="mat-pct">20%</span></div>
+    </div>
+    <div class="mat-row">
+      <div>
+        <h4>Validating model performance correctly</h4>
+        <p class="mat-note">Data leakage, walk-forward not yet applied.</p>
+      </div>
+      <div class="mat-bar"><div class="mat-bar-track"><div class="mat-bar-fill weak" data-pct="15"></div></div><span class="mat-pct">15%</span></div>
+    </div>
+    <div class="mat-row">
+      <div>
+        <h4>Operating ML in production</h4>
+        <p class="mat-note">No production ML, no drift detection, no monitoring yet.</p>
+      </div>
+      <div class="mat-bar"><div class="mat-bar-track"><div class="mat-bar-fill weak" data-pct="10"></div></div><span class="mat-pct">10%</span></div>
+    </div>
+  </div>
+
+  <h3 class="sub">What's missing or weak</h3>
+  <div class="prose">
+    <p><strong>No pipeline transaction wrapping.</strong> If the 10-step rebuild fails at step 4, you have partial derived tables. A senior engineer would wrap the full rebuild in a single transaction or use a schema-swap pattern.</p>
+    <p><strong>No data quality layer.</strong> SHA-256 dedup exists, but row-level validation does not. Negative quantities, zero prices, malformed dates all enter raw tables silently and propagate.</p>
+    <p><strong>No monitoring or alerting.</strong> The pipeline can produce zero rows in product_daily_metrics (if date parsing breaks). Nobody would know until staff notice wrong dashboard numbers.</p>
+    <p><strong>Feature documentation is absent.</strong> Every column in derived.product_daily_features is a computed assumption. Stockout proxy logic, WMA weights, threshold values — none documented in code or docs.</p>
+    <p><strong>No evaluation infrastructure.</strong> Before B1, there's no framework to ask "is XGBoost actually better than WMA on this dataset?" No baseline metrics collected, no backtesting harness, no MLflow runs with WMA as a baseline.</p>
+  </div>
+</section>
+
+<!-- PART 8: WEEKEND PLAN -->
+<section class="section" id="p8">
+  <div class="section-head">
+    <span class="section-number">Part Eight · Weekend Study Plan</span>
+    <h2 class="section-title">Two days,<br><em>focused</em>.</h2>
+    <p class="section-lead">Theory for thirty minutes maximum. Then immediately touch the codebase. Never study a concept disconnected from your implementation.</p>
+  </div>
+
+  <div class="weekend">
+    <div class="day">
+      <div class="day-head">
+        <h3>Saturday</h3>
+        <span class="day-theme">Derived Layer</span>
+      </div>
+      <div class="slot">
+        <div class="slot-time">09:00 — 10:00</div>
+        <h4>Window functions &amp; date spine</h4>
+        <ul>
+          <li>Open Step 01 and Step 02. Run individual CTEs in psql.</li>
+          <li>Pick one barcode, query across both tables.</li>
+          <li>Modify one window frame, observe the downstream change.</li>
+        </ul>
+      </div>
+      <div class="slot">
+        <div class="slot-time">10:00 — 11:00</div>
+        <h4>Data leakage &amp; stockout proxy</h4>
+        <ul>
+          <li>Find CURRENT ROW in Step 02. Write the fix.</li>
+          <li>Find ten rows where stockout_proxy = TRUE. Are they plausible?</li>
+        </ul>
+      </div>
+      <div class="slot">
+        <div class="slot-time">11:00 — 11:30</div>
+        <h4>WMA reconstruction</h4>
+        <p>Compute predicted_daily_demand in Python for one product using values from product_daily_features. Verify against product_health_signals. If they match, you understand the formula.</p>
+      </div>
+      <div class="slot">
+        <div class="slot-time">13:00 — 14:00</div>
+        <h4>Basket analysis &amp; lift</h4>
+        <ul>
+          <li>Query product_associations for lift &gt; 3 pairs.</li>
+          <li>Manually verify one pair: count co-occurrences in raw.</li>
+          <li>Compute lift by hand. Match it to the table.</li>
+        </ul>
+      </div>
+      <div class="slot">
+        <div class="slot-time">14:00 — 15:00</div>
+        <h4>Cumulative stock</h4>
+        <ul>
+          <li>Query product_stock_position for five products.</li>
+          <li>Find one with negative pseudo-stock. Trace why.</li>
+          <li>Understand UNBOUNDED PRECEDING.</li>
+        </ul>
+      </div>
+      <div class="slot">
+        <div class="slot-time">15:00 — 16:00</div>
+        <h4>End-to-end request trace</h4>
+        <p>Trace GET /api/analytics/replenishment from router to SQL to response. Run the SQL manually in psql. Compare to API JSON. Every join, every filter, every COALESCE.</p>
+      </div>
+    </div>
+
+    <div class="day">
+      <div class="day-head">
+        <h3>Sunday</h3>
+        <span class="day-theme">ML Layer</span>
+      </div>
+      <div class="slot">
+        <div class="slot-time">09:00 — 10:00</div>
+        <h4>XGBoost intuition, no code</h4>
+        <ul>
+          <li>Gradient boosting as iterative residual correction.</li>
+          <li>Why trees outperform linear on tabular data.</li>
+          <li>What "feature importance" means practically.</li>
+        </ul>
+      </div>
+      <div class="slot">
+        <div class="slot-time">10:00 — 11:00</div>
+        <h4>Walk-forward validation design</h4>
+        <ul>
+          <li>Design train/test split for B1 on your data.</li>
+          <li>Minimum window: 90 days.</li>
+          <li>How many folds with current data?</li>
+          <li>Write pseudocode for the walk-forward loop.</li>
+        </ul>
+      </div>
+      <div class="slot">
+        <div class="slot-time">11:00 — 11:30</div>
+        <h4>Feature audit for B1</h4>
+        <p>Re-read Step 02 with ML hat on. Which features are most predictive? Which need leakage fix? What's missing — day of month, price elasticity, competitor events, weather? Write the list before B1.</p>
+      </div>
+      <div class="slot">
+        <div class="slot-time">13:00 — 14:30</div>
+        <h4>Code ownership rebuilds</h4>
+        <ul>
+          <li>Rebuild mini date spine from scratch.</li>
+          <li>Write ingest_core logic from memory.</li>
+          <li>Trace entity resolution: UI confirm → Step 01 next rebuild.</li>
+        </ul>
+      </div>
+      <div class="slot">
+        <div class="slot-time">14:30 — 15:30</div>
+        <h4>FastAPI dependency deep dive</h4>
+        <ul>
+          <li>Add print() after yield in get_conn. Observe when it fires.</li>
+          <li>Trace get_current_user chain.</li>
+          <li>What happens when auth fails mid-chain?</li>
+        </ul>
+      </div>
+      <div class="slot">
+        <div class="slot-time">15:30 — 16:00</div>
+        <h4>Gap assessment</h4>
+        <p>After two days, which parts still feel opaque? Write five specific things that would confuse you under debugging pressure. That list is your next iteration's starting point.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="pullquote">
+    <div class="pq-label">What to skip</div>
+    <p>Frontend components. Docker config. Pamphlet internals. Framer Motion. shadcn/ui. Recharts. <strong>Never study anything disconnected from your codebase.</strong> "XGBoost tutorial" on YouTube is low value. "XGBoost tutorial with derived.product_daily_features open" is high value.</p>
+  </div>
+
+  <div class="flourish">· · · ✦ · · ·</div>
+</section>
+
+</main>
+
+<script>
+// Progress bar
+const fill = document.getElementById('progress-fill');
+window.addEventListener('scroll', () => {
+  const pct = window.scrollY / (document.body.scrollHeight - window.innerHeight) * 100;
+  fill.style.width = pct + '%';
+}, { passive: true });
+
+// Section reveal
+const revealObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) e.target.classList.add('visible');
+  });
+}, { threshold: 0.08 });
+document.querySelectorAll('.section').forEach(s => revealObserver.observe(s));
+
+// Accordion (single open at a time)
+document.querySelectorAll('[data-dive]').forEach(d => {
+  d.querySelector('.dive-head').addEventListener('click', () => {
+    const wasOpen = d.classList.contains('open');
+    document.querySelectorAll('[data-dive]').forEach(o => o.classList.remove('open'));
+    if (!wasOpen) d.classList.add('open');
+  });
+});
+
+// Sidebar active state
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('#sidebar nav a');
+const navObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navLinks.forEach(l => l.classList.remove('active'));
+      const link = document.querySelector('#sidebar nav a[href="#' + e.target.id + '"]');
+      if (link) link.classList.add('active');
+    }
+  });
+}, { threshold: 0.3, rootMargin: '-20% 0px -50% 0px' });
+sections.forEach(s => navObserver.observe(s));
+
+// Animate maturity bars when visible
+const barObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('.mat-bar-fill').forEach(b => {
+        b.style.width = b.dataset.pct + '%';
+      });
+      barObserver.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.2 });
+document.querySelectorAll('.maturity').forEach(m => barObserver.observe(m));
+</script>
+</body>
+</html>
