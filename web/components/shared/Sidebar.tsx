@@ -7,7 +7,11 @@ import { clearToken, getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { PipelineTriggerModal } from "@/components/pipeline/PipelineTriggerModal";
-import { Zap } from "lucide-react";
+import {
+  LayoutDashboard, Activity, Package, Users, BarChart2,
+  Wallet, FileText, GitMerge, Layers, BookOpen, Zap,
+} from "lucide-react";
+import type { ReactNode } from "react";
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -37,16 +41,18 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     router.push("/login");
   };
 
-  const links = [
-    { href: "/dashboard", label: "Dashboard", icon: "📊" },
-    { href: "/dashboard/health", label: "Product Health", icon: "❤️" },
-    { href: "/dashboard/replenishment", label: "Replenishment", icon: "📦" },
-    { href: "/customers", label: "Customers", icon: "👥" },
-    { href: "/tools/cash-closure", label: "Cash Closure", icon: "💰" },
-    { href: "/tools/pamphlet-generator", label: "Pamphlets", icon: "📄" },
-    { href: "/tools/entity-resolution", label: "Entity Resolution", icon: "🔗" },
-    { href: "/docs", label: "System Design", icon: "🏗️" },
-    { href: "/docs/library", label: "Docs Library", icon: "📚" },
+  const sz = "h-4 w-4 shrink-0";
+  const links: { href: string; label: string; icon: ReactNode }[] = [
+    { href: "/dashboard",                  label: "Dashboard",        icon: <LayoutDashboard className={sz} /> },
+    { href: "/dashboard/health",           label: "Product Health",   icon: <Activity className={sz} /> },
+    { href: "/dashboard/replenishment",    label: "Replenishment",    icon: <Package className={sz} /> },
+    { href: "/customers",                  label: "Customers",        icon: <Users className={sz} /> },
+    { href: "/customers/lapsed",           label: "Customer Activity",icon: <BarChart2 className={sz} /> },
+    { href: "/tools/cash-closure",         label: "Cash Closure",     icon: <Wallet className={sz} /> },
+    { href: "/tools/pamphlet-generator",   label: "Pamphlets",        icon: <FileText className={sz} /> },
+    { href: "/tools/entity-resolution",    label: "Entity Resolution",icon: <GitMerge className={sz} /> },
+    { href: "/docs",                       label: "System Design",    icon: <Layers className={sz} /> },
+    { href: "/docs/library",               label: "Docs Library",     icon: <BookOpen className={sz} /> },
   ];
 
   return (

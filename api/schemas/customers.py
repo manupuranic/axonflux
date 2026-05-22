@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Literal
 from pydantic import BaseModel
 
 
@@ -33,6 +34,44 @@ class CustomerBill(BaseModel):
     card_total: float | None
     upi_total: float | None
     credit_total: float | None
+
+
+ChurnTier = Literal["active", "at-risk", "lapsed", "lost"]
+
+
+class ActiveCustomer(BaseModel):
+    mobile_clean: str
+    display_name: str | None
+    is_member: bool
+    is_repeat: bool | None
+    total_bills: int | None
+    total_revenue: float | None
+    avg_bill_value: float | None
+    last_purchase_date: date | None
+    days_since_last_visit: int | None
+    preferred_payment: str | None
+
+
+class LapsedCustomer(BaseModel):
+    mobile_clean: str
+    display_name: str | None
+    is_member: bool
+    total_bills: int | None
+    total_revenue: float | None
+    avg_bill_value: float | None
+    last_purchase_date: date | None
+    days_since_last_visit: int | None
+    avg_days_between_visits: float | None
+    preferred_payment: str | None
+    churn_tier: ChurnTier
+
+
+class LapsedSummary(BaseModel):
+    active_count: int
+    at_risk_count: int
+    lapsed_count: int
+    lost_count: int
+    total_count: int
 
 
 class CustomerSummary(BaseModel):

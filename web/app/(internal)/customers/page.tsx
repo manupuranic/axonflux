@@ -13,7 +13,10 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatInrCompact } from "@/lib/formatters";
+import { Users, RefreshCcw, Receipt, BadgeCheck, UserPlus, Store } from "lucide-react";
 import type { CustomerListItem } from "@/types/api";
+
+const sz = "h-5 w-5";
 
 const PAGE_SIZE = 50;
 
@@ -59,42 +62,12 @@ export default function CustomersPage() {
       >
         {summary && (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-            <KpiCard
-              title="Unique Customers"
-              value={summary.total_unique_customers.toLocaleString("en-IN")}
-              accent="blue"
-              icon="👥"
-            />
-            <KpiCard
-              title="Repeat Customers"
-              value={`${summary.repeat_customer_count.toLocaleString("en-IN")} (${summary.repeat_customer_percent}%)`}
-              accent="green"
-              icon="🔄"
-            />
-            <KpiCard
-              title="Avg Bill Value"
-              value={summary.avg_bill_value != null ? formatInrCompact(summary.avg_bill_value) : "—"}
-              accent="purple"
-              icon="💰"
-            />
-            <KpiCard
-              title="Members"
-              value={summary.members_count.toLocaleString("en-IN")}
-              accent="yellow"
-              icon="🎫"
-            />
-            <KpiCard
-              title="New (Last 30d)"
-              value={summary.new_customers_last_30d.toLocaleString("en-IN")}
-              accent="green"
-              icon="✨"
-            />
-            <KpiCard
-              title="Walk-in Revenue"
-              value={summary.walk_in_revenue_percent != null ? `${summary.walk_in_revenue_percent}%` : "—"}
-              accent="red"
-              icon="🚶"
-            />
+            <KpiCard title="Unique Customers"  value={summary.total_unique_customers.toLocaleString("en-IN")}                                                  accent="blue"   icon={<Users className={sz} />} />
+            <KpiCard title="Repeat Customers"  value={`${summary.repeat_customer_count.toLocaleString("en-IN")} (${summary.repeat_customer_percent}%)`}        accent="green"  icon={<RefreshCcw className={sz} />} />
+            <KpiCard title="Avg Bill Value"    value={summary.avg_bill_value != null ? formatInrCompact(summary.avg_bill_value) : "—"}                          accent="purple" icon={<Receipt className={sz} />} />
+            <KpiCard title="Members"           value={summary.members_count.toLocaleString("en-IN")}                                                            accent="yellow" icon={<BadgeCheck className={sz} />} />
+            <KpiCard title="New (Last 30d)"    value={summary.new_customers_last_30d.toLocaleString("en-IN")}                                                   accent="green"  icon={<UserPlus className={sz} />} />
+            <KpiCard title="Walk-in Revenue"   value={summary.walk_in_revenue_percent != null ? `${summary.walk_in_revenue_percent}%` : "—"}                   accent="red"    icon={<Store className={sz} />} />
           </div>
         )}
       </DataStateWrapper>

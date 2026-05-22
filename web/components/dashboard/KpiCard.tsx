@@ -32,7 +32,7 @@ export function KpiCard({
         <CardTitle className="text-sm font-medium text-gray-700">
           {title}
         </CardTitle>
-        {icon && <div className="text-2xl">{icon}</div>}
+        {icon && <div className="text-gray-400">{icon}</div>}
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold text-gray-900">{value}</div>

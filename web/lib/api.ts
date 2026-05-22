@@ -17,7 +17,11 @@ import type {
   CustomerListItem,
   CustomerBill,
   CustomerSummary,
+  ActiveCustomer,
   CustomerParams,
+  ChurnTier,
+  LapsedParams,
+  LapsedResponse,
   TopProduct,
   HotoResponse,
   HotoCreate,
@@ -181,6 +185,21 @@ export const api = {
 
   customerSummary: () =>
     apiFetch<CustomerSummary>("/api/customers/summary"),
+
+  activeCustomers: (params: { limit?: number; offset?: number; [key: string]: unknown }) =>
+    apiFetch<PaginatedResponse<ActiveCustomer>>(`/api/customers/active${buildQuery(params)}`),
+
+  lapsedCustomers: (params: LapsedParams) =>
+    apiFetch<LapsedResponse>(`/api/customers/lapsed${buildQuery(params)}`),
+
+  downloadLapsedExport: (format: "csv" | "xlsx", tier?: ChurnTier) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const tierStr = tier ? `_${tier}` : "";
+    return downloadWithAuth(
+      `/api/customers/lapsed/export${buildQuery({ export_format: format, tier })}`,
+      `lapsed_customers${tierStr}_${today}.${format}`,
+    );
+  },
 
   customerHistory: (mobile: string, limit = 50) =>
     apiFetch<CustomerBill[]>(

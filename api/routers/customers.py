@@ -1,10 +1,26 @@
+import csv
+import io
+from datetime import date
+
+import openpyxl
+import openpyxl.utils
+from openpyxl.styles import Alignment, Font, PatternFill
+
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from api.dependencies import get_conn, get_current_user
 from api.schemas.auth import CurrentUser
-from api.schemas.customers import CustomerBill, CustomerListItem, CustomerSummary
+from api.schemas.customers import (
+    ChurnTier,
+    CustomerBill,
+    CustomerListItem,
+    CustomerSummary,
+    LapsedCustomer,
+    LapsedSummary,
+)
 
 router = APIRouter(prefix="/api/customers", tags=["customers"])
 
@@ -137,6 +153,190 @@ def get_customer_summary(
         members_count=int(row["members_count"] or 0),
         new_customers_last_30d=int(row["new_customers_last_30d"] or 0),
         walk_in_revenue_percent=float(row["walk_in_revenue_percent"]) if row["walk_in_revenue_percent"] else None,
+    )
+
+
+
+_LAPSED_BASE_SQL = """
+    FROM derived.customer_dimension d
+    JOIN derived.customer_metrics m ON d.mobile_clean = m.mobile_clean
+    WHERE d.is_walk_in = FALSE
+      AND m.is_repeat = TRUE
+"""
+
+_CHURN_TIER_EXPR = """
+    CASE
+        WHEN m.days_since_last_visit >= 90 THEN 'lost'
+        WHEN m.days_since_last_visit >= 60 THEN 'lapsed'
+        WHEN m.days_since_last_visit >= 30 THEN 'at-risk'
+        ELSE 'active'
+    END
+"""
+
+
+def _tier_filter(tier: str | None) -> str:
+    if tier == "active":
+        return "AND m.days_since_last_visit < 30"
+    if tier == "at-risk":
+        return "AND m.days_since_last_visit >= 30 AND m.days_since_last_visit < 60"
+    if tier == "lapsed":
+        return "AND m.days_since_last_visit >= 60 AND m.days_since_last_visit < 90"
+    if tier == "lost":
+        return "AND m.days_since_last_visit >= 90"
+    return ""
+
+
+@router.get("/lapsed", response_model=dict)
+def list_lapsed_customers(
+    tier: ChurnTier | None = Query(default=None),
+    limit: int = Query(default=50, le=500),
+    offset: int = Query(default=0, ge=0),
+    conn: Connection = Depends(get_conn),
+    _: CurrentUser = Depends(get_current_user),
+):
+    tier_sql = _tier_filter(tier)
+    base = f"{_LAPSED_BASE_SQL} {tier_sql}"
+
+    summary_row = conn.execute(text(f"""
+        SELECT
+            COUNT(*) FILTER (WHERE m.days_since_last_visit < 30)                                    AS active_count,
+            COUNT(*) FILTER (WHERE m.days_since_last_visit >= 30 AND m.days_since_last_visit < 60) AS at_risk_count,
+            COUNT(*) FILTER (WHERE m.days_since_last_visit >= 60 AND m.days_since_last_visit < 90) AS lapsed_count,
+            COUNT(*) FILTER (WHERE m.days_since_last_visit >= 90)                                   AS lost_count,
+            COUNT(*)                                                                                 AS total_count
+        {_LAPSED_BASE_SQL}
+    """)).mappings().one()
+
+    total = conn.execute(text(f"SELECT COUNT(*) {base}")).scalar()
+
+    rows = conn.execute(text(f"""
+        SELECT
+            d.mobile_clean,
+            d.display_name,
+            d.is_member,
+            m.total_bills,
+            m.total_revenue,
+            m.avg_bill_value,
+            m.last_purchase_date,
+            m.days_since_last_visit,
+            m.avg_days_between_visits,
+            m.preferred_payment,
+            {_CHURN_TIER_EXPR} AS churn_tier
+        {base}
+        ORDER BY m.days_since_last_visit DESC
+        LIMIT :limit OFFSET :offset
+    """), {"limit": limit, "offset": offset}).mappings().all()
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "summary": LapsedSummary(**dict(summary_row)),
+        "items": [LapsedCustomer(**dict(r)) for r in rows],
+    }
+
+
+_EXPORT_HEADERS = [
+    "Name", "Mobile", "Status", "Last Visit", "Days Silent",
+    "Total Spend (₹)", "Visits", "Avg Bill (₹)", "Member", "Pays With",
+]
+
+
+@router.get("/lapsed/export")
+def export_lapsed_customers(
+    tier: ChurnTier | None = Query(default=None),
+    export_format: str = Query(default="csv", pattern="^(csv|xlsx)$"),
+    conn: Connection = Depends(get_conn),
+    _: CurrentUser = Depends(get_current_user),
+):
+    tier_sql = _tier_filter(tier)
+    base = f"{_LAPSED_BASE_SQL} {tier_sql}"
+
+    rows = conn.execute(text(f"""
+        SELECT
+            d.display_name,
+            d.mobile_clean,
+            {_CHURN_TIER_EXPR} AS churn_tier,
+            m.last_purchase_date,
+            m.days_since_last_visit,
+            m.total_revenue,
+            m.total_bills,
+            m.avg_bill_value,
+            d.is_member,
+            m.preferred_payment
+        {base}
+        ORDER BY m.days_since_last_visit DESC
+        LIMIT 10000
+    """)).mappings().all()
+
+    today = date.today().isoformat()
+    tier_str = f"_{tier}" if tier else ""
+    filename_base = f"lapsed_customers{tier_str}_{today}"
+
+    def _row_values(r):
+        return [
+            r["display_name"] or "",
+            r["mobile_clean"],
+            r["churn_tier"],
+            str(r["last_purchase_date"]) if r["last_purchase_date"] is not None else "",
+            r["days_since_last_visit"] if r["days_since_last_visit"] is not None else "",
+            round(float(r["total_revenue"]), 2) if r["total_revenue"] is not None else "",
+            r["total_bills"] if r["total_bills"] is not None else "",
+            round(float(r["avg_bill_value"]), 2) if r["avg_bill_value"] is not None else "",
+            "Yes" if r["is_member"] else "No",
+            (r["preferred_payment"] or "").upper(),
+        ]
+
+    if export_format == "csv":
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(_EXPORT_HEADERS)
+        for r in rows:
+            writer.writerow(_row_values(r))
+        buf.seek(0)
+        return StreamingResponse(
+            iter([buf.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.csv"'},
+        )
+
+    # xlsx
+    tier_colors = {"at-risk": "FFF59D", "lapsed": "FFCC80", "lost": "EF9A9A"}
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Lapsed Customers"
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="1E3A5F")
+    for col_idx, header in enumerate(_EXPORT_HEADERS, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+
+    for row_idx, r in enumerate(rows, 2):
+        values = _row_values(r)
+        for col_idx, val in enumerate(values, 1):
+            ws.cell(row=row_idx, column=col_idx, value=val)
+        tier_val = r["churn_tier"]
+        if tier_val in tier_colors:
+            fill = PatternFill("solid", fgColor=tier_colors[tier_val])
+            ws.cell(row=row_idx, column=3).fill = fill
+
+    col_widths = [24, 16, 12, 14, 13, 18, 8, 14, 8, 12]
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+
+    ws.freeze_panes = "A2"
+
+    buf_bytes = io.BytesIO()
+    wb.save(buf_bytes)
+    buf_bytes.seek(0)
+    return StreamingResponse(
+        iter([buf_bytes.getvalue()]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename_base}.xlsx"'},
     )
 
 

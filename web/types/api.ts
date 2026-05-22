@@ -149,6 +149,58 @@ export interface CustomerSummary {
   walk_in_revenue_percent: number | null;
 }
 
+export interface ActiveCustomer {
+  mobile_clean: string;
+  display_name: string | null;
+  is_member: boolean;
+  is_repeat: boolean | null;
+  total_bills: number | null;
+  total_revenue: number | null;
+  avg_bill_value: number | null;
+  last_purchase_date: string | null;
+  days_since_last_visit: number | null;
+  preferred_payment: "cash" | "card" | "upi" | "credit" | null;
+}
+
+export type ChurnTier = "active" | "at-risk" | "lapsed" | "lost";
+
+export interface LapsedCustomer {
+  mobile_clean: string;
+  display_name: string | null;
+  is_member: boolean;
+  total_bills: number | null;
+  total_revenue: number | null;
+  avg_bill_value: number | null;
+  last_purchase_date: string | null;
+  days_since_last_visit: number | null;
+  avg_days_between_visits: number | null;
+  preferred_payment: "cash" | "card" | "upi" | "credit" | null;
+  churn_tier: ChurnTier;
+}
+
+export interface LapsedSummary {
+  active_count: number;
+  at_risk_count: number;
+  lapsed_count: number;
+  lost_count: number;
+  total_count: number;
+}
+
+export interface LapsedResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  summary: LapsedSummary;
+  items: LapsedCustomer[];
+}
+
+export interface LapsedParams {
+  tier?: ChurnTier;
+  limit?: number;
+  offset?: number;
+  [key: string]: unknown;
+}
+
 export interface CustomerParams {
   search?: string;
   is_repeat?: boolean;
