@@ -1,6 +1,9 @@
 # ---- Claude Code working directory ----
 .claude/
 
+# ---- Skills (project-local, not tracked) ----
+.agents/
+
 # ---- Git worktrees ----
 .worktrees/
 
