@@ -229,7 +229,24 @@ Full builder at `/tools/pamphlet-generator`. Features:
 - Import from Google Sheets CSV (auto-converts regular URL to export URL)
 - Backend: `api/tools/pamphlets/` — full CRUD + AI endpoint, Alembic migration 005
 
----
+**A4 — Role-Based Access Control** *(before Phase D)*
+
+Current state: JWT auth works, two roles exist (`staff`, `admin`), `require_admin` dependency exists.
+Missing: `manager` role, `require_manager` dependency, enforcement on all tool endpoints.
+
+**Three roles:**
+| Role | Who | Access |
+|---|---|---|
+| `admin` | Developer | Everything + system config + MCP API key management |
+| `manager` | Store manager | Verify cash closure, approve agent outputs, approve blog posts, all reports |
+| `staff` | Counter staff | Submit cash closure, pamphlet generator, BOM review, trigger pipeline |
+
+**Work:**
+- Add `manager` to `app.users.role` check constraint
+- Add `require_manager` dependency to `api/dependencies.py`
+- Audit all tool endpoints: cash closure verify → `require_manager`, BOM confirm → `require_staff`, agent trigger → `require_manager`
+- Phase E MCP needs separate `api_key` auth (machine credential, not user role)
+- Frontend: show/hide UI elements based on role from JWT
 
 ---
 
@@ -256,6 +273,31 @@ Different barcodes for the same physical product split analytics. Resolution pip
 - Confirmed aliases stored in `app.product_aliases`, remapped in derived layer via LEFT JOIN + COALESCE
 - Remapping at aggregation source (`01_product_daily_metrics.sql`), dimension view (`05_necessary_views.sql`), and basket analysis (`10_product_associations.sql`)
 - Alembic migration 006. See `docs/architecture/entity-resolution.md` and `docs/decisions/003-entity-resolution-design.md`
+
+**B4 — BOM Manager** ✅
+In-house repackaging blind spot fixed. See `docs/architecture/bom-manager.md`.
+
+**B5 — Test Baseline** *(before Phase C)*
+
+Current: 3 test files (DB connectivity, raw ingestion, insert). No API endpoint tests.
+Must establish before Phase C adds LLM calls + storage + agents (hard to test manually).
+
+**Target coverage (critical path only, not exhaustive):**
+```
+tests/
+├── test_db.py              ✅ exists — DB connectivity
+├── test_ingestion.py       ✅ exists — raw ingestion
+├── test_insert.py          ✅ exists — raw insert
+├── test_api_auth.py        login, token decode, role enforcement (staff/manager/admin)
+├── test_api_customers.py   lapsed tiers (30/60/90d math), active filter, summary counts
+├── test_api_analytics.py   summary endpoint, health signal flags
+├── test_api_bom.py         confirm requires qty > 0, reject marks status, duplicate prevention
+├── test_pipeline_step04.py BOM consumption math — wrong yield factor = daily stock error
+└── test_storage.py         LocalStorageClient upload/delete/url for dev env
+```
+
+**Not in scope for B5:** UI tests, ML notebook tests, full pipeline integration tests.
+Goal: catch regressions in auth, BOM math, customer tier logic before they hit production.
 
 ---
 

@@ -20,6 +20,7 @@ const PHASES: {
       { name: "A1 · Cash closure UI", detail: "EOD count vs system totals, manager verify/reject.", status: "shipped" },
       { name: "A2 · Daily ingestion + refresh", detail: "Pipeline trigger with run_ingestion flag. Er4u Playwright auto-export.", status: "shipped" },
       { name: "A3 · Pamphlet generator", detail: "Client PDF, AI highlight copy via Haiku, GSheets CSV import.", status: "shipped" },
+      { name: "A4 · Role-based access control", detail: "Three roles: admin (full access), manager (verify cash, approve agents + blog posts), staff (submit cash, use tools). require_manager dependency. Phase E MCP gets separate api_key auth. Frontend hides elements by role.", status: "planned" },
     ],
   },
   {
@@ -31,6 +32,7 @@ const PHASES: {
       { name: "B2 · Basket analysis", detail: "30,018 pairs in derived.product_associations. Frequently Bought Together UI.", status: "shipped" },
       { name: "B3 · Product entity resolution", detail: "RapidFuzz clustering, staff review UI, alias remap at aggregation source.", status: "shipped" },
       { name: "B4 · BOM Manager", detail: "In-house repackaging: loose raw materials (wheat, pulses, spices) → branded retail packets. app.product_bom with yield-based qty_per_unit. Auto-suggest on every rebuild. Step 04 stock position corrected: BOM consumption deducted, finished goods excluded.", status: "shipped" },
+      { name: "B5 · Test Baseline", detail: "Critical path tests before Phase C: auth + role enforcement, lapsed tier math (30/60/90d), BOM yield consumption, customer activity counts, LocalStorageClient. Not exhaustive — protects against regressions in auth, BOM math, and customer logic.", status: "planned" },
     ],
   },
   {
