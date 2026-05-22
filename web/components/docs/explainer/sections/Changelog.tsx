@@ -14,6 +14,12 @@ type Entry = {
 const ENTRIES: Entry[] = [
   {
     date: "2026-05-23",
+    title: "Phase F — Puranic Storefront + D8 Content Writer Agent (design)",
+    detail: "Storefront: puranic.in, brand Puranic, static export to Vercel (dashboard stays local). 8 routes: homepage, catalogue, product pages, category, offers, WhatsApp-shareable offers, blog, contact. WhatsApp: click-to-enquire + Meta product feed export. C2 updated: StorageClient abstraction over boto3 — switch R2→S3 via .env only. D8 Content Writer Agent: topic seeds from catalog → Claude draft → SEO pass → staff approves → static export.",
+    type: "doc",
+  },
+  {
+    date: "2026-05-23",
     title: "Phase D + E — Agentic Intelligence + MCP Server (design)",
     detail: "Phase D: 7 internal agents (Reorder, Weekly Intelligence, Dead Stock Clearance, Pamphlet Intelligence, Cash Discrepancy, Supplier Performance, Storefront Group). Storefront Group = coordinator + 4 sub-agents (Product Selection, Image, Content, SEO, Publisher). Phase E: read-only MCP server for Manastra integration — 6 tools, owner briefings + anomaly alerts. Phase F (was D): Public presence renumbered.",
     type: "doc",

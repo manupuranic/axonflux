@@ -267,12 +267,24 @@ For promoted products (especially herbals). Requires new `app.products` columns:
 Script: `scripts/generate_product_content.py` — takes barcode list → calls Claude API →
 returns structured JSON → upserts into `app.products`. Framing must be wellness (not medical claims).
 
-**C2 — Product Images**
-For promoted products only (select few, not entire catalog).
-- **Source priority**: Open Food Facts API (free, has images for FMCG by barcode) → manufacturer site → manual upload
-- **Storage**: Cloudflare R2 (S3-compatible, free 10GB) or Vercel Blob
-- **DB**: add `image_url TEXT` column to `app.products` — store CDN URL, not binary
-- **Script**: `scripts/fetch_product_images.py` — tries Open Food Facts by barcode, falls back to manual
+**C2 — Storage Abstraction + Product Images**
+First task in C2: build `api/storage/client.py` — S3-compatible abstraction over boto3.
+Switching provider (R2 → S3 → any S3-compatible) = change `.env` vars only, zero code changes.
+
+```
+STORAGE_ENDPOINT_URL   # R2: https://{acct}.r2.cloudflarestorage.com | S3: omit
+STORAGE_ACCESS_KEY     # provider access key
+STORAGE_SECRET_KEY     # provider secret key
+STORAGE_BUCKET         # bucket name
+STORAGE_REGION         # R2: "auto" | S3: "ap-south-1" etc.
+STORAGE_PUBLIC_URL     # CDN public base URL (e.g. https://assets.puranic.in)
+```
+
+Local dev: `LocalStorageClient` writes to `data/uploads/`, served via FastAPI static files.
+Same `StorageClient` interface used by: C2 image fetcher, D7 Image Agent, D8 blog content.
+
+Image sourcing priority: Open Food Facts API (free, by barcode) → web fallback → AI generation (D7).
+- **DB**: `image_url TEXT` on `app.products` — stores CDN URL, never binary
 
 **C3 — Embedding Pipeline + pgvector**
 Product catalog → vectors stored in PostgreSQL via pgvector extension.
@@ -306,17 +318,25 @@ Parallel agents use async fan-out; sequential agents pass structured output betw
 | **Cash Discrepancy Agent** | Sequential analysis | 30-day closure history → pattern detection (recurring? day-of-week bias? worsening?) → severity flag |
 | **Supplier Performance Agent** | Parallel per supplier | Spend trend, top products, stockout frequency → one-page brief per vendor |
 | **Storefront Agent Group** | Coordinator + 4 sub-agents | Product Selection → parallel (Image Agent + Content Agent + SEO Agent) → Publisher Agent |
+| **Content Writer Agent** | Sequential | Topic seed → Claude draft (800–1200 words) → SEO pass → `app.blog_posts` (status: draft) → staff approves → static export |
 
-**Storefront Agent Group detail:**
-- **Product Selection Agent** — fast-moving + in-stock + has canonical name → ranked list to feature
-- **Image Agent** — Open Food Facts by barcode → web fallback → AI generation → uploads to R2/Vercel Blob
+**Storefront Agent Group (D7) detail:**
+- **Product Selection Agent** — fast-moving + in-stock + `is_featured=true` OR agent-ranked → list to feature
+- **Image Agent** — Open Food Facts by barcode → web fallback → AI generation → `StorageClient.upload()` → URL stored in `app.products.image_url`
 - **Content Agent** — Claude API → description, tags, use_cases, key_benefits (wellness framing, no medical claims)
-- **SEO Agent** — Claude API → meta_title (60 chars), meta_description (155 chars), schema.org JSON-LD, url_slug
-- **Publisher Agent** — upserts app.products → triggers public storefront rebuild
+- **SEO Agent** — Claude API → seo_title (60 chars), seo_description (155 chars), schema.org JSON-LD, storefront_slug
+- **Publisher Agent** — upserts `app.products` → exports storefront JSON → git push → Vercel auto-deploys
+
+**Content Writer Agent (D8) detail:**
+- Topic seeds from: PHM product catalog, category keywords, basket associations, seasonal patterns
+- Draft: Claude API → 800–1200 words, wellness/utility tone, 2–3 internal product page links
+- SEO pass: meta_title, meta_description, slug, schema.org `Article` markup
+- Stored in `app.blog_posts` with `status='draft'` → staff reviews in AxonFlux dashboard → approve → next export
 
 **New `app.*` tables needed:**
 - `app.agent_runs` — audit log: agent name, triggered_by, status, started_at, completed_at, output_summary
 - `app.agent_outputs` — structured output per run (JSON): draft POs, clearance lists, reports
+- `app.blog_posts` — slug, title, body, meta_title, meta_description, status, product_refs[], published_at
 
 ---
 
@@ -355,12 +375,71 @@ mobile numbers never leave AxonFlux.
 
 ---
 
-### Phase F — Public Presence *(parallel to D/E, was Phase D)*
+### Phase F — Puranic Storefront *(depends on C2 + D7 + D8)*
 
-Next.js `(public)/` segment: store info, current offers from published pamphlets.
-Deploy to Vercel (free). No raw/internal data exposed.
-Product pages for promoted items: image, description, tags, key benefits.
-Content fed by Phase C + Storefront Agent Group (Phase D).
+Public storefront at **puranic.in**. Brand: **Puranic**. Tagline: *"Freshness, crafted daily."*
+Old PHM government-style logo: footer-only. Wordmark is primary identity.
+
+**Architecture: same repo, separate Vercel project (static export)**
+```
+Local machine (AxonFlux pipeline runs)
+  └── Pipeline step: export public-safe data → web/storefront-data/*.json
+        (products, offers, blog posts, store info — zero customer/internal data)
+  └── git push → GitHub
+        └── Vercel auto-deploys (public) segment only
+              Next.js builds static pages from JSON at build time
+              Internal dashboard stays local permanently
+```
+
+**Deployment:**
+- Vercel project root: `web/`, only `app/(public)/` routes deployed
+- Domain: `puranic.in` → Vercel
+- Images: served from `STORAGE_PUBLIC_URL` (Cloudflare R2 / any S3-compatible, see C2)
+- Switching storage provider: change 2 env vars, zero code changes
+
+**Sitemap:**
+```
+puranic.in/
+├── /                          Homepage — hero, featured products, current offer banner
+├── /products                  Full catalogue — category filter, search
+├── /products/[slug]           Product page — image, description, key_benefits, related products
+├── /category/[slug]           Category page — all products in category with filters
+├── /offers                    All active pamphlets
+├── /offers/[id]               Shareable offer page — WhatsApp-optimised mobile layout
+├── /blog                      Blog listing — SEO articles seeded from product catalog
+├── /blog/[slug]               Blog post — links to 2–3 product pages, schema.org Article
+└── /contact                   Store info, hours, location map, WhatsApp enquiry button
+```
+
+**WhatsApp integration:**
+- Every product page + offer page: "Enquire on WhatsApp" button (click-to-wa.me link)
+- Pipeline generates Meta-compatible product feed (JSON/CSV) → staff downloads → uploads to WhatsApp Business Manager manually (no Meta API needed)
+- Offer pages: single-tap share URL optimised for WhatsApp previews (og:image, og:title)
+
+**Content curation:**
+- `app.products.is_featured = true` → appears in homepage hero + featured sections (staff-curated)
+- Agent-ranked products (D7 Product Selection) → broader catalogue pages
+- `app.blog_posts.status = 'published'` → blog (Content Writer Agent D8 drafts, staff approves)
+
+**New `app.products` columns needed:**
+```
+is_featured        BOOLEAN DEFAULT FALSE   -- staff marks for homepage/hero
+storefront_slug    TEXT UNIQUE              -- URL-safe slug for /products/[slug]
+image_url          TEXT                    -- CDN URL from StorageClient (C2)
+description        TEXT                    -- Content Agent (D7/C1)
+tags               TEXT[]                  -- Content Agent
+key_benefits       TEXT[]                  -- Content Agent
+seo_title          TEXT                    -- SEO Agent (60 chars)
+seo_description    TEXT                    -- SEO Agent (155 chars)
+schema_org_json    JSONB                   -- schema.org Product JSON-LD
+```
+
+**SEO strategy:**
+- Static HTML per product → Google indexes "HESARU BELE 500GM Puranic Bangalore" as real URL
+- schema.org `Product` markup on product pages (price, availability, brand)
+- schema.org `Article` markup on blog posts
+- sitemap.xml auto-generated from product + blog slugs on each build
+- Blog posts target long-tail: "health benefits of horsegram", "stone-ground wheat flour vs commercial"
 
 ---
 
