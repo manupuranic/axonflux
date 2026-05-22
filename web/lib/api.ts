@@ -186,6 +186,43 @@ export const api = {
   customerSummary: () =>
     apiFetch<CustomerSummary>("/api/customers/summary"),
 
+  bom: {
+    suggestions: (status = "pending") =>
+      apiFetch<import("@/types/api").BomSuggestionGroup[]>(
+        `/api/tools/bom/suggestions?status=${encodeURIComponent(status)}`
+      ),
+    confirm: (body: { raw_barcode: string; finished_barcode: string; qty_per_unit: number; notes?: string | null; suggestion_id?: string | null }) =>
+      apiFetch<import("@/types/api").BomMapping>("/api/tools/bom/confirm", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    reject: (suggestion_id: string) =>
+      apiFetch<{ ok: boolean }>("/api/tools/bom/reject", {
+        method: "POST",
+        body: JSON.stringify({ suggestion_id }),
+      }),
+    mappings: (limit = 100, offset = 0) =>
+      apiFetch<import("@/types/api").BomMapping[]>(
+        `/api/tools/bom/mappings${buildQuery({ limit, offset })}`
+      ),
+    update: (id: string, body: { qty_per_unit?: number; notes?: string | null }) =>
+      apiFetch<import("@/types/api").BomMapping>(`/api/tools/bom/mappings/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    delete: (id: string) =>
+      apiFetch<void>(`/api/tools/bom/mappings/${id}`, { method: "DELETE" }),
+    manual: (body: { raw_barcode: string; finished_barcode: string; qty_per_unit: number; notes?: string | null }) =>
+      apiFetch<import("@/types/api").BomMapping>("/api/tools/bom/manual", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    productSearch: (q: string, limit = 20) =>
+      apiFetch<{ barcode: string; item_name: string }[]>(
+        `/api/tools/bom/product-search${buildQuery({ q, limit })}`
+      ),
+  },
+
   activeCustomers: (params: { limit?: number; offset?: number; [key: string]: unknown }) =>
     apiFetch<PaginatedResponse<ActiveCustomer>>(`/api/customers/active${buildQuery(params)}`),
 

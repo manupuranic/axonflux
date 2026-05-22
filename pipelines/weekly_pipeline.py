@@ -174,6 +174,10 @@ def main(run_ingestion: bool = False) -> None:
     print("Exporting conversion attention sheet...")
     export_conversion_sheet(engine)
 
+    print("Refreshing BOM suggestions...")
+    from scripts.suggest_bom import run as suggest_bom
+    suggest_bom(min_score=70, dry_run=False)
+
     print("Weekly pipeline complete.")
 
 

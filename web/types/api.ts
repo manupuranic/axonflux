@@ -149,6 +149,35 @@ export interface CustomerSummary {
   walk_in_revenue_percent: number | null;
 }
 
+// BOM Manager
+export interface BomSuggestion {
+  id: string;
+  raw_barcode: string;
+  raw_name: string | null;
+  finished_barcode: string;
+  finished_name: string | null;
+  similarity_score: number;
+  status: string;
+}
+
+export interface BomSuggestionGroup {
+  raw_barcode: string;
+  raw_name: string | null;
+  suggestions: BomSuggestion[];
+  max_score: number;
+}
+
+export interface BomMapping {
+  id: string;
+  raw_barcode: string;
+  raw_name: string | null;
+  finished_barcode: string;
+  finished_name: string | null;
+  qty_per_unit: number;
+  notes: string | null;
+  confirmed_at: string | null;
+}
+
 export interface ActiveCustomer {
   mobile_clean: string;
   display_name: string | null;
