@@ -14,6 +14,12 @@ type Entry = {
 const ENTRIES: Entry[] = [
   {
     date: "2026-05-23",
+    title: "Phase D + E — Agentic Intelligence + MCP Server (design)",
+    detail: "Phase D: 7 internal agents (Reorder, Weekly Intelligence, Dead Stock Clearance, Pamphlet Intelligence, Cash Discrepancy, Supplier Performance, Storefront Group). Storefront Group = coordinator + 4 sub-agents (Product Selection, Image, Content, SEO, Publisher). Phase E: read-only MCP server for Manastra integration — 6 tools, owner briefings + anomaly alerts. Phase F (was D): Public presence renumbered.",
+    type: "doc",
+  },
+  {
+    date: "2026-05-23",
     title: "Phase B4 — BOM Manager",
     detail: "Solves in-house repackaging blind spot: wheat/pulses/spices bought loose, sold as branded packets. app.product_bom + app.product_bom_suggestions (migration 008). Auto-suggest script (792 candidates, 100% scores for core products). Staff review UI at /tools/bom-manager — collapsible groups, yield-based qty_per_unit as confirmation gate. Step 04 stock position rewritten: BOM consumption deducted from raw material stock, finished goods excluded entirely. Suggest script reruns on every pipeline rebuild.",
     type: "feature",

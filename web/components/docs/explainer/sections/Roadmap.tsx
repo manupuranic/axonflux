@@ -47,10 +47,34 @@ const PHASES: {
   },
   {
     key: "D",
-    title: "Phase D — Public presence",
-    blurb: "External-facing surface. Read-only. No internal data exposed.",
+    title: "Phase D — Agentic Intelligence",
+    blurb: "Multi-agent system inside AxonFlux. All agents suggest — staff approves. Parallel where independent, sequential where output feeds the next step.",
     items: [
-      { name: "Public Next.js segment", detail: "Store info, current offers from published pamphlets. Vercel deploy.", status: "planned" },
+      { name: "D1 · Reorder Agent", detail: "Parallel per supplier: reads replenishment sheet + stock + lead times → draft purchase order per supplier, merged for staff review.", status: "planned" },
+      { name: "D2 · Weekly Intelligence Agent", detail: "Sequential pipeline: sales summary → stock alerts → lapsed customers → cash status → one-screen weekly report for the owner.", status: "planned" },
+      { name: "D3 · Dead Stock Clearance Agent", detail: "4,661 dead stock products cross-referenced with basket associations → ranked clearance list with bundle/discount suggestions per product.", status: "planned" },
+      { name: "D4 · Pamphlet Intelligence Agent", detail: "Parallel: demand signals + expiry risk + basket associations → ranked product list suggestion for next pamphlet creation.", status: "planned" },
+      { name: "D5 · Cash Discrepancy Agent", detail: "30-day closure history → pattern detection (recurring discrepancy? day-of-week bias? worsening trend?) → severity-flagged alert.", status: "planned" },
+      { name: "D6 · Supplier Performance Agent", detail: "Parallel per supplier: spend trend, top products, stockout frequency → one-page brief per vendor before supplier meetings.", status: "planned" },
+      { name: "D7 · Storefront Agent Group", detail: "Coordinator + 4 sub-agents. Product Selection → parallel fan-out (Image Agent: Open Food Facts→AI gen, Content Agent: Claude descriptions, SEO Agent: meta+schema.org) → Publisher Agent: upserts app.products + triggers public rebuild.", status: "planned" },
+    ],
+  },
+  {
+    key: "E",
+    title: "Phase E — MCP Server",
+    blurb: "AxonFlux exposes a read-only MCP server consumed by Manastra (personal intelligence OS) for owner briefings and anomaly alerts. No writes via MCP.",
+    items: [
+      { name: "E1 · MCP server scaffold", detail: "FastAPI MCP endpoint with API key auth (read-only role). 6 tools: daily_summary, stock_alerts, lapsed_customers, cash_status, health_signals, weekly_report.", status: "planned" },
+      { name: "E2 · Manastra integration", detail: "Owner asks Manastra 'how did the store do?' → Manastra agent calls axonflux.weekly_report() → structured JSON → conversational answer with memory context.", status: "planned" },
+      { name: "E3 · Anomaly watchdog", detail: "Manastra nightly agent calls stock_alerts() + cash_status() → if critical threshold crossed → Manastra notification to owner. No customer PII exposed via MCP.", status: "planned" },
+    ],
+  },
+  {
+    key: "F",
+    title: "Phase F — Public Presence",
+    blurb: "External-facing store surface. Read-only. No internal data exposed. Content fed by Phase C + Storefront Agent (Phase D7).",
+    items: [
+      { name: "Public Next.js segment", detail: "Store info, current offers from published pamphlets. Product pages with AI-generated content + images from D7 Storefront Agent. Vercel deploy.", status: "planned" },
     ],
   },
 ];
@@ -73,7 +97,7 @@ export function Roadmap() {
       id="roadmap"
       eyebrow="Forward"
       title="What's next"
-      description="Phases compose. A lays the operational floor. B ships intelligence on top. C wraps it in an AI co-pilot. D opens a public surface."
+      description="Phases compose. A lays the operational floor. B ships intelligence. C wraps it in an AI co-pilot. D adds agentic automation. E connects to Manastra via MCP. F opens a public surface."
     >
       <m.div
         variants={stagger(0.08)}

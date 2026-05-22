@@ -289,11 +289,78 @@ new customer trends, cash closure discrepancy flag.
 
 ---
 
-### Phase D — Public Presence *(parallel to C)*
+### Phase D — Agentic Intelligence *(after Phase C)*
+
+Multi-agent system running inside AxonFlux. Agents are staff-triggered or scheduled.
+All agents are **read-only + suggest** — no autonomous writes. Human approval before any action.
+Parallel agents use async fan-out; sequential agents pass structured output between steps.
+
+**Agent roster:**
+
+| Agent | Orchestration | What it does |
+|---|---|---|
+| **Reorder Agent** | Parallel per supplier → merge | Reads replenishment sheet + stock + lead times → draft PO per supplier |
+| **Weekly Intelligence Agent** | Sequential pipeline | Sales → stock alerts → lapsed customers → cash status → one-screen weekly report |
+| **Dead Stock Clearance Agent** | Parallel per category → rank | 4,661 dead stock products → cross-ref basket associations → ranked clearance + bundle suggestions |
+| **Pamphlet Intelligence Agent** | Parallel fan-out → rank | Demand signals + expiry risk + basket associations → suggested product list for next pamphlet |
+| **Cash Discrepancy Agent** | Sequential analysis | 30-day closure history → pattern detection (recurring? day-of-week bias? worsening?) → severity flag |
+| **Supplier Performance Agent** | Parallel per supplier | Spend trend, top products, stockout frequency → one-page brief per vendor |
+| **Storefront Agent Group** | Coordinator + 4 sub-agents | Product Selection → parallel (Image Agent + Content Agent + SEO Agent) → Publisher Agent |
+
+**Storefront Agent Group detail:**
+- **Product Selection Agent** — fast-moving + in-stock + has canonical name → ranked list to feature
+- **Image Agent** — Open Food Facts by barcode → web fallback → AI generation → uploads to R2/Vercel Blob
+- **Content Agent** — Claude API → description, tags, use_cases, key_benefits (wellness framing, no medical claims)
+- **SEO Agent** — Claude API → meta_title (60 chars), meta_description (155 chars), schema.org JSON-LD, url_slug
+- **Publisher Agent** — upserts app.products → triggers public storefront rebuild
+
+**New `app.*` tables needed:**
+- `app.agent_runs` — audit log: agent name, triggered_by, status, started_at, completed_at, output_summary
+- `app.agent_outputs` — structured output per run (JSON): draft POs, clearance lists, reports
+
+---
+
+### Phase E — MCP Server *(after Phase D)*
+
+AxonFlux exposes a read-only MCP server consumed by **Manastra** (personal intelligence OS at
+`D:\projects\Manastra`) for owner briefings and anomaly alerts. No writes via MCP.
+
+**MCP tools exposed:**
+
+```python
+axonflux.daily_summary(date?)          # revenue, bills, purchases, top 5 products
+axonflux.stock_alerts()                # products at critical stock level (< 7 days cover)
+axonflux.lapsed_customers(tier?)       # who hasn't visited by tier (at-risk/lapsed/lost)
+axonflux.cash_status(date?)            # closure status, discrepancy amount
+axonflux.health_signals(flag?)         # fast/slow/dead/spike product counts + top items
+axonflux.weekly_report()               # calls Weekly Intelligence Agent, returns structured JSON
+```
+
+**Integration pattern:**
+```
+Manastra owner asks: "how did the store do this week?"
+    → Manastra agent calls axonflux.weekly_report()
+    → AxonFlux MCP runs Weekly Intelligence Agent
+    → Returns structured JSON
+    → Manastra formats with owner's memory context → answers conversationally
+
+Manastra anomaly watchdog (runs nightly):
+    → calls axonflux.stock_alerts() + axonflux.cash_status()
+    → if critical threshold crossed → Manastra notification to owner
+```
+
+**Implementation:** FastAPI MCP endpoint + `mcp` Python package (or raw SSE/JSON-RPC).
+Auth: API key scoped to read-only role. No customer PII exposed — lapsed tool returns counts only,
+mobile numbers never leave AxonFlux.
+
+---
+
+### Phase F — Public Presence *(parallel to D/E, was Phase D)*
 
 Next.js `(public)/` segment: store info, current offers from published pamphlets.
 Deploy to Vercel (free). No raw/internal data exposed.
-Product pages for promoted items: image, description, tags, key benefits (from Phase C content generation).
+Product pages for promoted items: image, description, tags, key benefits.
+Content fed by Phase C + Storefront Agent Group (Phase D).
 
 ---
 
