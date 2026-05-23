@@ -6,12 +6,13 @@ import openpyxl
 import openpyxl.utils
 from openpyxl.styles import Alignment, Font, PatternFill
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from api.dependencies import get_conn, get_current_user
+from api.lib.filters import FieldSpec, build_where, parse_conditions
 from api.schemas.auth import CurrentUser
 from api.schemas.customers import (
     ChurnTier,
@@ -186,17 +187,49 @@ def _tier_filter(tier: str | None) -> str:
     return ""
 
 
+# Public field spec for the Customer Activity endpoint. Keys are wire-format
+# names the client sends in `cond=key:op:value`. Columns stay server-internal,
+# never leak to the URL. Adding a new filterable column = one line here.
+LAPSED_FIELDS: dict[str, FieldSpec] = {
+    "visits":       FieldSpec(column="m.total_bills",            type="number"),
+    "days_silent":  FieldSpec(column="m.days_since_last_visit",  type="number"),
+    "spend":        FieldSpec(column="m.total_revenue",          type="number"),
+    "avg_bill":     FieldSpec(column="m.avg_bill_value",         type="number"),
+    "name":         FieldSpec(column="d.display_name",           type="string"),
+    "mobile":       FieldSpec(column="d.mobile_clean",           type="string"),
+    "is_member":    FieldSpec(column="d.is_member",              type="bool"),
+    "payment":      FieldSpec(
+        column="m.preferred_payment",
+        type="enum",
+        allowed_values=("cash", "card", "upi", "credit"),
+    ),
+}
+
+
+def _parse_lapsed_conditions(cond: list[str]) -> tuple[str, dict]:
+    try:
+        filters = parse_conditions(cond, LAPSED_FIELDS)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid filter: {exc}") from exc
+    return build_where(filters)
+
+
 @router.get("/lapsed", response_model=dict)
 def list_lapsed_customers(
     tier: ChurnTier | None = Query(default=None),
+    cond: list[str] = Query(default_factory=list, description="Filter as key:op:value (repeatable)"),
     limit: int = Query(default=50, le=500),
     offset: int = Query(default=0, ge=0),
     conn: Connection = Depends(get_conn),
     _: CurrentUser = Depends(get_current_user),
 ):
     tier_sql = _tier_filter(tier)
-    base = f"{_LAPSED_BASE_SQL} {tier_sql}"
+    filter_sql, filter_params = _parse_lapsed_conditions(cond)
+    base = f"{_LAPSED_BASE_SQL} {tier_sql} {filter_sql}"
 
+    # Summary KPIs intentionally ignore the user's filter knobs — they always
+    # reflect the full tier breakdown so the user sees the unfiltered universe
+    # before slicing into it. (Matches the existing UX: tier chips show full counts.)
     summary_row = conn.execute(text(f"""
         SELECT
             COUNT(*) FILTER (WHERE m.days_since_last_visit < 30)                                    AS active_count,
@@ -207,7 +240,7 @@ def list_lapsed_customers(
         {_LAPSED_BASE_SQL}
     """)).mappings().one()
 
-    total = conn.execute(text(f"SELECT COUNT(*) {base}")).scalar()
+    total = conn.execute(text(f"SELECT COUNT(*) {base}"), filter_params).scalar()
 
     rows = conn.execute(text(f"""
         SELECT
@@ -225,7 +258,7 @@ def list_lapsed_customers(
         {base}
         ORDER BY m.days_since_last_visit DESC
         LIMIT :limit OFFSET :offset
-    """), {"limit": limit, "offset": offset}).mappings().all()
+    """), {**filter_params, "limit": limit, "offset": offset}).mappings().all()
 
     return {
         "total": total,
@@ -245,12 +278,14 @@ _EXPORT_HEADERS = [
 @router.get("/lapsed/export")
 def export_lapsed_customers(
     tier: ChurnTier | None = Query(default=None),
+    cond: list[str] = Query(default_factory=list),
     export_format: str = Query(default="csv", pattern="^(csv|xlsx)$"),
     conn: Connection = Depends(get_conn),
     _: CurrentUser = Depends(get_current_user),
 ):
     tier_sql = _tier_filter(tier)
-    base = f"{_LAPSED_BASE_SQL} {tier_sql}"
+    filter_sql, filter_params = _parse_lapsed_conditions(cond)
+    base = f"{_LAPSED_BASE_SQL} {tier_sql} {filter_sql}"
 
     rows = conn.execute(text(f"""
         SELECT
@@ -267,7 +302,7 @@ def export_lapsed_customers(
         {base}
         ORDER BY m.days_since_last_visit DESC
         LIMIT 10000
-    """)).mappings().all()
+    """), filter_params).mappings().all()
 
     today = date.today().isoformat()
     tier_str = f"_{tier}" if tier else ""

@@ -13,6 +13,18 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    date: "2026-05-24",
+    title: "Filter infrastructure (cross-table, operator-per-row)",
+    detail: "Reusable filter system shared by every list/export endpoint. Backend api/lib/filters.py: FieldSpec + parse_conditions translates wire-format cond=key:op:value into parameterized SQL via build_where(). 53 unit tests cover ops, NULL-safe ncontains, column-safety guard, rejection paths. Frontend FilterBuilder.tsx is a Notion/Linear-style row builder — each row [field ▾][op ▾][value][×], Add filter picker, Apply/Clear, draft state inside the component so no per-keystroke refetch. First consumer: Customer Activity (8 filterable fields incl. visits, days_silent, spend, name contains/starts-with, is_member, payment enum). Export shares the same filter list — WYSIWYG download.",
+    type: "feature",
+  },
+  {
+    date: "2026-05-24",
+    title: "Tailscale Serve tunnel for mobile dev",
+    detail: "dev.ps1 launches tailscale serve --bg --https=8443 alongside uvicorn + Next.js — phone reaches dashboard at https://desktop-jb2ntpf.tail961410.ts.net:8443. Next.js rewrites() proxies /api/* to localhost:8000 so the FastAPI backend never crosses the tailnet. Port 8443 chosen so Manastra (already on 443) coexists. allowedDevOrigins in next.config.ts whitelists the tailnet hostname.",
+    type: "feature",
+  },
+  {
     date: "2026-05-23",
     title: "Phase F — Puranic Storefront + D8 Content Writer Agent (design)",
     detail: "Storefront: puranic.in, brand Puranic, static export to Vercel (dashboard stays local). 8 routes: homepage, catalogue, product pages, category, offers, WhatsApp-shareable offers, blog, contact. WhatsApp: click-to-enquire + Meta product feed export. C2 updated: StorageClient abstraction over boto3 — switch R2→S3 via .env only. D8 Content Writer Agent: topic seeds from catalog → Claude draft → SEO pass → staff approves → static export.",

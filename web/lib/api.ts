@@ -41,16 +41,27 @@ import type {
   RejectRequest,
   AliasListResponse,
   ProductDetail,
+  LapsedExportParams,
 } from "@/types/api";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 function buildQuery(params: Record<string, unknown>): string {
-  const filtered = Object.entries(params)
-    .filter(([, v]) => v !== undefined && v !== null)
-    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
-    .join("&");
-  return filtered ? `?${filtered}` : "";
+  const pairs: string[] = [];
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null) continue;
+    // Arrays expand to repeated keys: `?cond=a&cond=b`. FastAPI's `Query()`
+    // collects these into a list, matching the parse_conditions wire format.
+    if (Array.isArray(v)) {
+      for (const item of v) {
+        if (item === undefined || item === null) continue;
+        pairs.push(`${k}=${encodeURIComponent(String(item))}`);
+      }
+    } else {
+      pairs.push(`${k}=${encodeURIComponent(String(v))}`);
+    }
+  }
+  return pairs.length ? `?${pairs.join("&")}` : "";
 }
 
 async function apiFetch<T>(
@@ -229,11 +240,11 @@ export const api = {
   lapsedCustomers: (params: LapsedParams) =>
     apiFetch<LapsedResponse>(`/api/customers/lapsed${buildQuery(params)}`),
 
-  downloadLapsedExport: (format: "csv" | "xlsx", tier?: ChurnTier) => {
+  downloadLapsedExport: (format: "csv" | "xlsx", params: LapsedExportParams = {}) => {
     const today = new Date().toISOString().slice(0, 10);
-    const tierStr = tier ? `_${tier}` : "";
+    const tierStr = params.tier ? `_${params.tier}` : "";
     return downloadWithAuth(
-      `/api/customers/lapsed/export${buildQuery({ export_format: format, tier })}`,
+      `/api/customers/lapsed/export${buildQuery({ ...params, export_format: format })}`,
       `lapsed_customers${tierStr}_${today}.${format}`,
     );
   },

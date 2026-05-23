@@ -5,17 +5,48 @@ import { useFetch } from "@/hooks/useFetch";
 import { api } from "@/lib/api";
 import { DataStateWrapper } from "@/components/shared/DataStateWrapper";
 import { Pagination } from "@/components/shared/Pagination";
+import { FilterBuilder } from "@/components/shared/FilterBuilder";
 import { CustomerDrawer } from "@/components/customers/CustomerDrawer";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { Button } from "@/components/ui/button";
 import { formatInrCompact } from "@/lib/formatters";
 import { format } from "date-fns";
 import { CheckCircle2, AlertTriangle, TrendingDown, UserX, Users } from "lucide-react";
-import type { ChurnTier, CustomerListItem, LapsedCustomer } from "@/types/api";
+import type { ChurnTier, CustomerListItem, LapsedCustomer, LapsedExportParams } from "@/types/api";
+import {
+  type FilterCondition,
+  type FilterFieldSpec,
+  serializeConditions,
+} from "@/types/filters";
 
 const sz = "h-5 w-5";
 
 const PAGE_SIZE = 50;
+
+// Field allowlist exposed to the FilterBuilder. Keys MUST match the backend
+// LAPSED_FIELDS dict in api/routers/customers.py — the server uses them to
+// look up the safe SQL column. Add a field here AND there to introduce a new
+// filterable column; nothing else needs to change.
+const LAPSED_FILTER_FIELDS: FilterFieldSpec[] = [
+  { key: "visits",      label: "Visits",        type: "number", placeholder: "4" },
+  { key: "days_silent", label: "Days silent",   type: "number", placeholder: "365", unit: "d" },
+  { key: "spend",       label: "Total spend",   type: "number", placeholder: "2000", unit: "₹" },
+  { key: "avg_bill",    label: "Avg bill",      type: "number", placeholder: "500", unit: "₹" },
+  { key: "name",        label: "Name",          type: "string", placeholder: "raj" },
+  { key: "mobile",      label: "Mobile",        type: "string", placeholder: "98…" },
+  { key: "is_member",   label: "Member",        type: "bool"  },
+  {
+    key: "payment",
+    label: "Pays with",
+    type: "enum",
+    options: [
+      { value: "cash",   label: "Cash" },
+      { value: "card",   label: "Card" },
+      { value: "upi",    label: "UPI" },
+      { value: "credit", label: "Credit" },
+    ],
+  },
+];
 
 const TIER_CONFIG: Record<ChurnTier, { label: string; badgeCls: string }> = {
   "active":  { label: "Active",   badgeCls: "bg-green-100 text-green-800 border border-green-300" },
@@ -45,16 +76,30 @@ function toDrawerCustomer(c: LapsedCustomer): CustomerListItem {
 
 export default function LapsedCustomersPage() {
   const [activeTier, setActiveTier] = useState<ChurnTier | undefined>(undefined);
+  const [conditions, setConditions] = useState<FilterCondition[]>([]);
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<CustomerListItem | null>(null);
   const [exporting, setExporting] = useState<"csv" | "xlsx" | null>(null);
 
+  // Wire-format string array, only changes when an active condition's
+  // key/op/value changes. Stringified for stable effect deps below.
+  const condParams = serializeConditions(conditions);
+  const condKey = condParams.join("|");
+
   const fetcher = useCallback(
-    () => api.lapsedCustomers({ tier: activeTier, limit: PAGE_SIZE, offset: page * PAGE_SIZE }),
-    [activeTier, page],
+    () => api.lapsedCustomers({
+      tier: activeTier,
+      cond: condParams,
+      limit: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+    }),
+    // condParams is rebuilt every render; tie the effect to its stable string form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeTier, page, condKey],
   );
 
-  const { data, loading, error } = useFetch(fetcher, [activeTier, page]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const { data, loading, error } = useFetch(fetcher, [activeTier, page, condKey]);
 
   const summary = data?.summary;
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
@@ -64,10 +109,19 @@ export default function LapsedCustomersPage() {
     setPage(0);
   };
 
+  const handleFiltersApply = (next: FilterCondition[]) => {
+    setConditions(next);
+    setPage(0);
+  };
+
   const handleExport = async (fmt: "csv" | "xlsx") => {
     setExporting(fmt);
     try {
-      await api.downloadLapsedExport(fmt, activeTier);
+      const exportParams: LapsedExportParams = {
+        tier: activeTier,
+        cond: condParams,
+      };
+      await api.downloadLapsedExport(fmt, exportParams);
     } finally {
       setExporting(null);
     }
@@ -112,6 +166,15 @@ export default function LapsedCustomersPage() {
           <KpiCard title="Total Repeat"     value={summary.total_count.toLocaleString("en-IN")}   accent="blue"   icon={<Users className={sz} />} />
         </div>
       )}
+
+      {/* Filter builder */}
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <FilterBuilder
+          fields={LAPSED_FILTER_FIELDS}
+          value={conditions}
+          onApply={handleFiltersApply}
+        />
+      </div>
 
       {/* Tier filter chips */}
       <div className="flex flex-wrap gap-2 items-center">

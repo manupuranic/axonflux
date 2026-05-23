@@ -225,9 +225,16 @@ export interface LapsedResponse {
 
 export interface LapsedParams {
   tier?: ChurnTier;
+  /** Each entry: `field_key:op:value` — see api.lib.filters.parse_conditions. */
+  cond?: string[];
   limit?: number;
   offset?: number;
   [key: string]: unknown;
+}
+
+export interface LapsedExportParams {
+  tier?: ChurnTier;
+  cond?: string[];
 }
 
 export interface CustomerParams {
