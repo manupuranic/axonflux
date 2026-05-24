@@ -23,6 +23,7 @@ from api.tools.pamphlets import service, ai as pamphlet_ai
 from api.tools.pamphlets import service as svc
 from api.tools.pamphlets.ai_session import make_pamphlet_session
 from api.tools.pamphlets.render.html import render_pamphlet as render_html
+from api.tools.pamphlets.render.validator import sanitize_html, sanitize_svg
 from api.ai.config import ALLOWED_MODELS
 
 router = APIRouter(
@@ -385,7 +386,10 @@ def list_models(_=Depends(get_current_user)):
 
 
 def _sanitize_dsl_inplace(node: dict) -> None:
-    # Sanitizers applied in Task 23; stub here for safety
+    if node.get("type") == "custom_html" and "html" in node:
+        node["html"] = sanitize_html(node["html"])
+    if node.get("type") == "raw_svg" and "svg" in node:
+        node["svg"] = sanitize_svg(node["svg"])
     for child in node.get("children", []):
         _sanitize_dsl_inplace(child)
 
