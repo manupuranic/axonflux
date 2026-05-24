@@ -242,3 +242,141 @@ def bulk_update_highlights(db: Session, updates: list[dict]) -> None:
         item = db.query(PamphletItem).filter(PamphletItem.id == u["id"]).first()
         if item:
             item.highlight_text = u["highlight_text"]
+
+
+import uuid as _uuid
+from api.tools.pamphlets.models import PamphletVersion, PamphletChatMessage
+from api.ai.provider import Message
+
+VERSION_RETENTION = 50
+
+
+def create_version(
+    db: Session,
+    pamphlet_id: str,
+    dsl: dict,
+    theme: dict,
+    parent_version_id,
+    user_id,
+    edit_summary: str,
+) -> PamphletVersion:
+    version = PamphletVersion(
+        id=_uuid.uuid4(),
+        pamphlet_id=pamphlet_id,
+        template_dsl=dsl,
+        theme=theme,
+        parent_version_id=parent_version_id,
+        created_by=user_id,
+        edit_summary=edit_summary,
+    )
+    db.add(version)
+    db.flush()
+    _prune_old_versions(db, pamphlet_id)
+    return version
+
+
+def _prune_old_versions(db: Session, pamphlet_id: str) -> None:
+    versions = (
+        db.query(PamphletVersion)
+        .filter(PamphletVersion.pamphlet_id == pamphlet_id)
+        .order_by(PamphletVersion.created_at.desc())
+        .all()
+    )
+    for old in versions[VERSION_RETENTION:]:
+        db.delete(old)
+
+
+def list_versions(db: Session, pamphlet_id: str) -> list:
+    return (
+        db.query(PamphletVersion)
+        .filter(PamphletVersion.pamphlet_id == pamphlet_id)
+        .order_by(PamphletVersion.created_at.desc())
+        .all()
+    )
+
+
+def restore_version(db: Session, pamphlet_id: str, version_id: str, user_id: str):
+    version = db.query(PamphletVersion).filter(PamphletVersion.id == version_id).first()
+    if not version:
+        return None
+    pamphlet = get_pamphlet(db, pamphlet_id)
+    if not pamphlet:
+        return None
+    new_version = create_version(
+        db, pamphlet_id, version.template_dsl, version.theme,
+        parent_version_id=str(pamphlet.current_version_id) if pamphlet.current_version_id else None,
+        user_id=user_id,
+        edit_summary=f"Restored from version {str(version.id)[:8]}",
+    )
+    pamphlet.template_dsl = version.template_dsl
+    pamphlet.theme = version.theme
+    pamphlet.current_version_id = new_version.id
+    return new_version
+
+
+def save_chat_messages(
+    db: Session,
+    pamphlet_id: str,
+    messages: list,
+    version_id,
+    user_id,
+    provider: str,
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    cost_usd: float,
+) -> None:
+    for msg in messages:
+        if msg.role == "user" and not msg.tool_results and msg.content:
+            db.add(PamphletChatMessage(
+                id=_uuid.uuid4(), pamphlet_id=pamphlet_id,
+                role="user", content=msg.content,
+                user_id=user_id,
+            ))
+        elif msg.role == "assistant":
+            db.add(PamphletChatMessage(
+                id=_uuid.uuid4(), pamphlet_id=pamphlet_id,
+                role="assistant", content=msg.content,
+                version_id=version_id,
+                provider=provider, model=model,
+                prompt_tokens=prompt_tokens, completion_tokens=completion_tokens,
+                cost_usd=cost_usd,
+            ))
+        elif msg.role == "user" and msg.tool_results:
+            for tr in msg.tool_results:
+                db.add(PamphletChatMessage(
+                    id=_uuid.uuid4(), pamphlet_id=pamphlet_id,
+                    role="tool", tool_call_name=tr.name,
+                    tool_call_result=tr.result if isinstance(tr.result, dict) else {"value": str(tr.result)},
+                    version_id=version_id,
+                ))
+
+
+def load_chat_history(db: Session, pamphlet_id: str) -> list:
+    rows = (
+        db.query(PamphletChatMessage)
+        .filter(PamphletChatMessage.pamphlet_id == pamphlet_id)
+        .order_by(PamphletChatMessage.created_at)
+        .all()
+    )
+    messages = []
+    for row in rows:
+        if row.role == "user" and row.content:
+            messages.append(Message(role="user", content=row.content))
+        elif row.role == "assistant":
+            messages.append(Message(role="assistant", content=row.content))
+    return messages
+
+
+def get_items_lookup(db: Session, pamphlet_id: str) -> dict:
+    items = get_pamphlet_items(db, pamphlet_id)
+    return {
+        str(item.id): {
+            "display_name": item.display_name,
+            "offer_price": float(item.offer_price) if item.offer_price else None,
+            "original_price": float(item.original_price) if item.original_price else None,
+            "highlight_text": item.highlight_text,
+            "image_url": item.image_url,
+        }
+        for item in items
+    }
