@@ -66,7 +66,7 @@ class PamphletChatMessage(AppBase):
     tool_call_args = Column(JSONB, nullable=True)
     tool_call_result = Column(JSONB, nullable=True)
     version_id = Column(UUID(as_uuid=True), nullable=True)
-    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     user_id = Column(UUID(as_uuid=True), nullable=True)
     provider = Column(Text, nullable=True)
     model = Column(Text, nullable=True)
