@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -6,7 +8,19 @@ from api.routers import auth, analytics, customers, products, suppliers, pipelin
 from api.tools import register_tools, _registered_manifests, get_manifests
 from api.tools.base import ToolManifest
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from api.tools.pamphlets.render.pdf import launch_browser, close_browser
+    pw, browser = await launch_browser()
+    app.state.playwright = pw
+    app.state.browser = browser
+    yield
+    await close_browser(pw, browser)
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="AxonFlux API",
     description="Analytics, inventory intelligence, and internal staff tools for supermarket operations.",
     version="0.1.0",
