@@ -59,8 +59,30 @@ def build_tools(state: PamphletState) -> list[Tool]:
         }, "required": ["description"]}
     )
     def generate_theme(description: str) -> dict:
-        # Stub — real implementation added in Task 24
-        return {"ok": True, "message": f"Generating theme for: {description}"}
+        import os, json
+        import anthropic as sdk
+        client = sdk.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        prompt = f"""Generate a retail pamphlet color theme for: "{description}"
+Return ONLY valid JSON with this exact structure, no prose:
+{{
+  "colors": {{
+    "primary": "#rrggbb", "secondary": "#rrggbb", "accent": "#rrggbb",
+    "bg": "#rrggbb", "surface": "#rrggbb", "text": "#rrggbb",
+    "text_muted": "#rrggbb", "border": "#rrggbb", "success": "#rrggbb", "danger": "#rrggbb"
+  }},
+  "decoration": {{"bg_gradient": "linear-gradient(...)"}}
+}}
+Rules: colors must be hex. bg and surface must be light if bg is light, dark if dark. accent must pop."""
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=512,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = resp.content[0].text.strip().strip("```json").strip("```").strip()
+        tokens = json.loads(raw)
+        state.theme = {"preset": "minimal_light", "overrides": tokens}
+        state.dirty = True
+        return {"ok": True, "tokens": tokens}
 
     @tool(
         description="Insert a new node as a child of parent_id at given position (0 = first).",

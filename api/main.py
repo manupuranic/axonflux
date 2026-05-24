@@ -7,6 +7,7 @@ from api.core.config import settings
 from api.routers import auth, analytics, customers, products, suppliers, pipeline, docs
 from api.tools import register_tools, _registered_manifests, get_manifests
 from api.tools.base import ToolManifest
+from api.ai.config import ALLOWED_MODELS
 
 
 @asynccontextmanager
@@ -56,6 +57,19 @@ app.include_router(docs.router)
 # ---------------------------------------------------------------------------
 registered = register_tools(app)
 _registered_manifests.extend(registered)
+
+
+# ---------------------------------------------------------------------------
+# Global AI models endpoint — returns all models from the allowlist
+# ---------------------------------------------------------------------------
+@app.get("/api/ai/models", tags=["ai"])
+def get_all_models():
+    """Returns all allowed AI models grouped by provider."""
+    return [
+        {"provider": p, "model": m}
+        for p, models in ALLOWED_MODELS.items()
+        for m in models
+    ]
 
 
 # ---------------------------------------------------------------------------
