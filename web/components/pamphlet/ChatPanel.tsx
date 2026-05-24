@@ -100,8 +100,8 @@ export function ChatPanel({ pamphletId, onDslUpdate, onSend }: Props) {
         <div className="flex gap-2">
           <Textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}
+            onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
             placeholder="Describe a change..."
             className="min-h-[60px] max-h-32 resize-none text-sm"
             disabled={loading}

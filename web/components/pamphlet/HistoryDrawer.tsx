@@ -33,10 +33,8 @@ export function HistoryDrawer({ pamphletId, onRestore }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1">
-          <History className="w-4 h-4" /> History
-        </Button>
+      <SheetTrigger render={<Button variant="outline" size="sm" className="gap-1" />}>
+        <History className="w-4 h-4" /> History
       </SheetTrigger>
       <SheetContent side="right" className="w-80">
         <SheetHeader>
