@@ -73,6 +73,7 @@ logs/*
 !web/tsconfig.json
 !web/components.json
 !.vscode/launch.json
+!api/tools/pamphlets/themes/*.json
 secrets/
 
 # ---- Node (if added later) ----

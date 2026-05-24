@@ -1,0 +1,22 @@
+{
+  "id": "monsoon",
+  "name": "Monsoon",
+  "tokens": {
+    "colors": {
+      "primary": "#1e3a5f", "secondary": "#2d6a9f", "accent": "#00b4d8",
+      "bg": "#f0f8ff", "surface": "#e0f0ff", "text": "#0d2137",
+      "text_muted": "#4a7fa5", "border": "#b3d9f2", "success": "#06b6d4", "danger": "#dc2626"
+    },
+    "typography": {
+      "font_body": "Geist, Inter, sans-serif",
+      "font_heading": "Geist, Inter, sans-serif",
+      "font_price": "Geist, Inter, sans-serif"
+    },
+    "spacing": {"xs": "4px","sm": "8px","md": "16px","lg": "24px","xl": "40px"},
+    "radii": {"sm": "6px","md": "12px","lg": "20px"},
+    "shadows": {"sm": "0 2px 8px rgba(0,100,180,0.15)","md": "0 6px 20px rgba(0,100,180,0.2)","lg": "0 12px 40px rgba(0,100,180,0.25)"},
+    "decoration": {
+      "bg_gradient": "linear-gradient(135deg, #f0f8ff 0%, #e0f0ff 50%, #cce8ff 100%)"
+    }
+  }
+}

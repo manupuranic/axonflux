@@ -1,0 +1,22 @@
+{
+  "id": "summer",
+  "name": "Summer",
+  "tokens": {
+    "colors": {
+      "primary": "#065f46", "secondary": "#059669", "accent": "#f97316",
+      "bg": "#ecfdf5", "surface": "#d1fae5", "text": "#022c22",
+      "text_muted": "#047857", "border": "#6ee7b7", "success": "#10b981", "danger": "#dc2626"
+    },
+    "typography": {
+      "font_body": "Geist, Inter, sans-serif",
+      "font_heading": "Geist, Inter, sans-serif",
+      "font_price": "Geist, Inter, sans-serif"
+    },
+    "spacing": {"xs": "4px","sm": "8px","md": "16px","lg": "24px","xl": "40px"},
+    "radii": {"sm": "8px","md": "16px","lg": "24px"},
+    "shadows": {"sm": "0 2px 8px rgba(0,120,60,0.1)","md": "0 6px 20px rgba(0,120,60,0.15)","lg": "0 12px 40px rgba(0,120,60,0.2)"},
+    "decoration": {
+      "bg_gradient": "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)"
+    }
+  }
+}

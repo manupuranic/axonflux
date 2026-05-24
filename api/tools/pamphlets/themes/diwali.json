@@ -1,0 +1,22 @@
+{
+  "id": "diwali",
+  "name": "Diwali",
+  "tokens": {
+    "colors": {
+      "primary": "#7c2d12", "secondary": "#c2410c", "accent": "#f59e0b",
+      "bg": "#fef3c7", "surface": "#fde68a", "text": "#451a03",
+      "text_muted": "#92400e", "border": "#fbbf24", "success": "#d97706", "danger": "#dc2626"
+    },
+    "typography": {
+      "font_body": "Geist, Inter, sans-serif",
+      "font_heading": "Geist, Inter, sans-serif",
+      "font_price": "Geist, Inter, sans-serif"
+    },
+    "spacing": {"xs": "4px","sm": "8px","md": "16px","lg": "24px","xl": "40px"},
+    "radii": {"sm": "4px","md": "8px","lg": "16px"},
+    "shadows": {"sm": "0 2px 8px rgba(180,80,0,0.2)","md": "0 6px 20px rgba(180,80,0,0.25)","lg": "0 12px 40px rgba(180,80,0,0.3)"},
+    "decoration": {
+      "bg_gradient": "linear-gradient(135deg, #fef3c7 0%, #fde68a 60%, #fcd34d 100%)"
+    }
+  }
+}
