@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -6,6 +6,9 @@ from api.dependencies import get_db, get_current_user
 from api.schemas.auth import CurrentUser
 from api.tools.pamphlets import MANIFEST
 from api.tools.pamphlets.schemas import (
+    ChatRequest,
+    ChatResponse,
+    ModelInfo,
     PamphletCreate,
     PamphletItemCreate,
     PamphletItemResponse,
@@ -13,8 +16,14 @@ from api.tools.pamphlets.schemas import (
     PamphletResponse,
     PamphletSummary,
     PamphletUpdate,
+    ToolCallInfo,
+    VersionResponse,
 )
 from api.tools.pamphlets import service, ai as pamphlet_ai
+from api.tools.pamphlets import service as svc
+from api.tools.pamphlets.ai_session import make_pamphlet_session
+from api.tools.pamphlets.render.html import render_pamphlet as render_html
+from api.ai.config import ALLOWED_MODELS
 
 router = APIRouter(
     prefix=f"/api/tools/{MANIFEST.id}",
@@ -209,6 +218,184 @@ def generate_ai_highlights(
     db.commit()
     items = service.get_pamphlet_items(db, pamphlet_id)
     return _to_response(pamphlet, items)
+
+
+@router.post("/{pamphlet_id}/chat", response_model=ChatResponse)
+def chat(
+    pamphlet_id: str,
+    body: ChatRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    pamphlet = svc.get_pamphlet(db, pamphlet_id)
+    if not pamphlet:
+        raise HTTPException(404, "Pamphlet not found")
+
+    dsl = pamphlet.template_dsl or {}
+    theme = pamphlet.theme or {"preset": "minimal_light"}
+    items = svc.get_items_lookup(db, pamphlet_id)
+    history = svc.load_chat_history(db, pamphlet_id)
+
+    session, state = make_pamphlet_session(
+        dsl=dsl, theme=theme, items=items,
+        pamphlet_title=pamphlet.title,
+        history=history,
+        provider=body.provider,
+        model=body.model,
+    )
+
+    try:
+        turn = session.send(body.message)
+    except Exception as e:
+        raise HTTPException(502, f"AI error: {e}")
+
+    version = None
+    if state.dirty:
+        _sanitize_dsl_inplace(state.dsl)
+        version = svc.create_version(
+            db, pamphlet_id, state.dsl, state.theme,
+            parent_version_id=str(pamphlet.current_version_id) if pamphlet.current_version_id else None,
+            user_id=current_user.id,
+            edit_summary=_summarize_turn(turn),
+        )
+        pamphlet.template_dsl = state.dsl
+        pamphlet.theme = state.theme
+        pamphlet.current_version_id = version.id
+
+    svc.save_chat_messages(
+        db, pamphlet_id, turn.new_messages,
+        version_id=str(version.id) if version else None,
+        user_id=current_user.id,
+        provider=turn.provider, model=turn.model,
+        prompt_tokens=turn.prompt_tokens, completion_tokens=turn.completion_tokens,
+        cost_usd=float(turn.cost_usd),
+    )
+    db.commit()
+
+    return ChatResponse(
+        assistant_text=turn.assistant_text,
+        tool_calls=[ToolCallInfo(tool_name=e.tool_name, args=e.args, result=e.result, is_error=e.is_error) for e in turn.tool_executions],
+        version_id=str(version.id) if version else None,
+        dsl=state.dsl,
+        theme=state.theme,
+        cost_usd=float(turn.cost_usd),
+        provider=turn.provider,
+        model=turn.model,
+    )
+
+
+@router.get("/{pamphlet_id}/versions", response_model=list[VersionResponse])
+def get_versions(
+    pamphlet_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    return [
+        VersionResponse(
+            id=str(v.id), pamphlet_id=str(v.pamphlet_id),
+            edit_summary=v.edit_summary, created_at=v.created_at,
+            created_by=str(v.created_by) if v.created_by else None,
+        )
+        for v in svc.list_versions(db, pamphlet_id)
+    ]
+
+
+@router.post("/{pamphlet_id}/versions/{version_id}/restore", response_model=VersionResponse)
+def restore_version(
+    pamphlet_id: str, version_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    version = svc.restore_version(db, pamphlet_id, version_id, current_user.id)
+    if not version:
+        raise HTTPException(404, "Version not found")
+    db.commit()
+    return VersionResponse(
+        id=str(version.id), pamphlet_id=str(version.pamphlet_id),
+        edit_summary=version.edit_summary, created_at=version.created_at,
+        created_by=str(version.created_by) if version.created_by else None,
+    )
+
+
+@router.post("/{pamphlet_id}/export-pdf")
+async def export_pdf(
+    pamphlet_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    from fastapi.responses import Response as FastAPIResponse
+    pamphlet = svc.get_pamphlet(db, pamphlet_id)
+    if not pamphlet:
+        raise HTTPException(404, "Pamphlet not found")
+    if not pamphlet.template_dsl:
+        raise HTTPException(400, "Pamphlet has no DSL — use chat to generate a layout first")
+
+    items = svc.get_items_lookup(db, pamphlet_id)
+    html = render_html(pamphlet.template_dsl, pamphlet.theme or {}, items)
+
+    browser = request.app.state.browser
+    from api.tools.pamphlets.render.pdf import render_html_to_pdf
+    try:
+        pdf_bytes = await render_html_to_pdf(html, browser)
+    except Exception as e:
+        raise HTTPException(502, f"PDF render failed: {e}")
+
+    return FastAPIResponse(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{pamphlet.title}.pdf"'},
+    )
+
+
+@router.get("/{pamphlet_id}/preview-html")
+def preview_html(
+    pamphlet_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    from fastapi.responses import HTMLResponse
+    pamphlet = svc.get_pamphlet(db, pamphlet_id)
+    if not pamphlet:
+        raise HTTPException(404, "Pamphlet not found")
+    if not pamphlet.template_dsl:
+        return HTMLResponse("<html><body>No DSL yet — use chat to generate layout.</body></html>")
+    items = svc.get_items_lookup(db, pamphlet_id)
+    html = render_html(pamphlet.template_dsl, pamphlet.theme or {}, items)
+    return HTMLResponse(html)
+
+
+@router.get("/models", response_model=list[ModelInfo])
+def list_models(_=Depends(get_current_user)):
+    labels = {
+        "claude-opus-4-7": "Claude Opus 4.7", "claude-sonnet-4-6": "Claude Sonnet 4.6",
+        "claude-haiku-4-5-20251001": "Claude Haiku 4.5",
+        "gpt-4o": "GPT-4o", "gpt-4o-mini": "GPT-4o Mini", "gpt-4-turbo": "GPT-4 Turbo",
+        "anthropic/claude-sonnet-4-6": "Claude Sonnet (OpenRouter)",
+        "openai/gpt-4o": "GPT-4o (OpenRouter)",
+        "meta-llama/llama-3.1-70b-instruct": "Llama 3.1 70B",
+        "deepseek/deepseek-chat": "DeepSeek Chat",
+    }
+    return [
+        ModelInfo(provider=p, model=m, display_name=labels.get(m, m))
+        for p, models in ALLOWED_MODELS.items()
+        for m in models
+    ]
+
+
+def _sanitize_dsl_inplace(node: dict) -> None:
+    # Sanitizers applied in Task 23; stub here for safety
+    for child in node.get("children", []):
+        _sanitize_dsl_inplace(child)
+
+
+def _summarize_turn(turn) -> str:
+    names = [e.tool_name for e in turn.tool_executions if not e.is_error]
+    if not names:
+        return "Chat (no changes)"
+    unique = list(dict.fromkeys(names))
+    return ", ".join(unique[:3]) + ("..." if len(unique) > 3 else "")
 
 
 def _item_to_response(item) -> PamphletItemResponse:

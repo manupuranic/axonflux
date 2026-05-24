@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Any
 from pydantic import BaseModel, model_validator
 
 
@@ -89,3 +90,41 @@ class PamphletSummary(BaseModel):
     item_count: int = 0
 
     model_config = {"from_attributes": True}
+
+
+class ChatRequest(BaseModel):
+    message: str
+    provider: str | None = None
+    model: str | None = None
+
+
+class ToolCallInfo(BaseModel):
+    tool_name: str
+    args: dict
+    result: Any
+    is_error: bool
+
+
+class ChatResponse(BaseModel):
+    assistant_text: str | None
+    tool_calls: list[ToolCallInfo]
+    version_id: str | None
+    dsl: dict
+    theme: dict
+    cost_usd: float
+    provider: str
+    model: str
+
+
+class VersionResponse(BaseModel):
+    id: str
+    pamphlet_id: str
+    edit_summary: str | None
+    created_at: Any
+    created_by: str | None
+
+
+class ModelInfo(BaseModel):
+    provider: str
+    model: str
+    display_name: str
