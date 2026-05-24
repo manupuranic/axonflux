@@ -32,11 +32,31 @@ SELECT DISTINCT
     supplier_name_raw AS supplier_name
 FROM raw.raw_purchase_itemwise;
 
--- product_dimension_view: Recency-aware product identity with app.products overrides
+-- product_dimension: Recency-aware product identity with app.products overrides
 -- Alias-aware: barcodes in app.product_aliases are remapped to their canonical_barcode
 -- before DISTINCT ON, so alias barcodes never appear as independent product rows.
-DROP VIEW IF EXISTS derived.product_dimension CASCADE;
-CREATE VIEW derived.product_dimension AS
+--
+-- Materialized as a TABLE (not VIEW) because the underlying CTE pipeline does
+-- external-merge sorts on raw_sales_itemwise (~260k rows) every call. Materializing
+-- here once per pipeline run drops /api/analytics/top-products from 700ms → ~20ms.
+-- Bootstrap (sql/derived_tables.sql) may have created this as a VIEW on fresh DBs,
+-- so handle both object kinds before recreating.
+DO $$
+DECLARE
+    obj_kind "char";
+BEGIN
+    SELECT relkind INTO obj_kind
+    FROM pg_class
+    WHERE relnamespace = 'derived'::regnamespace
+      AND relname = 'product_dimension';
+    IF obj_kind = 'v' THEN
+        EXECUTE 'DROP VIEW derived.product_dimension CASCADE';
+    ELSIF obj_kind = 'r' THEN
+        EXECUTE 'DROP TABLE derived.product_dimension CASCADE';
+    END IF;
+END $$;
+
+CREATE TABLE derived.product_dimension AS
 WITH alias_map AS (
     -- Confirmed barcode aliases: alias_barcode → canonical_barcode
     SELECT alias_barcode, canonical_barcode FROM app.product_aliases
@@ -99,3 +119,7 @@ SELECT
     product_type,
     is_reviewed
 FROM product_names;
+
+CREATE INDEX product_dimension_product_id_idx
+    ON derived.product_dimension(product_id);
+ANALYZE derived.product_dimension;
