@@ -180,6 +180,14 @@ export default function PamphletGeneratorPage() {
     router.push(`/tools/pamphlet-generator/${p.id}`);
   }
 
+  async function createDslPamphlet() {
+    const p = await api.pamphlets.create({
+      title: "New Pamphlet",
+      template_type: "dsl",
+    });
+    router.push(`/tools/pamphlet-generator/${p.id}`);
+  }
+
   async function handleImport(url: string, title: string, rows: number, cols: number) {
     const p = await api.pamphlets.importFromSheet({ url, title, rows, cols });
     router.push(`/tools/pamphlet-generator/${p.id}`);
@@ -227,6 +235,9 @@ export default function PamphletGeneratorPage() {
           <Button onClick={() => setShowCreate(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Pamphlet
+          </Button>
+          <Button onClick={createDslPamphlet} variant="default">
+            + New Pamphlet (AI)
           </Button>
         </div>
       </div>
