@@ -1,25 +1,9 @@
-import json
-import os
-
-import anthropic
-
 from api.tools.pamphlets.models import PamphletItem
-
-_client: anthropic.Anthropic | None = None
-
-
-def _get_client() -> anthropic.Anthropic:
-    global _client
-    if _client is None:
-        _client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    return _client
+from api.ai import ChatSession
+from api.ai.tools import tool
 
 
 def generate_highlights(items: list[PamphletItem]) -> list[dict]:
-    """Call Claude to generate punchy highlight_text for each pamphlet item.
-
-    Returns list of {id, highlight_text} dicts ready for bulk_update_highlights().
-    """
     if not items:
         return []
 
@@ -30,33 +14,28 @@ def generate_highlights(items: list[PamphletItem]) -> list[dict]:
         offer = f"₹{item.offer_price}" if item.offer_price else "N/A"
         lines.append(f"{i}. id={item.id} | {name} | MRP {mrp} | Offer {offer}")
 
-    product_list = "\n".join(lines)
+    results: list[dict] = []
 
-    prompt = f"""You are writing short promotional badge text for a health mart pamphlet.
-For each product write a punchy 2–6 word highlight (examples: "Save ₹120 Today!", "Best Value!", "Limited Stock!", "Top Seller").
-Rules:
-- Keep it retail-friendly. No medical claims.
-- If there is a discount, quantify it (e.g. "Save ₹50!" or "33% OFF").
-- If no discount info, use generic retail copy.
-- Return ONLY a JSON array, no prose.
-
-Products:
-{product_list}
-
-Return format (one object per product, same order):
-[{{"id": "<uuid>", "highlight_text": "<text>"}}]"""
-
-    client = _get_client()
-    message = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=512,
-        messages=[{"role": "user", "content": prompt}],
+    @tool(
+        description="Return highlight text for each product.",
+        parameters={"type": "object", "properties": {
+            "highlights": {"type": "array", "items": {"type": "object", "properties": {
+                "id": {"type": "string"}, "highlight_text": {"type": "string"}
+            }, "required": ["id", "highlight_text"]}}
+        }, "required": ["highlights"]}
     )
+    def submit_highlights(highlights: list) -> dict:
+        results.extend(highlights)
+        return {"ok": True}
 
-    raw = message.content[0].text.strip()
-    # Strip markdown fences if Claude wrapped in ```json
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    return json.loads(raw.strip())
+    session = ChatSession(
+        provider="anthropic",
+        model="claude-haiku-4-5-20251001",
+        system_prompt="You write punchy 2-6 word retail badge text for pamphlet products. No medical claims.",
+        tools=[submit_highlights],
+    )
+    product_list = "\n".join(lines)
+    session.send(
+        f"Write highlight_text for each product. Call submit_highlights with all results.\n\n{product_list}"
+    )
+    return results if results else []
