@@ -66,3 +66,24 @@ def test_set_theme_by_preset():
     assert result["ok"] is True
     assert state.theme["preset"] == "monsoon"
     assert state.dirty is True
+
+
+def test_update_products_no_db_returns_error():
+    state, _, _, _, _ = _make_state()
+    # state.db is None by default in _make_state
+    tools = build_dsl_tools(state)
+    update_products = next(t for t in tools if t.name == "update_products")
+    result = update_products.func(updates=[{"item_id": "fake"}])
+    assert "error" in result
+
+
+def test_edit_layout_move_invalid_parent_does_not_orphan():
+    state, page_id, section_id, product_id, _ = _make_state()
+    tools = build_dsl_tools(state)
+    edit_layout = next(t for t in tools if t.name == "edit_layout")
+    # Try to move product_id to a non-existent parent
+    result = edit_layout.func(operation="move", node_id=product_id, new_parent_id="nonexistent", new_position=0)
+    assert "error" in result
+    # Product must still be in its original parent
+    section = state.dsl["children"][0]
+    assert any(c["id"] == product_id for c in section["children"])

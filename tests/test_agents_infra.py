@@ -37,3 +37,18 @@ def test_fetch_url_returns_json():
         result = fetch_url.func(url="https://world.openfoodfacts.org/api/v0/product/8901030012345.json")
 
     assert result["json"]["product"]["image_front_url"] == "https://img.com/sugar.jpg"
+
+
+def test_web_search_raises_on_http_error():
+    tools = build_infra_tools()
+    web_search = next(t for t in tools if t.name == "web_search")
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status.side_effect = Exception("HTTP 401")
+
+    with patch("httpx.post", return_value=mock_resp):
+        try:
+            web_search.func(query="test")
+            assert False, "Should have raised"
+        except Exception as e:
+            assert "401" in str(e)

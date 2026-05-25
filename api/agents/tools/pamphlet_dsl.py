@@ -115,10 +115,10 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
             node_obj, parent_children, idx = _find_node(state.dsl, node_id)
             if node_obj is None:
                 return {"error": f"Node {node_id!r} not found"}
-            parent_children.pop(idx)
-            new_parent, _, _ = _find_node(state.dsl, new_parent_id)
+            new_parent, _, _ = _find_node(state.dsl, new_parent_id)  # find FIRST
             if new_parent is None:
                 return {"error": f"New parent {new_parent_id!r} not found"}
+            parent_children.pop(idx)  # pop AFTER validating destination
             children = new_parent.setdefault("children", [])
             pos = max(0, min(new_position or 0, len(children)))
             children.insert(pos, node_obj)
@@ -276,7 +276,10 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
             import os
             import json
             import anthropic as sdk
-            client = sdk.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+            api_key = os.environ.get("ANTHROPIC_API_KEY")
+            if not api_key:
+                return {"error": "ANTHROPIC_API_KEY is not set"}
+            client = sdk.Anthropic(api_key=api_key)
             prompt = (
                 f'Generate a retail pamphlet color theme for: "{description}"\n'
                 'Return ONLY valid JSON:\n'
@@ -289,7 +292,10 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
                 messages=[{"role": "user", "content": prompt}]
             )
             raw = resp.content[0].text.strip().strip("```json").strip("```").strip()
-            generated = json.loads(raw)
+            try:
+                generated = json.loads(raw)
+            except json.JSONDecodeError:
+                return {"error": "Theme generation produced invalid JSON"}
             state.theme = {"preset": "minimal_light", "overrides": generated}
             state.dsl["theme_id"] = "minimal_light"
             state.dirty = True

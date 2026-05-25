@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+from urllib.parse import urlparse
 
 import httpx
 
@@ -61,6 +62,9 @@ def build_infra_tools() -> list[Tool]:
         },
     )
     def fetch_url(url: str) -> dict:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return {"error": "Only http/https URLs are allowed"}
         resp = httpx.get(url, follow_redirects=True, timeout=15)
         resp.raise_for_status()
         content_type = resp.headers.get("content-type", "")
