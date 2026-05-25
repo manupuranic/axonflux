@@ -60,3 +60,28 @@ export interface ModelInfo {
   model: string;
   display_name: string;
 }
+
+export interface PamphletItem {
+  id: string;
+  pamphlet_id: string;
+  barcode: string | null;
+  display_name: string | null;
+  offer_price: number | null;
+  original_price: number | null;
+  highlight_text: string | null;
+  sort_order: number;
+  image_url: string | null;
+  category: string | null;
+  unit: string | null;
+}
+
+export interface AgentTask {
+  task_id: string;
+  pamphlet_id: string;
+  status: "pending" | "running" | "done" | "error";
+  current_product: string;
+  total: number;
+  done_count: number;
+  updates: Array<{ item_id: string; image_url: string; name: string }>;
+  error: string;
+}
