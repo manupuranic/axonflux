@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -139,6 +139,7 @@ def update_pamphlet(
 def add_item(
     pamphlet_id: str,
     body: PamphletItemCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(get_current_user),
 ):
@@ -148,6 +149,21 @@ def add_item(
     item = service.add_item(db, pamphlet_id, body)
     db.commit()
     db.refresh(item)
+    if not item.image_url:
+        from config.db import SessionLocal
+        from api.agents.image_agent import start_scan_task
+        background_tasks.add_task(
+            start_scan_task,
+            pamphlet_id=pamphlet_id,
+            items=[{
+                "id": str(item.id),
+                "display_name": item.display_name or "",
+                "barcode": item.barcode,
+                "category": item.category,
+                "unit": item.unit,
+            }],
+            db_factory=SessionLocal,
+        )
     return _item_to_response(item)
 
 
