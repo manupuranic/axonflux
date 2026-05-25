@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import logging
 import threading
 import uuid
 from dataclasses import dataclass, field
@@ -8,7 +9,10 @@ from typing import Optional
 from api.ai import ChatSession
 from api.agents.tools.infra import build_infra_tools
 
+logger = logging.getLogger(__name__)
+
 _tasks: dict[str, "ImageTask"] = {}
+_tasks_lock = threading.Lock()
 
 _SYSTEM_PROMPT = """You are an image-finding agent for a supermarket product catalog.
 Find a direct, publicly accessible product image URL for the given product.
@@ -123,6 +127,7 @@ async def _scan_items(task: ImageTask, items: list[dict], db_factory) -> None:
             task.done_count += 1
         task.status = "done"
     except Exception as exc:
+        logger.exception("Image scan task %s failed", task.task_id)
         task.status = "error"
         task.error = str(exc)
 
@@ -130,7 +135,8 @@ async def _scan_items(task: ImageTask, items: list[dict], db_factory) -> None:
 def start_scan_task(pamphlet_id: str, items: list[dict], db_factory) -> str:
     task_id = str(uuid.uuid4())[:8]
     task = ImageTask(task_id=task_id, pamphlet_id=pamphlet_id)
-    _tasks[task_id] = task
+    with _tasks_lock:
+        _tasks[task_id] = task
     t = threading.Thread(
         target=_run_scan_thread, args=(task, items, db_factory), daemon=True
     )
@@ -139,4 +145,5 @@ def start_scan_task(pamphlet_id: str, items: list[dict], db_factory) -> str:
 
 
 def get_task(task_id: str) -> Optional[ImageTask]:
-    return _tasks.get(task_id)
+    with _tasks_lock:
+        return _tasks.get(task_id)
