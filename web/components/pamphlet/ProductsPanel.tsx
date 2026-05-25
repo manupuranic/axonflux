@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Plus, Trash2, ChevronUp, ChevronDown, Image as ImageIcon, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,10 +91,15 @@ export function ProductsPanel({ pamphletId, initialItems, onItemsChange }: Props
   const [scanning, setScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState("");
   const [search, setSearch] = useState("");
+  const scanCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     setItems(initialItems);
   }, [initialItems]);
+
+  useEffect(() => {
+    return () => { scanCleanupRef.current?.(); };
+  }, []);
 
   const filtered = items.filter((i) =>
     (i.display_name ?? "").toLowerCase().includes(search.toLowerCase())
@@ -140,22 +145,29 @@ export function ProductsPanel({ pamphletId, initialItems, onItemsChange }: Props
       setForm(EMPTY_FORM);
       setShowAdd(false);
       onItemsChange();
+    } catch {
+      alert("Failed to add item. Please try again.");
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(itemId: string) {
-    await removeItem(pamphletId, itemId);
-    setItems((prev) => prev.filter((i) => i.id !== itemId));
-    onItemsChange();
+    try {
+      await removeItem(pamphletId, itemId);
+      setItems((prev) => prev.filter((i) => i.id !== itemId));
+      onItemsChange();
+    } catch {
+      alert("Failed to delete item. Please try again.");
+    }
   }
 
-  async function handleMove(index: number, dir: -1 | 1) {
+  async function handleMove(itemId: string, dir: -1 | 1) {
+    const idx = items.findIndex((i) => i.id === itemId);
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= items.length) return;
     const newItems = [...items];
-    const swapIdx = index + dir;
-    if (swapIdx < 0 || swapIdx >= newItems.length) return;
-    [newItems[index], newItems[swapIdx]] = [newItems[swapIdx], newItems[index]];
+    [newItems[idx], newItems[swapIdx]] = [newItems[swapIdx], newItems[idx]];
     setItems(newItems);
     await reorderItems(pamphletId, newItems.map((i) => i.id));
     onItemsChange();
@@ -172,7 +184,7 @@ export function ProductsPanel({ pamphletId, initialItems, onItemsChange }: Props
         return;
       }
       setScanStatus(`Scanning ${count} products...`);
-      streamAgentTask(
+      scanCleanupRef.current = streamAgentTask(
         task_id,
         (task) => {
           if (task.current_product) {
@@ -188,6 +200,7 @@ export function ProductsPanel({ pamphletId, initialItems, onItemsChange }: Props
           }
         },
         () => {
+          scanCleanupRef.current = null;
           setScanStatus("Scan complete.");
           setScanning(false);
           onItemsChange();
@@ -234,7 +247,7 @@ export function ProductsPanel({ pamphletId, initialItems, onItemsChange }: Props
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
-        {filtered.map((item, index) => (
+        {filtered.map((item) => (
           <div
             key={item.id}
             className="flex items-center gap-1.5 rounded-md border bg-card px-2 py-1.5 text-xs group"
@@ -255,10 +268,10 @@ export function ProductsPanel({ pamphletId, initialItems, onItemsChange }: Props
               </p>
             </div>
             <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleMove(index, -1)}>
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleMove(item.id, -1)}>
                 <ChevronUp className="w-3 h-3" />
               </Button>
-              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleMove(index, 1)}>
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleMove(item.id, 1)}>
                 <ChevronDown className="w-3 h-3" />
               </Button>
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditItem({ ...item })}>
