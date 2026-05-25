@@ -1,27 +1,18 @@
-from contextlib import asynccontextmanager
+import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.core.config import settings
 from api.routers import auth, analytics, customers, products, suppliers, pipeline, docs
+from api.agents.router import router as agents_router
 from api.tools import register_tools, _registered_manifests, get_manifests
 from api.tools.base import ToolManifest
 from api.ai.config import ALLOWED_MODELS
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    from api.tools.pamphlets.render.pdf import launch_browser, close_browser
-    pw, browser = await launch_browser()
-    app.state.playwright = pw
-    app.state.browser = browser
-    yield
-    await close_browser(pw, browser)
+from api.dependencies import get_current_user
 
 
 app = FastAPI(
-    lifespan=lifespan,
     title="AxonFlux API",
     description="Analytics, inventory intelligence, and internal staff tools for supermarket operations.",
     version="0.1.0",
@@ -51,6 +42,7 @@ app.include_router(products.router)
 app.include_router(suppliers.router)
 app.include_router(pipeline.router)
 app.include_router(docs.router)
+app.include_router(agents_router)
 
 # ---------------------------------------------------------------------------
 # Tool plugin routers (auto-discovered)
@@ -70,6 +62,29 @@ def get_all_models():
         for p, models in ALLOWED_MODELS.items()
         for m in models
     ]
+
+
+# ---------------------------------------------------------------------------
+# AI connection test endpoint
+# ---------------------------------------------------------------------------
+@app.post("/api/ai/test", tags=["ai"])
+def test_ai_connection(body: dict, _=Depends(get_current_user)):
+    """Sends a minimal message to the specified provider/model and reports latency."""
+    from api.ai import ChatSession
+    provider = body.get("provider", "anthropic")
+    model = body.get("model", "")
+    if not model:
+        from api.ai.config import ALLOWED_MODELS
+        model = ALLOWED_MODELS[provider][0]
+    t0 = time.monotonic()
+    try:
+        session = ChatSession(provider=provider, model=model, system_prompt="", tools=[])
+        result = session.send("Reply with exactly one word: OK")
+        ms = int((time.monotonic() - t0) * 1000)
+        return {"ok": True, "response": result.assistant_text, "latency_ms": ms, "provider": provider, "model": model}
+    except Exception as e:
+        ms = int((time.monotonic() - t0) * 1000)
+        return {"ok": False, "error": str(e), "latency_ms": ms, "provider": provider, "model": model}
 
 
 # ---------------------------------------------------------------------------
