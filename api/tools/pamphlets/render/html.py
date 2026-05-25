@@ -1,4 +1,6 @@
 from __future__ import annotations
+from html import escape
+
 from api.tools.pamphlets.render.primitives import (
     PageNode, SectionNode, SlotNode, ProductNode, TextNode, ImageNode,
     DividerNode, SpacerNode, OfferBannerNode, LogoNode, DecorationNode,
@@ -234,7 +236,7 @@ def _render_product(n: ProductNode, lookup: dict) -> str:
     so = _style_overrides(n.style_overrides)
 
     if n.show_image and img_url:
-        img_html = f'<div class="product-img-wrap"><img class="product-img" src="{img_url}" alt="{name}"></div>'
+        img_html = f'<div class="product-img-wrap"><img class="product-img" src="{escape(img_url)}" alt="{escape(name)}"></div>'
     else:
         img_html = '<div class="product-img-wrap"></div>'
     badge_html = f'<span class="product-badge">{badge}</span>' if (n.show_badge and badge) else ""

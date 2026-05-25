@@ -215,6 +215,8 @@ def import_from_gsheet(
             "offer_price": offer_price,
             "highlight_text": highlight_text,
             "image_url": norm.get("image") or norm.get("image_url") or None,
+            "category": norm.get("category") or None,
+            "unit": norm.get("unit") or None,
             "sort_order": i,
         })
 
