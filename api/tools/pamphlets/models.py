@@ -38,6 +38,8 @@ class PamphletItem(AppBase):
     highlight_text = Column(Text)
     sort_order = Column(Integer, default=0)
     image_url = Column(Text)
+    category = Column(Text, nullable=True)
+    unit = Column(Text, nullable=True)
 
 
 class PamphletVersion(AppBase):

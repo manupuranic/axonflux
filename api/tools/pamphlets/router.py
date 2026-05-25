@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -68,6 +69,28 @@ def create_pamphlet(
     db.refresh(pamphlet)
     items = service.get_pamphlet_items(db, str(pamphlet.id))
     return _to_response(pamphlet, items)
+
+
+@router.get("/models", response_model=list[ModelInfo])
+def list_models(_=Depends(get_current_user)):
+    labels = {
+        "claude-opus-4-7": "Claude Opus 4.7", "claude-sonnet-4-6": "Claude Sonnet 4.6",
+        "claude-haiku-4-5-20251001": "Claude Haiku 4.5",
+        "gpt-4o": "GPT-4o", "gpt-4o-mini": "GPT-4o Mini", "gpt-4-turbo": "GPT-4 Turbo",
+        "anthropic/claude-sonnet-4-6": "Claude Sonnet (OpenRouter)",
+        "anthropic/claude-haiku-4-5-20251001": "Claude Haiku (OpenRouter)",
+        "anthropic/claude-opus-4-7": "Claude Opus (OpenRouter)",
+        "openai/gpt-4o": "GPT-4o (OpenRouter)",
+        "openai/gpt-4o-mini": "GPT-4o Mini (OpenRouter)",
+        "google/gemini-2.0-flash-001": "Gemini 2.0 Flash",
+        "meta-llama/llama-3.1-70b-instruct": "Llama 3.1 70B",
+        "deepseek/deepseek-chat": "DeepSeek Chat",
+    }
+    return [
+        ModelInfo(provider=p, model=m, display_name=labels.get(m, m))
+        for p, models in ALLOWED_MODELS.items()
+        for m in models
+    ]
 
 
 @router.get("/{pamphlet_id}", response_model=PamphletResponse)
@@ -244,6 +267,8 @@ def chat(
         history=history,
         provider=body.provider,
         model=body.model,
+        db=db,
+        pamphlet_id=pamphlet_id,
     )
 
     try:
@@ -322,7 +347,6 @@ def restore_version(
 @router.post("/{pamphlet_id}/export-pdf")
 async def export_pdf(
     pamphlet_id: str,
-    request: Request,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
@@ -336,10 +360,9 @@ async def export_pdf(
     items = svc.get_items_lookup(db, pamphlet_id)
     html = render_html(pamphlet.template_dsl, pamphlet.theme or {}, items)
 
-    browser = request.app.state.browser
     from api.tools.pamphlets.render.pdf import render_html_to_pdf
     try:
-        pdf_bytes = await render_html_to_pdf(html, browser)
+        pdf_bytes = await render_html_to_pdf(html)
     except Exception as e:
         raise HTTPException(502, f"PDF render failed: {e}")
 
@@ -350,11 +373,56 @@ async def export_pdf(
     )
 
 
+@router.post("/{pamphlet_id}/export-image")
+async def export_image(
+    pamphlet_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    from fastapi.responses import Response as FastAPIResponse
+    pamphlet = svc.get_pamphlet(db, pamphlet_id)
+    if not pamphlet:
+        raise HTTPException(404, "Pamphlet not found")
+    if not pamphlet.template_dsl:
+        raise HTTPException(400, "Pamphlet has no DSL")
+
+    items = svc.get_items_lookup(db, pamphlet_id)
+    html = render_html(pamphlet.template_dsl, pamphlet.theme or {}, items)
+
+    from api.tools.pamphlets.render.pdf import render_html_to_image
+    try:
+        img_bytes = await render_html_to_image(html)
+    except Exception as e:
+        raise HTTPException(502, f"Image render failed: {e}")
+
+    return FastAPIResponse(
+        content=img_bytes,
+        media_type="image/png",
+        headers={"Content-Disposition": f'attachment; filename="{pamphlet.title}.png"'},
+    )
+
+
+def _user_from_query_token(
+    token: str | None = Query(default=None),
+    credentials=Depends(HTTPBearer(auto_error=False)),
+):
+    raw = credentials.credentials if credentials else token
+    if not raw:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
+    from api.core.security import decode_access_token
+    from api.schemas.auth import CurrentUser as CU
+    payload = decode_access_token(raw)
+    if not payload.get("sub"):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
+    return CU(id=payload.get("user_id", ""), username=payload["sub"],
+               role=payload.get("role", "staff"), full_name=payload.get("full_name"))
+
+
 @router.get("/{pamphlet_id}/preview-html")
 def preview_html(
     pamphlet_id: str,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    _=Depends(_user_from_query_token),
 ):
     from fastapi.responses import HTMLResponse
     pamphlet = svc.get_pamphlet(db, pamphlet_id)
@@ -365,24 +433,6 @@ def preview_html(
     items = svc.get_items_lookup(db, pamphlet_id)
     html = render_html(pamphlet.template_dsl, pamphlet.theme or {}, items)
     return HTMLResponse(html)
-
-
-@router.get("/models", response_model=list[ModelInfo])
-def list_models(_=Depends(get_current_user)):
-    labels = {
-        "claude-opus-4-7": "Claude Opus 4.7", "claude-sonnet-4-6": "Claude Sonnet 4.6",
-        "claude-haiku-4-5-20251001": "Claude Haiku 4.5",
-        "gpt-4o": "GPT-4o", "gpt-4o-mini": "GPT-4o Mini", "gpt-4-turbo": "GPT-4 Turbo",
-        "anthropic/claude-sonnet-4-6": "Claude Sonnet (OpenRouter)",
-        "openai/gpt-4o": "GPT-4o (OpenRouter)",
-        "meta-llama/llama-3.1-70b-instruct": "Llama 3.1 70B",
-        "deepseek/deepseek-chat": "DeepSeek Chat",
-    }
-    return [
-        ModelInfo(provider=p, model=m, display_name=labels.get(m, m))
-        for p, models in ALLOWED_MODELS.items()
-        for m in models
-    ]
 
 
 def _sanitize_dsl_inplace(node: dict) -> None:
@@ -413,6 +463,8 @@ def _item_to_response(item) -> PamphletItemResponse:
         highlight_text=item.highlight_text,
         sort_order=item.sort_order,
         image_url=item.image_url,
+        category=item.category,
+        unit=item.unit,
     )
 
 
