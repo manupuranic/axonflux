@@ -296,6 +296,20 @@ def chat(
         version = None
         if state.dirty:
             _sanitize_dsl_inplace(state.dsl)
+            # Validate DSL before saving — reject if Pydantic can't parse it
+            # (normalizer already remaps common LLM type mistakes)
+            try:
+                from api.tools.pamphlets.render.html import render_pamphlet as _rp
+                _rp(state.dsl, state.theme or {}, {})
+            except Exception as dsl_err:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Chat produced invalid DSL for pamphlet %s, discarding: %s", pamphlet_id, dsl_err
+                )
+                state.dirty = False  # don't save the bad DSL
+            else:
+                pass  # valid — fall through to create_version
+        if state.dirty:
             version = svc.create_version(
                 db, pamphlet_id, state.dsl, state.theme,
                 parent_version_id=str(pamphlet.current_version_id) if pamphlet.current_version_id else None,
@@ -456,7 +470,15 @@ def preview_html(
     if not pamphlet.template_dsl:
         return HTMLResponse("<html><body>No DSL yet — use chat to generate layout.</body></html>")
     items = svc.get_items_lookup(db, pamphlet_id)
-    html = render_html(pamphlet.template_dsl, pamphlet.theme or {}, items)
+    try:
+        html = render_html(pamphlet.template_dsl, pamphlet.theme or {}, items)
+    except Exception as exc:
+        html = (
+            f"<html><body style='font-family:monospace;padding:24px;color:#c00'>"
+            f"<strong>Preview error:</strong> {exc}<br><br>"
+            f"Restore a previous version from the chat panel to recover."
+            f"</body></html>"
+        )
     return HTMLResponse(html)
 
 

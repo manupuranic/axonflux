@@ -27,7 +27,30 @@ def _fmt_mm(v: float) -> str:
     return f"{v:g}mm"
 
 
+_TEXT_VARIANTS = {"heading", "subheading", "body", "price", "caption"}
+_VALID_TYPES = {
+    "page", "section", "slot", "product", "text", "image", "divider",
+    "spacer", "offer_banner", "logo", "decoration", "qr_code",
+    "contact_strip", "price_compare", "custom_html", "raw_svg",
+}
+
+
+def _normalize_node(node: dict) -> dict:
+    """Remap LLM-hallucinated node types to valid primitives."""
+    t = node.get("type", "")
+    if t in _TEXT_VARIANTS and t not in _VALID_TYPES:
+        node = {**node, "type": "text", "variant": t}
+    if t not in _VALID_TYPES and t not in _TEXT_VARIANTS:
+        # Unknown type — replace with a placeholder text node
+        node = {"type": "text", "id": node.get("id", "unknown"), "content": f"[{t}]", "variant": "caption"}
+    children = node.get("children")
+    if children:
+        node = {**node, "children": [_normalize_node(c) for c in children]}
+    return node
+
+
 def render_pamphlet(dsl: dict, theme: dict, items_lookup: dict[str, dict]) -> str:
+    dsl = _normalize_node(dsl)
     page = PageNode.model_validate(dsl)
     resolved_theme = _resolve_theme(theme if theme else {}, page.theme_id)
     css_vars = _theme_to_css_vars(resolved_theme)
