@@ -272,48 +272,57 @@ def chat(
     if not pamphlet:
         raise HTTPException(404, "Pamphlet not found")
 
-    dsl = pamphlet.template_dsl or {}
-    theme = pamphlet.theme or {"preset": "minimal_light"}
-    items = svc.get_items_lookup(db, pamphlet_id)
-    history = svc.load_chat_history(db, pamphlet_id)
-
-    session, state = make_pamphlet_session(
-        dsl=dsl, theme=theme, items=items,
-        pamphlet_title=pamphlet.title,
-        history=history,
-        provider=body.provider,
-        model=body.model,
-        db=db,
-        pamphlet_id=pamphlet_id,
-    )
-
     try:
-        turn = session.send(body.message)
-    except Exception as e:
-        raise HTTPException(502, f"AI error: {e}")
+        dsl = pamphlet.template_dsl or {}
+        theme = pamphlet.theme or {"preset": "minimal_light"}
+        items = svc.get_items_lookup(db, pamphlet_id)
+        history = svc.load_chat_history(db, pamphlet_id)
 
-    version = None
-    if state.dirty:
-        _sanitize_dsl_inplace(state.dsl)
-        version = svc.create_version(
-            db, pamphlet_id, state.dsl, state.theme,
-            parent_version_id=str(pamphlet.current_version_id) if pamphlet.current_version_id else None,
-            user_id=current_user.id,
-            edit_summary=_summarize_turn(turn),
+        session, state = make_pamphlet_session(
+            dsl=dsl, theme=theme, items=items,
+            pamphlet_title=pamphlet.title,
+            history=history,
+            provider=body.provider,
+            model=body.model,
+            db=db,
+            pamphlet_id=pamphlet_id,
         )
-        pamphlet.template_dsl = state.dsl
-        pamphlet.theme = state.theme
-        pamphlet.current_version_id = version.id
 
-    svc.save_chat_messages(
-        db, pamphlet_id, turn.new_messages,
-        version_id=str(version.id) if version else None,
-        user_id=current_user.id,
-        provider=turn.provider, model=turn.model,
-        prompt_tokens=turn.prompt_tokens, completion_tokens=turn.completion_tokens,
-        cost_usd=float(turn.cost_usd),
-    )
-    db.commit()
+        try:
+            turn = session.send(body.message)
+        except Exception as e:
+            raise HTTPException(502, f"AI error: {e}")
+
+        version = None
+        if state.dirty:
+            _sanitize_dsl_inplace(state.dsl)
+            version = svc.create_version(
+                db, pamphlet_id, state.dsl, state.theme,
+                parent_version_id=str(pamphlet.current_version_id) if pamphlet.current_version_id else None,
+                user_id=current_user.id,
+                edit_summary=_summarize_turn(turn),
+            )
+            pamphlet.template_dsl = state.dsl
+            pamphlet.theme = state.theme
+            pamphlet.current_version_id = version.id
+
+        svc.save_chat_messages(
+            db, pamphlet_id, turn.new_messages,
+            version_id=str(version.id) if version else None,
+            user_id=current_user.id,
+            provider=turn.provider, model=turn.model,
+            prompt_tokens=turn.prompt_tokens, completion_tokens=turn.completion_tokens,
+            cost_usd=float(turn.cost_usd),
+        )
+        db.commit()
+
+    except HTTPException:
+        raise
+    except BaseException as e:
+        import logging
+        logging.getLogger(__name__).exception("Chat endpoint crashed for pamphlet %s", pamphlet_id)
+        db.rollback()
+        raise HTTPException(500, f"Chat error: {type(e).__name__}: {e}")
 
     return ChatResponse(
         assistant_text=turn.assistant_text,

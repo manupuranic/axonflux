@@ -13,7 +13,11 @@ class OpenAIProvider(AIProvider):
 
     def _get_client(self) -> OpenAI:
         if not self._client:
-            self._client = OpenAI(api_key=get_api_key(self._api_key_provider), base_url=self._base_url)
+            self._client = OpenAI(
+                api_key=get_api_key(self._api_key_provider),
+                base_url=self._base_url,
+                timeout=120.0,
+            )
         return self._client
 
     def complete(self, messages: list[Message], system: str, tools: list[Tool], model: str) -> CompletionResult:
@@ -53,15 +57,26 @@ class OpenAIProvider(AIProvider):
             kwargs["tool_choice"] = "auto"
 
         resp = self._get_client().chat.completions.create(**kwargs)
+
+        if not resp.choices:
+            raise ValueError(
+                f"Provider returned no choices for model '{model}'. "
+                "The model may not support function calling — try a Claude model via OpenRouter."
+            )
+
         choice = resp.choices[0]
 
         tool_calls = []
         if choice.message.tool_calls:
             for tc in choice.message.tool_calls:
-                tool_calls.append(ToolCall(id=tc.id, name=tc.function.name, arguments=json.loads(tc.function.arguments)))
+                try:
+                    args = json.loads(tc.function.arguments)
+                except json.JSONDecodeError:
+                    args = {"_raw": tc.function.arguments}
+                tool_calls.append(ToolCall(id=tc.id, name=tc.function.name, arguments=args))
 
         return CompletionResult(
             message=Message(role="assistant", content=choice.message.content, tool_calls=tool_calls),
-            prompt_tokens=resp.usage.prompt_tokens,
-            completion_tokens=resp.usage.completion_tokens,
+            prompt_tokens=resp.usage.prompt_tokens if resp.usage else 0,
+            completion_tokens=resp.usage.completion_tokens if resp.usage else 0,
         )

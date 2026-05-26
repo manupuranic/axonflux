@@ -273,33 +273,39 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
         font_scale: dict | None = None,
     ) -> dict:
         if description:
-            import os
             import json
-            import anthropic as sdk
-            api_key = os.environ.get("ANTHROPIC_API_KEY")
-            if not api_key:
-                return {"error": "ANTHROPIC_API_KEY is not set"}
-            client = sdk.Anthropic(api_key=api_key)
+            from api.ai import ChatSession
+            from api.ai.config import get_default_provider
+
+            _CHEAP = {
+                "anthropic": "claude-haiku-4-5-20251001",
+                "openrouter": "anthropic/claude-haiku-4-5-20251001",
+                "openai": "gpt-4o-mini",
+            }
+            provider = get_default_provider()
+            model = _CHEAP.get(provider, "anthropic/claude-haiku-4-5-20251001")
             prompt = (
                 f'Generate a retail pamphlet color theme for: "{description}"\n'
-                'Return ONLY valid JSON:\n'
+                'Return ONLY valid JSON (no markdown):\n'
                 '{"colors":{"primary":"#hex","secondary":"#hex","accent":"#hex","bg":"#hex","surface":"#hex",'
                 '"text":"#hex","text_muted":"#hex","border":"#hex","success":"#hex","danger":"#hex"},'
                 '"decoration":{"bg_gradient":"linear-gradient(...)"}}'
             )
-            resp = client.messages.create(
-                model="claude-haiku-4-5-20251001", max_tokens=512,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            raw = resp.content[0].text.strip().strip("```json").strip("```").strip()
             try:
+                sess = ChatSession(
+                    provider=provider, model=model,
+                    system_prompt="You are a color theme generator for retail pamphlets. Return only JSON.",
+                    tools=[], history=[],
+                )
+                turn = sess.send(prompt)
+                raw = (turn.assistant_text or "").strip().strip("```json").strip("```").strip()
                 generated = json.loads(raw)
-            except json.JSONDecodeError:
-                return {"error": "Theme generation produced invalid JSON"}
-            state.theme = {"preset": "minimal_light", "overrides": generated}
-            state.dsl["theme_id"] = "minimal_light"
-            state.dirty = True
-            return {"ok": True, "generated_tokens": generated}
+                state.theme = {"preset": "minimal_light", "overrides": generated}
+                state.dsl["theme_id"] = "minimal_light"
+                state.dirty = True
+                return {"ok": True, "generated": generated}
+            except Exception as exc:
+                return {"error": f"Theme generation failed: {exc}. Try using preset= instead."}
 
         if preset:
             state.theme = {"preset": preset}
