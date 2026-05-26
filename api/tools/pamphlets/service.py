@@ -31,6 +31,8 @@ def create_pamphlet(db: Session, body: PamphletCreate, user_id: str) -> Pamphlet
             highlight_text=item_data.highlight_text,
             sort_order=item_data.sort_order if item_data.sort_order is not None else i,
             image_url=item_data.image_url,
+            category=item_data.category,
+            unit=item_data.unit,
         )
         db.add(item)
 
@@ -81,6 +83,8 @@ def add_item(db: Session, pamphlet_id: str, item_data) -> PamphletItem:
         highlight_text=item_data.highlight_text,
         sort_order=item_data.sort_order,
         image_url=item_data.image_url,
+        category=item_data.category,
+        unit=item_data.unit,
     )
     db.add(item)
     return item
@@ -132,6 +136,8 @@ def duplicate_pamphlet(db: Session, pamphlet_id: str, user_id: str) -> Pamphlet 
             highlight_text=item.highlight_text,
             sort_order=item.sort_order,
             image_url=item.image_url,
+            category=item.category,
+            unit=item.unit,
         ))
     return copy
 
@@ -209,6 +215,8 @@ def import_from_gsheet(
             "offer_price": offer_price,
             "highlight_text": highlight_text,
             "image_url": norm.get("image") or norm.get("image_url") or None,
+            "category": norm.get("category") or None,
+            "unit": norm.get("unit") or None,
             "sort_order": i,
         })
 
@@ -377,6 +385,9 @@ def get_items_lookup(db: Session, pamphlet_id: str) -> dict:
             "original_price": float(item.original_price) if item.original_price else None,
             "highlight_text": item.highlight_text,
             "image_url": item.image_url,
+            "barcode": item.barcode,
+            "category": item.category,
+            "unit": item.unit,
         }
         for item in items
     }

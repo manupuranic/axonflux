@@ -11,6 +11,8 @@ class PamphletItemCreate(BaseModel):
     highlight_text: str | None = None
     sort_order: int = 0
     image_url: str | None = None
+    category: str | None = None
+    unit: str | None = None
 
     @model_validator(mode="after")
     def display_name_required_for_custom(self):
@@ -26,6 +28,8 @@ class PamphletItemUpdate(BaseModel):
     highlight_text: str | None = None
     sort_order: int | None = None
     image_url: str | None = None
+    category: str | None = None
+    unit: str | None = None
 
 
 class PamphletItemResponse(BaseModel):
@@ -38,6 +42,8 @@ class PamphletItemResponse(BaseModel):
     highlight_text: str | None = None
     sort_order: int = 0
     image_url: str | None = None
+    category: str | None = None
+    unit: str | None = None
 
     model_config = {"from_attributes": True}
 

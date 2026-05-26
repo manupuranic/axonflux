@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ModelDropdown } from "./ModelDropdown";
 import { ToolCallPill } from "./ToolCallPill";
 import { ChatResponse, ToolCallInfo } from "@/lib/pamphlet/types";
+import { getAiDefaults } from "@/lib/ai-settings";
 
 interface Message {
   role: "user" | "assistant";
@@ -19,15 +20,13 @@ interface Props {
   onSend: (message: string, provider: string, model: string) => Promise<ChatResponse>;
 }
 
-const DEFAULT_PROVIDER = "anthropic";
-const DEFAULT_MODEL = "claude-sonnet-4-6";
-
 export function ChatPanel({ pamphletId, onDslUpdate, onSend }: Props) {
+  const defaults = typeof window !== "undefined" ? getAiDefaults() : { provider: "openrouter", model: "" };
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [provider, setProvider] = useState(DEFAULT_PROVIDER);
-  const [model, setModel] = useState(DEFAULT_MODEL);
+  const [provider, setProvider] = useState(defaults.provider);
+  const [model, setModel] = useState(defaults.model);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -82,8 +81,26 @@ export function ChatPanel({ pamphletId, onDslUpdate, onSend }: Props) {
               {msg.content}
             </div>
             {msg.toolCalls && msg.toolCalls.length > 0 && (
-              <div className="flex flex-wrap gap-1 max-w-[90%]">
-                {msg.toolCalls.map((tc, j) => <ToolCallPill key={j} toolCall={tc} />)}
+              <div className="flex flex-col gap-1 max-w-[90%] w-full">
+                <div className="flex flex-wrap gap-1">
+                  {msg.toolCalls.map((tc, j) => <ToolCallPill key={j} toolCall={tc} />)}
+                </div>
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
+                    Raw ({msg.toolCalls.length} tool call{msg.toolCalls.length !== 1 ? "s" : ""})
+                  </summary>
+                  <div className="mt-1 space-y-1">
+                    {msg.toolCalls.map((tc, j) => (
+                      <div key={j} className="rounded border bg-muted/50 p-2 font-mono text-[10px] overflow-x-auto">
+                        <div className="font-semibold text-accent-foreground mb-1">{tc.tool_name}</div>
+                        <div className="text-muted-foreground mb-0.5">args:</div>
+                        <pre className="whitespace-pre-wrap break-all">{JSON.stringify(tc.args, null, 2)}</pre>
+                        <div className={`text-muted-foreground mt-1 mb-0.5 ${tc.is_error ? "text-destructive" : ""}`}>result:</div>
+                        <pre className="whitespace-pre-wrap break-all">{JSON.stringify(tc.result, null, 2)}</pre>
+                      </div>
+                    ))}
+                  </div>
+                </details>
               </div>
             )}
           </div>
