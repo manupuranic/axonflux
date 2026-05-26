@@ -36,6 +36,18 @@ export interface ToolCallInfo {
   is_error: boolean;
 }
 
+export interface PendingItemChange {
+  action: "remove" | "update";
+  item_id: string;
+  item_name: string;
+  fields?: {
+    mrp?: number;
+    offer_price?: number;
+    display_name?: string;
+    highlight_text?: string;
+  };
+}
+
 export interface ChatResponse {
   assistant_text: string | null;
   tool_calls: ToolCallInfo[];
@@ -45,6 +57,7 @@ export interface ChatResponse {
   cost_usd: number;
   provider: string;
   model: string;
+  pending_item_changes?: PendingItemChange[];
 }
 
 export interface VersionInfo {

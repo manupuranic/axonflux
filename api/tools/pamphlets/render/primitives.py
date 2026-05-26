@@ -4,20 +4,34 @@ from typing import Literal, Optional, Union, Annotated, Any
 from pydantic import BaseModel, Field, model_validator
 
 
+_COLOR_TOKENS = Literal["primary","secondary","accent","bg","surface","text","text_muted","border","success","danger"]
+_SPACING_TOKENS = Literal["none","xs","sm","md","lg","xl","2xl"]
+
+
 class StyleOverrides(BaseModel):
+    model_config = {"extra": "ignore"}
+
     font_size_token: Optional[Literal["xs","sm","md","lg","xl","2xl"]] = None
     font_size_px: Optional[int] = Field(None, ge=8, le=72)
-    font_weight: Optional[Literal["regular","medium","bold"]] = None
-    color_token: Optional[Literal["primary","secondary","accent","bg","surface","text","text_muted","border","success","danger"]] = None
+    font_weight: Optional[int] = Field(None, description="400|600|700|900")
+    color_token: Optional[_COLOR_TOKENS] = None
     color_hex: Optional[str] = None
+    bg_color_token: Optional[_COLOR_TOKENS] = None
+    bg_color_hex: Optional[str] = None
     text_align: Optional[Literal["left","center","right"]] = None
-    padding_token: Optional[Literal["xs","sm","md","lg"]] = None
-    margin_token: Optional[Literal["xs","sm","md","lg"]] = None
+    padding_token: Optional[_SPACING_TOKENS] = None
+    margin_token: Optional[_SPACING_TOKENS] = None
+    text_transform: Optional[Literal["uppercase","lowercase","capitalize"]] = None
+    opacity: Optional[float] = Field(None, ge=0.0, le=1.0)
+    letter_spacing: Optional[str] = None
+    line_height: Optional[str] = None
+    border_radius_token: Optional[_SPACING_TOKENS] = None
 
     @model_validator(mode="after")
     def validate_hex(self):
-        if self.color_hex and not re.match(r"^#[0-9a-fA-F]{6}$", self.color_hex):
-            raise ValueError(f"color_hex must be #rrggbb, got: {self.color_hex}")
+        for field, val in [("color_hex", self.color_hex), ("bg_color_hex", self.bg_color_hex)]:
+            if val and not re.match(r"^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$", val):
+                raise ValueError(f"{field} must be #rrggbb or #rrggbbaa, got: {val}")
         return self
 
 
@@ -38,7 +52,7 @@ class SectionNode(BaseModel):
     layout: Literal["grid","flex","stack"]
     cols: Optional[int] = None
     rows: Optional[int] = None
-    gap: Literal["xs","sm","md","lg"] = "md"
+    gap: Literal["none","xs","sm","md","lg","xl"] = "md"
     align: Literal["start","center","end","stretch"] = "start"
     children: list[AnyNode] = Field(default_factory=list)
     style_overrides: Optional[StyleOverrides] = None

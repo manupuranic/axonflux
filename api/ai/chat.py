@@ -61,10 +61,13 @@ class ChatSession:
         new_msgs: list[Message] = [user_msg]
         total_p = total_c = 0
 
-        for _ in range(self.MAX_TOOL_ROUNDS):
+        for round_num in range(self.MAX_TOOL_ROUNDS):
+            # Force tool call on first round so model can't narrate without acting
+            tc = "required" if round_num == 0 and self.tools else "auto"
             completion = self._provider.complete(
                 messages=self.history, system=self.system_prompt,
                 tools=list(self.tools.values()), model=self.model,
+                tool_choice=tc,
             )
             total_p += completion.prompt_tokens
             total_c += completion.completion_tokens

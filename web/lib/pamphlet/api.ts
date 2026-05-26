@@ -1,5 +1,5 @@
 import { getToken } from "@/lib/auth";
-import { ChatResponse, VersionInfo, ModelInfo, PamphletItem, AgentTask } from "./types";
+import { ChatResponse, PendingItemChange, VersionInfo, ModelInfo, PamphletItem, AgentTask } from "./types";
 
 const BASE = `/api/tools/pamphlets`;
 
@@ -127,6 +127,19 @@ export async function triggerImageScan(
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error("Scan trigger failed");
+  return res.json();
+}
+
+export async function applyItemChanges(
+  pamphletId: string,
+  changes: PendingItemChange[]
+): Promise<{ applied: unknown[]; count: number; dsl?: unknown }> {
+  const res = await fetch(`${BASE}/${pamphletId}/items/apply-changes`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ changes }),
+  });
+  if (!res.ok) throw new Error("Apply changes failed");
   return res.json();
 }
 

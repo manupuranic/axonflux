@@ -13,7 +13,7 @@ class AnthropicProvider(AIProvider):
             self._client = sdk.Anthropic(api_key=get_api_key("anthropic"))
         return self._client
 
-    def complete(self, messages: list[Message], system: str, tools: list[Tool], model: str) -> CompletionResult:
+    def complete(self, messages: list[Message], system: str, tools: list[Tool], model: str, tool_choice: str = "auto") -> CompletionResult:
         sdk_msgs = []
         for msg in messages:
             if msg.role == "user" and msg.tool_results:
@@ -45,6 +45,8 @@ class AnthropicProvider(AIProvider):
         kwargs: dict = {"model": model, "max_tokens": 4096, "system": system, "messages": sdk_msgs}
         if sdk_tools:
             kwargs["tools"] = sdk_tools
+            if tool_choice == "required":
+                kwargs["tool_choice"] = {"type": "any"}
 
         resp = self._get_client().messages.create(**kwargs)
 

@@ -8,7 +8,7 @@ from api.tools.pamphlets.render.primitives import (
 )
 from api.tools.pamphlets.themes import load_theme, apply_overrides
 
-_SPACING = {"xs": "4px", "sm": "8px", "md": "16px", "lg": "24px", "xl": "40px"}
+_SPACING = {"none": "0", "xs": "4px", "sm": "8px", "md": "16px", "lg": "24px", "xl": "40px", "2xl": "64px"}
 _FONT_URLS = {
     "hi": "https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;700&display=swap",
     "kn": "https://fonts.googleapis.com/css2?family=Noto+Sans+Kannada:wght@400;700&display=swap",
@@ -35,14 +35,31 @@ _VALID_TYPES = {
 }
 
 
+_VALID_SHAPES = {"ribbon", "badge", "strip"}
+_VALID_TEXT_VARIANTS = {"heading", "subheading", "body", "price", "caption"}
+_VALID_SECTION_LAYOUTS = {"grid", "flex", "stack"}
+_VALID_GAPS = {"none", "xs", "sm", "md", "lg", "xl"}
+
+
 def _normalize_node(node: dict) -> dict:
-    """Remap LLM-hallucinated node types to valid primitives."""
+    """Remap LLM-hallucinated enum values and node types to valid primitives."""
     t = node.get("type", "")
     if t in _TEXT_VARIANTS and t not in _VALID_TYPES:
         node = {**node, "type": "text", "variant": t}
-    if t not in _VALID_TYPES and t not in _TEXT_VARIANTS:
-        # Unknown type — replace with a placeholder text node
+    elif t not in _VALID_TYPES and t not in _TEXT_VARIANTS:
         node = {"type": "text", "id": node.get("id", "unknown"), "content": f"[{t}]", "variant": "caption"}
+
+    t = node.get("type", "")
+    if t == "text" and node.get("variant") not in _VALID_TEXT_VARIANTS:
+        node = {**node, "variant": "body"}
+    if t == "offer_banner" and node.get("shape") not in _VALID_SHAPES:
+        node = {**node, "shape": "strip"}
+    if t == "section":
+        if node.get("layout") not in _VALID_SECTION_LAYOUTS:
+            node = {**node, "layout": "grid"}
+        if node.get("gap") not in _VALID_GAPS:
+            node = {**node, "gap": "md"}
+
     children = node.get("children")
     if children:
         node = {**node, "children": [_normalize_node(c) for c in children]}
@@ -59,7 +76,10 @@ def render_pamphlet(dsl: dict, theme: dict, items_lookup: dict[str, dict]) -> st
     body = _render_children(page.children, items_lookup)
     pad = _SPACING.get(page.padding, "16px")
     bg_gradient = resolved_theme.get("tokens", {}).get("decoration", {}).get("bg_gradient", "")
-    bg_style = f"background: {bg_gradient};" if bg_gradient else "background: var(--bg);"
+    if bg_gradient and bg_gradient.strip().lower() not in ("", "none", "null"):
+        bg_style = f"background: {bg_gradient};"
+    else:
+        bg_style = "background: var(--bg);"
 
     w = _fmt_mm(page.width_mm)
     h = _fmt_mm(page.height_mm)
@@ -80,11 +100,11 @@ body{{width:{w};{bg_style}font-family:var(--font-body,Geist,sans-serif);color:va
 .a4-page{{width:{w};height:{h};overflow:hidden;padding:{pad};break-after:page;margin-bottom:24px;outline:1px solid #e0e0e0;}}
 .a4-page:last-child{{break-after:auto;margin-bottom:0;}}
 .section-grid{{display:grid;}}
-.section-flex{{display:flex;flex-wrap:wrap;}}
+.section-flex{{display:flex;flex-direction:row;align-items:center;justify-content:space-between;}}
 .section-stack{{display:flex;flex-direction:column;}}
 .product-card{{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md,8px);padding:6px;display:flex;flex-direction:row;height:100%;overflow:hidden;min-height:0;gap:6px;}}
 .product-card .product-img-wrap{{width:38%;flex-shrink:0;align-self:stretch;border-radius:4px;background:var(--border);overflow:hidden;}}
-.product-card .product-img{{width:100%;height:100%;object-fit:cover;}}
+.product-card .product-img{{width:100%;height:100%;object-fit:cover;object-position:center top;}}
 .product-card .product-info{{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}}
 .product-card .product-name{{font-size:0.68rem;font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}}
 .product-card .product-prices{{display:flex;gap:4px;align-items:baseline;margin-top:auto;flex-wrap:wrap;padding-top:4px;}}
@@ -148,23 +168,38 @@ def _style_overrides(so) -> str:
     if not so:
         return ""
     parts = []
+    _SZ = {"none":"0","xs":"10px","sm":"12px","md":"14px","lg":"18px","xl":"22px","2xl":"28px"}
+    _BR = {"none":"0","xs":"2px","sm":"4px","md":"8px","lg":"12px","xl":"16px","2xl":"24px"}
     if so.font_size_px:
         parts.append(f"font-size:{so.font_size_px}px;")
     if so.font_size_token:
-        sz = {"xs":"10px","sm":"12px","md":"14px","lg":"18px","xl":"22px","2xl":"28px"}.get(so.font_size_token,"")
-        parts.append(f"font-size:{sz};")
+        parts.append(f"font-size:{_SZ.get(so.font_size_token,'')};")
     if so.font_weight:
-        parts.append(f"font-weight:{'400' if so.font_weight=='regular' else '500' if so.font_weight=='medium' else '700'};")
+        parts.append(f"font-weight:{so.font_weight};")
     if so.color_hex:
         parts.append(f"color:{so.color_hex};")
     elif so.color_token:
         parts.append(f"color:var(--{so.color_token.replace('_','-')});")
+    if so.bg_color_hex:
+        parts.append(f"background:{so.bg_color_hex};")
+    elif so.bg_color_token:
+        parts.append(f"background:var(--{so.bg_color_token.replace('_','-')});")
     if so.text_align:
         parts.append(f"text-align:{so.text_align};")
     if so.padding_token:
         parts.append(f"padding:{_SPACING.get(so.padding_token,'8px')};")
     if so.margin_token:
         parts.append(f"margin:{_SPACING.get(so.margin_token,'8px')};")
+    if so.text_transform:
+        parts.append(f"text-transform:{so.text_transform};")
+    if so.opacity is not None:
+        parts.append(f"opacity:{so.opacity};")
+    if so.letter_spacing:
+        parts.append(f"letter-spacing:{so.letter_spacing};")
+    if so.line_height:
+        parts.append(f"line-height:{so.line_height};")
+    if so.border_radius_token:
+        parts.append(f"border-radius:{_BR.get(so.border_radius_token,'0')};")
     return "".join(parts)
 
 
@@ -199,6 +234,13 @@ def _render_section(n: SectionNode, lookup: dict) -> str:
     gap = _SPACING.get(n.gap, "16px")
     extra += f"gap:{gap};"
     so = _style_overrides(n.style_overrides)
+    if n.layout == "flex":
+        # each child gets flex:1 so text-align:right inside a child pushes content to the right edge
+        children_html = "".join(
+            f'<div style="flex:1;min-width:0;">{_render_node(c, lookup)}</div>'
+            for c in n.children
+        )
+        return f'<div class="{cls}" style="{extra}{so}">{children_html}</div>'
     return f'<div class="{cls}" style="{extra}{so}">{_render_children(n.children, lookup)}</div>'
 
 
@@ -225,14 +267,16 @@ def _render_paginated_grid(n: SectionNode, lookup: dict) -> str:
 
 
 def _render_slot(n: SlotNode, lookup: dict) -> str:
+    inner = _render_children(n.children, lookup)
+    if not inner.strip():
+        return ""  # empty slot after product removal — skip grid cell entirely
     style = "height:100%;"
     if n.span_cols:
         style += f"grid-column:span {n.span_cols};"
     if n.span_rows:
         style += f"grid-row:span {n.span_rows};"
     style += _style_overrides(n.style_overrides)
-    # stretch so product-card fills the cell
-    return f'<div style="display:flex;align-items:stretch;{style}">{_render_children(n.children, lookup)}</div>'
+    return f'<div style="display:flex;align-items:stretch;{style}">{inner}</div>'
 
 
 def _fmt_price(v) -> str:
@@ -251,7 +295,9 @@ def _fmt_save(offer, mrp) -> str:
 
 
 def _render_product(n: ProductNode, lookup: dict) -> str:
-    item = lookup.get(n.item_id, {})
+    item = lookup.get(n.item_id)
+    if not item:
+        return ""  # item deleted — slot will collapse this to nothing
     name = item.get("display_name", "Product")
     offer = item.get("offer_price")
     mrp = item.get("original_price")

@@ -7,6 +7,7 @@ from api.dependencies import get_db, get_current_user
 from api.schemas.auth import CurrentUser
 from api.tools.pamphlets import MANIFEST
 from api.tools.pamphlets.schemas import (
+    ApplyItemChangesRequest,
     ChatRequest,
     ChatResponse,
     ModelInfo,
@@ -17,6 +18,7 @@ from api.tools.pamphlets.schemas import (
     PamphletResponse,
     PamphletSummary,
     PamphletUpdate,
+    PendingItemChange,
     ToolCallInfo,
     VersionResponse,
 )
@@ -196,6 +198,132 @@ def remove_item(
     db.commit()
 
 
+def _purge_product_nodes(tree: dict, item_ids: set) -> dict:
+    """Recursively remove product nodes whose item_id is in item_ids."""
+    children = tree.get("children")
+    if not children:
+        return tree
+    kept = [
+        _purge_product_nodes(c, item_ids)
+        for c in children
+        if not (c.get("type") == "product" and c.get("item_id") in item_ids)
+    ]
+    return {**tree, "children": kept}
+
+
+@router.post("/{pamphlet_id}/items/apply-changes")
+def apply_item_changes(
+    pamphlet_id: str,
+    body: ApplyItemChangesRequest,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(get_current_user),
+):
+    import copy as _copy
+    from sqlalchemy.orm.attributes import flag_modified
+    from api.tools.pamphlets.models import PamphletItem
+
+    pamphlet = svc.get_pamphlet(db, pamphlet_id)
+    if not pamphlet:
+        raise HTTPException(404, "Pamphlet not found")
+
+    applied = []
+    removed_ids: set[str] = set()
+
+    for change in body.changes:
+        if change.action == "remove":
+            removed = service.remove_item(db, change.item_id)
+            if removed:
+                removed_ids.add(change.item_id)
+                applied.append({"action": "remove", "item_name": change.item_name})
+        elif change.action == "update" and change.fields:
+            item = db.query(PamphletItem).filter(PamphletItem.id == change.item_id).first()
+            if item:
+                if "mrp" in change.fields:
+                    item.original_price = change.fields["mrp"]
+                if "offer_price" in change.fields:
+                    item.offer_price = change.fields["offer_price"]
+                if "display_name" in change.fields:
+                    item.display_name = change.fields["display_name"]
+                if "highlight_text" in change.fields:
+                    item.highlight_text = change.fields["highlight_text"]
+                applied.append({"action": "update", "item_name": change.item_name, "fields": change.fields})
+
+    # Purge dead product nodes from DSL so preview doesn't show placeholder cards
+    if removed_ids and pamphlet.template_dsl:
+        new_dsl = _purge_product_nodes(_copy.deepcopy(pamphlet.template_dsl), removed_ids)
+        pamphlet.template_dsl = new_dsl
+        flag_modified(pamphlet, "template_dsl")
+
+    db.commit()
+    return {"applied": applied, "count": len(applied), "dsl": pamphlet.template_dsl}
+
+
+class NodeContentUpdate(BaseModel):
+    content: str
+
+
+@router.patch("/{pamphlet_id}/nodes/{node_id}/content")
+def update_node_content(
+    pamphlet_id: str,
+    node_id: str,
+    body: NodeContentUpdate,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(get_current_user),
+):
+    import copy as _copy
+    from sqlalchemy.orm.attributes import flag_modified
+    from api.tools.pamphlets.state import _find_node
+    pamphlet = svc.get_pamphlet(db, pamphlet_id)
+    if not pamphlet or not pamphlet.template_dsl:
+        raise HTTPException(404, "Pamphlet not found")
+    dsl = _copy.deepcopy(pamphlet.template_dsl)
+    node, _, _ = _find_node(dsl, node_id)
+    if node is None:
+        raise HTTPException(404, f"Node {node_id!r} not found in DSL")
+    node["content"] = body.content
+    pamphlet.template_dsl = dsl
+    flag_modified(pamphlet, "template_dsl")
+    db.commit()
+    return {"ok": True, "node_id": node_id, "content": body.content}
+
+
+@router.post("/{pamphlet_id}/purge-orphaned-nodes")
+def purge_orphaned_nodes(
+    pamphlet_id: str,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(get_current_user),
+):
+    import copy as _copy
+    from sqlalchemy.orm.attributes import flag_modified
+    pamphlet = svc.get_pamphlet(db, pamphlet_id)
+    if not pamphlet:
+        raise HTTPException(404, "Pamphlet not found")
+    valid_ids = {str(item.id) for item in svc.get_pamphlet_items(db, pamphlet_id)}
+    if not pamphlet.template_dsl:
+        return {"purged": 0}
+
+    def _purge_invalid(tree: dict) -> tuple[dict, int]:
+        children = tree.get("children")
+        if not children:
+            return tree, 0
+        kept, total = [], 0
+        for c in children:
+            if c.get("type") == "product" and c.get("item_id") not in valid_ids:
+                total += 1
+            else:
+                child, n = _purge_invalid(c)
+                kept.append(child)
+                total += n
+        return {**tree, "children": kept}, total
+
+    new_dsl, purged = _purge_invalid(_copy.deepcopy(pamphlet.template_dsl))
+    if purged:
+        pamphlet.template_dsl = new_dsl
+        flag_modified(pamphlet, "template_dsl")
+        db.commit()
+    return {"purged": purged}
+
+
 @router.post("/{pamphlet_id}/duplicate", response_model=PamphletResponse, status_code=201)
 def duplicate_pamphlet(
     pamphlet_id: str,
@@ -316,9 +444,13 @@ def chat(
                 user_id=current_user.id,
                 edit_summary=_summarize_turn(turn),
             )
-            pamphlet.template_dsl = state.dsl
-            pamphlet.theme = state.theme
+            import copy
+            from sqlalchemy.orm.attributes import flag_modified
+            pamphlet.template_dsl = copy.deepcopy(state.dsl)
+            pamphlet.theme = copy.deepcopy(state.theme) if state.theme else None
             pamphlet.current_version_id = version.id
+            flag_modified(pamphlet, "template_dsl")
+            flag_modified(pamphlet, "theme")
 
         svc.save_chat_messages(
             db, pamphlet_id, turn.new_messages,
@@ -347,6 +479,7 @@ def chat(
         cost_usd=float(turn.cost_usd),
         provider=turn.provider,
         model=turn.model,
+        pending_item_changes=[PendingItemChange(**c) for c in state.pending_item_changes],
     )
 
 
@@ -526,5 +659,7 @@ def _to_response(pamphlet, items) -> PamphletResponse:
         is_published=pamphlet.is_published,
         rows=pamphlet.rows,
         cols=pamphlet.cols,
+        template_dsl=pamphlet.template_dsl,
+        theme=pamphlet.theme,
         items=[_item_to_response(i) for i in items],
     )

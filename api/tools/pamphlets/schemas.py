@@ -78,6 +78,8 @@ class PamphletResponse(BaseModel):
     is_published: bool
     rows: int = 4
     cols: int = 5
+    template_dsl: dict | None = None
+    theme: dict | None = None
     items: list[PamphletItemResponse] = []
 
     model_config = {"from_attributes": True}
@@ -111,6 +113,17 @@ class ToolCallInfo(BaseModel):
     is_error: bool
 
 
+class PendingItemChange(BaseModel):
+    action: str  # "remove" | "update"
+    item_id: str
+    item_name: str
+    fields: dict | None = None
+
+
+class ApplyItemChangesRequest(BaseModel):
+    changes: list[PendingItemChange]
+
+
 class ChatResponse(BaseModel):
     assistant_text: str | None
     tool_calls: list[ToolCallInfo]
@@ -120,6 +133,7 @@ class ChatResponse(BaseModel):
     cost_usd: float
     provider: str
     model: str
+    pending_item_changes: list[PendingItemChange] = []
 
 
 class VersionResponse(BaseModel):

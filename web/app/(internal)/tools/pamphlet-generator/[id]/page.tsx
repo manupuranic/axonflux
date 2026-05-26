@@ -119,6 +119,7 @@ export default function PamphletEditorPage() {
             pamphletId={pamphletId}
             onDslUpdate={handleDslUpdate}
             onSend={handleSend}
+            onItemsApplied={handleItemsChange}
           />
         </div>
 

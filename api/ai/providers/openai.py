@@ -20,7 +20,7 @@ class OpenAIProvider(AIProvider):
             )
         return self._client
 
-    def complete(self, messages: list[Message], system: str, tools: list[Tool], model: str) -> CompletionResult:
+    def complete(self, messages: list[Message], system: str, tools: list[Tool], model: str, tool_choice: str = "auto") -> CompletionResult:
         oai_msgs: list[dict] = [{"role": "system", "content": system}]
         for msg in messages:
             if msg.role == "user" and not msg.tool_results:
@@ -54,7 +54,7 @@ class OpenAIProvider(AIProvider):
         kwargs: dict = {"model": model, "messages": oai_msgs}
         if oai_tools:
             kwargs["tools"] = oai_tools
-            kwargs["tool_choice"] = "auto"
+            kwargs["tool_choice"] = tool_choice
 
         resp = self._get_client().chat.completions.create(**kwargs)
 

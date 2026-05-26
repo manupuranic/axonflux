@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -14,6 +14,7 @@ class PamphletState:
     dirty: bool = False
     db: "Session | None" = None
     pamphlet_id: str = ""
+    pending_item_changes: list = field(default_factory=list)
 
 
 def _find_node(tree: dict, node_id: str) -> tuple[dict | None, list | None, int]:

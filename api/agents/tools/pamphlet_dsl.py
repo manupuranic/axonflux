@@ -49,12 +49,15 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
 
     @tool(
         description=(
-            "Structural tree operations: insert/remove/move/duplicate a node, or sort products. "
-            "insert: parent_id, position (int), node (dict with type + fields). "
-            "remove: node_id. "
-            "move: node_id, new_parent_id, new_position. "
-            "duplicate: node_id. "
-            "sort: section_id, sort_by (price_asc|price_desc|name_asc|discount_pct_desc|category)."
+            "Structural tree operations: insert/remove/move/duplicate a node, or sort products.\n"
+            "insert: parent_id, position (int), node (dict with type + fields).\n"
+            "remove: node_id. move: node_id, new_parent_id, new_position. duplicate: node_id.\n"
+            "sort: section_id, sort_by (price_asc|price_desc|name_asc|discount_pct_desc|category).\n"
+            "Node type field constraints (use exact values or save will fail):\n"
+            "  offer_banner: shape must be 'ribbon'|'badge'|'strip'  (NOT 'wave', 'bar', etc.)\n"
+            "  section: layout must be 'grid'|'flex'|'stack'; gap must be 'none'|'xs'|'sm'|'md'|'lg'|'xl'\n"
+            "  text: variant must be 'heading'|'subheading'|'body'|'price'|'caption'\n"
+            "  image: fit must be 'cover'|'contain'; radius must be 'sm'|'md'|'lg'|'none'"
         ),
         parameters={
             "type": "object",
@@ -169,20 +172,70 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
 
         return {"error": f"Unknown operation: {operation!r}"}
 
+    _STYLE_FIELDS = {
+        "color_hex", "color_token", "font_size_px", "font_size_token",
+        "font_weight", "text_align", "padding_token", "margin_token",
+        "bg_color_hex", "bg_color_token", "border_radius_token",
+        "letter_spacing", "line_height", "text_transform", "opacity",
+    }
+    _COLOR_TOKENS = ["primary", "secondary", "accent", "bg", "surface", "text", "text_muted", "danger", "success", "border"]
+    _SPACING_TOKENS = ["none", "xs", "sm", "md", "lg", "xl", "2xl"]
+
     @tool(
         description=(
-            "Update any fields on a DSL node by ID. "
-            "patch can include: content, style_overrides, cols, rows, item_id, show_image, "
-            "variant, gap, layout, headline, subtext, phone, address, and any other node field. "
-            "Examples: update_node(id, {cols:4}) to resize grid; "
-            "update_node(id, {style_overrides:{color_token:'accent'}}) for styling; "
-            "update_node(id, {content:'New Title'}) to change text."
+            "Update fields on a DSL node by ID.\n"
+            "patch fields: content, variant, cols, rows, item_id, show_image, gap, layout, headline, subtext, phone, address.\n"
+            "style_overrides EXACT fields (no CSS names — use these exactly):\n"
+            "  color_hex: '#RRGGBB'  — text color as hex\n"
+            f"  color_token: one of {_COLOR_TOKENS}  — theme-relative text color\n"
+            f"  bg_color_token: one of {_COLOR_TOKENS}  — background color\n"
+            "  bg_color_hex: '#RRGGBB'  — background color as hex\n"
+            "  font_size_px: number  — e.g. 24\n"
+            "  font_weight: 400|600|700|900\n"
+            "  text_align: 'left'|'center'|'right'\n"
+            f"  margin_token: one of {_SPACING_TOKENS}  — uniform margin (NOT margin_left/margin_right)\n"
+            f"  padding_token: one of {_SPACING_TOKENS}  — uniform padding\n"
+            "  text_transform: 'uppercase'|'lowercase'|'capitalize'\n"
+            "Example: update_node(id, {style_overrides:{color_token:'danger', font_weight:700}})\n"
+            "WARNING: margin_left, margin_right, color, background are NOT valid — use the fields above."
         ),
         parameters={
             "type": "object",
             "properties": {
                 "node_id": {"type": "string"},
-                "patch": {"type": "object"},
+                "patch": {
+                    "type": "object",
+                    "properties": {
+                        "content": {"type": "string"},
+                        "variant": {"type": "string", "enum": ["heading", "subheading", "body", "price", "caption"]},
+                        "cols": {"type": "integer"},
+                        "rows": {"type": "integer"},
+                        "gap": {"type": "string"},
+                        "layout": {"type": "string"},
+                        "show_image": {"type": "boolean"},
+                        "style_overrides": {
+                            "type": "object",
+                            "properties": {
+                                "color_hex": {"type": "string"},
+                                "color_token": {"type": "string", "enum": _COLOR_TOKENS},
+                                "bg_color_hex": {"type": "string"},
+                                "bg_color_token": {"type": "string", "enum": _COLOR_TOKENS},
+                                "font_size_px": {"type": "number"},
+                                "font_weight": {"type": "integer", "enum": [400, 600, 700, 900]},
+                                "text_align": {"type": "string", "enum": ["left", "center", "right"]},
+                                "margin_token": {"type": "string", "enum": _SPACING_TOKENS},
+                                "padding_token": {"type": "string", "enum": _SPACING_TOKENS},
+                                "text_transform": {"type": "string", "enum": ["uppercase", "lowercase", "capitalize"]},
+                                "opacity": {"type": "number"},
+                                "letter_spacing": {"type": "string"},
+                                "line_height": {"type": "string"},
+                                "border_radius_token": {"type": "string", "enum": _SPACING_TOKENS},
+                                "font_size_token": {"type": "string"},
+                            },
+                            "additionalProperties": False,
+                        },
+                    },
+                },
             },
             "required": ["node_id", "patch"],
         },
@@ -193,6 +246,14 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
             node = state.dsl
         if node is None:
             return {"error": f"Node {node_id!r} not found"}
+        if "style_overrides" in patch:
+            unknown = set(patch["style_overrides"].keys()) - _STYLE_FIELDS
+            if unknown:
+                return {
+                    "error": f"Unknown style_overrides fields: {sorted(unknown)}. "
+                             f"Valid fields: {sorted(_STYLE_FIELDS)}. "
+                             "Use color_token (not 'color'), margin_token (not 'margin_left'/'margin_right')."
+                }
         node.update(patch)
         state.dirty = True
         return {"ok": True}
@@ -308,6 +369,8 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
                 return {"error": f"Theme generation failed: {exc}. Try using preset= instead."}
 
         if preset:
+            if preset not in PRESET_IDS:
+                return {"error": f"Unknown preset {preset!r}. Valid presets: {PRESET_IDS}"}
             state.theme = {"preset": preset}
             state.dsl["theme_id"] = preset
             state.dirty = True
