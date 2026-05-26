@@ -177,9 +177,14 @@ export function ProductsPanel({ pamphletId, initialItems, onItemsChange }: Props
     setScanning(true);
     setScanStatus("Starting scan...");
     try {
-      const { task_id, count, message } = await triggerImageScan(pamphletId);
+      let { task_id, count } = await triggerImageScan(pamphletId);
       if (!task_id) {
-        setScanStatus(message ?? "All images already present.");
+        // No missing images — retry with force to rescan broken URLs
+        setScanStatus("Rescanning all images...");
+        ({ task_id, count } = await triggerImageScan(pamphletId, true));
+      }
+      if (!task_id) {
+        setScanStatus("No products to scan.");
         setScanning(false);
         return;
       }

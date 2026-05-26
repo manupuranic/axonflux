@@ -1,5 +1,6 @@
 import os
 
+# Suggestions only — any model string is accepted; provider API validates at call time
 ALLOWED_MODELS: dict[str, list[str]] = {
     "anthropic": [
         "claude-opus-4-7",
@@ -13,9 +14,13 @@ ALLOWED_MODELS: dict[str, list[str]] = {
     ],
     "openrouter": [
         "anthropic/claude-sonnet-4-6",
+        "anthropic/claude-haiku-4-5-20251001",
+        "anthropic/claude-opus-4-7",
         "openai/gpt-4o",
-        "meta-llama/llama-3.1-70b-instruct",
+        "openai/gpt-4o-mini",
+        "google/gemini-2.0-flash-001",
         "deepseek/deepseek-chat",
+        "meta-llama/llama-3.1-70b-instruct",
     ],
 }
 
@@ -31,7 +36,7 @@ def get_default_model() -> str:
 
 
 def is_model_allowed(provider: str, model: str) -> bool:
-    return model in ALLOWED_MODELS.get(provider, [])
+    return provider in ALLOWED_MODELS  # any model string OK; provider API validates at call time
 
 
 def get_api_key(provider: str) -> str:

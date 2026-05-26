@@ -5,6 +5,42 @@ import { fadeInUp, m, stagger } from "../motion";
 
 const ROWS = [
   {
+    decision: "Pamphlet rendering",
+    chosen: "DSL JSON tree → server HTML → Playwright PDF",
+    rejected: "Client-side React-PDF",
+    why: "LLMs can edit a JSON tree reliably. React component trees are opaque to models — any edit risks breaking JSX. Server rendering also gives pixel-identical PDF/PNG from the same code path.",
+  },
+  {
+    decision: "AI tool count",
+    chosen: "6 composable tools",
+    rejected: "18 specialised tools",
+    why: "Each tool in the context costs tokens on every turn. 18 tools saturates the tool-choice attention of smaller models (Haiku, Sonnet). Collapsing to 6 with operation params (edit_layout takes insert/remove/move/duplicate/sort) keeps the model decisive.",
+  },
+  {
+    decision: "Agent task streaming",
+    chosen: "SSE (EventSource)",
+    rejected: "Long-poll / WebSocket",
+    why: "EventSource is a browser-native one-way stream — no library, no handshake, reconnects automatically. WebSocket adds bidirectional complexity we don't need. Polling is fine for <5 items; 20+ product image scans need push. SSE requires ?token= query param since EventSource can't send custom headers.",
+  },
+  {
+    decision: "Product card layout",
+    chosen: "Horizontal (image left 38%, text right)",
+    rejected: "Vertical (image top, fixed 90px)",
+    why: "Fixed-height image breaks equal-card invariant — tall names overflow below. Horizontal layout lets the grid row height set card height uniformly; image stretches via align-self:stretch.",
+  },
+  {
+    decision: "Pamphlet state location",
+    chosen: "Extracted PamphletState to state.py",
+    rejected: "Inline in ai_session.py or ai_tools.py",
+    why: "Both ai_session.py and pamphlet_dsl.py need PamphletState. Keeping it in either file creates a circular import. A neutral state.py breaks the cycle with zero runtime cost.",
+  },
+  {
+    decision: "Image rescan trigger",
+    chosen: "Auto-retry with force=true when count=0",
+    rejected: "Expose separate 'force rescan' button",
+    why: "Users don't know whether URLs are missing vs broken — they just see no image. A single scan button that silently escalates from soft (missing-only) to hard (rescan all) hides the complexity without hiding the capability.",
+  },
+  {
     decision: "Storage engine",
     chosen: "Postgres",
     rejected: "BigQuery / Snowflake",

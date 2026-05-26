@@ -13,6 +13,12 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    date: "2026-05-25",
+    title: "Pamphlet generator v2 — DSL renderer, AI image agent, 3-column editor",
+    detail: "Full ground-up rewrite of the pamphlet tool. DSL JSON tree replaces client-side React-PDF: 16 primitive node types (Page, Section, Slot, Product, Text, Image, Divider, Spacer, OfferBanner, Logo, Decoration, QrCode, ContactStrip, PriceCompare, CustomHtml, RawSvg) rendered server-side to HTML, then to PDF/PNG via Playwright. Three-column editor: Chat (AI conversation) | Products (CRUD panel) | Preview (live iframe). AI tool registry collapsed from 18 specialised tools to 6 composable ones (get_layout, edit_layout, update_node, update_products, set_theme, ask_user) — reduces LLM context pressure and prevents tool-choice paralysis. LLM image agent: Claude Haiku drives Tavily search + Open Food Facts API → finds product images autonomously, streams progress via SSE (EventSource). Thread-safe task registry with asyncio + threading.Lock. CSS Grid equal-height cards with grid-template-rows:repeat(n,1fr) — no per-card height hacks. Horizontal card layout: image left 38%, text right, align-self:stretch fills full row height. Force-rescan: soft path scans missing-only; auto-retries with ?force=true when all URLs present but broken. AI Settings page with provider/model dropdown and OpenRouter support. Versioned history preserved per pamphlet. Migration 010 adds category + unit columns to pamphlet_items.",
+    type: "feature",
+  },
+  {
     date: "2026-05-24",
     title: "Filter infrastructure (cross-table, operator-per-row)",
     detail: "Reusable filter system shared by every list/export endpoint. Backend api/lib/filters.py: FieldSpec + parse_conditions translates wire-format cond=key:op:value into parameterized SQL via build_where(). 53 unit tests cover ops, NULL-safe ncontains, column-safety guard, rejection paths. Frontend FilterBuilder.tsx is a Notion/Linear-style row builder — each row [field ▾][op ▾][value][×], Add filter picker, Apply/Clear, draft state inside the component so no per-keystroke refetch. First consumer: Customer Activity (8 filterable fields incl. visits, days_silent, spend, name contains/starts-with, is_member, payment enum). Export shares the same filter list — WYSIWYG download.",

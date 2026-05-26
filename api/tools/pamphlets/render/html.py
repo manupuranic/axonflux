@@ -59,12 +59,13 @@ body{{width:{w};{bg_style}font-family:var(--font-body,Geist,sans-serif);color:va
 .section-grid{{display:grid;}}
 .section-flex{{display:flex;flex-wrap:wrap;}}
 .section-stack{{display:flex;flex-direction:column;}}
-.product-card{{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md,8px);padding:8px;display:flex;flex-direction:column;height:100%;overflow:hidden;min-height:0;}}
-.product-card .product-img-wrap{{width:100%;height:90px;overflow:hidden;flex-shrink:0;border-radius:4px;background:var(--border);}}
+.product-card{{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md,8px);padding:6px;display:flex;flex-direction:row;height:100%;overflow:hidden;min-height:0;gap:6px;}}
+.product-card .product-img-wrap{{width:38%;flex-shrink:0;align-self:stretch;border-radius:4px;background:var(--border);overflow:hidden;}}
 .product-card .product-img{{width:100%;height:100%;object-fit:cover;}}
-.product-card .product-name{{font-size:0.7rem;font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;flex-shrink:0;margin-top:4px;}}
+.product-card .product-info{{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}}
+.product-card .product-name{{font-size:0.68rem;font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}}
 .product-card .product-prices{{display:flex;gap:4px;align-items:baseline;margin-top:auto;flex-wrap:wrap;padding-top:4px;}}
-.product-badge{{background:var(--accent);color:#fff;font-size:0.6rem;padding:2px 5px;border-radius:99px;align-self:flex-start;flex-shrink:0;}}
+.product-badge{{background:var(--accent);color:#fff;font-size:0.58rem;padding:2px 4px;border-radius:99px;align-self:flex-start;flex-shrink:0;margin-bottom:2px;}}
 .price-offer{{color:var(--accent);font-weight:700;}}
 .price-mrp{{color:var(--text-muted);font-size:0.75rem;text-decoration:line-through;}}
 .offer-banner-strip{{background:var(--accent);color:#fff;padding:12px 24px;text-align:center;border-radius:var(--radius-md,8px);}}
@@ -242,7 +243,8 @@ def _render_product(n: ProductNode, lookup: dict) -> str:
     badge_html = f'<span class="product-badge">{badge}</span>' if (n.show_badge and badge) else ""
     mrp_html = f'<span class="price-mrp">&#8377;{_fmt_price(mrp)}</span>' if (n.show_mrp and mrp) else ""
     offer_html = f'<span class="price-offer">&#8377;{_fmt_price(offer)}</span>' if (n.show_offer and offer) else ""
-    return f'<div class="product-card" style="{so}">{img_html}{badge_html}<span class="product-name">{name}</span><div class="product-prices">{offer_html}{mrp_html}</div></div>'
+    info_html = f'{badge_html}<span class="product-name">{escape(name)}</span><div class="product-prices">{offer_html}{mrp_html}</div>'
+    return f'<div class="product-card" style="{so}">{img_html}<div class="product-info">{info_html}</div></div>'
 
 
 def _render_text(n: TextNode) -> str:

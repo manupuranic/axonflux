@@ -112,9 +112,13 @@ export async function reorderItems(pamphletId: string, orderedIds: string[]): Pr
 }
 
 export async function triggerImageScan(
-  pamphletId: string
+  pamphletId: string,
+  force = false
 ): Promise<{ task_id: string | null; count: number; message?: string }> {
-  const res = await fetch(`/api/agents/image/scan-all/${pamphletId}`, {
+  const url = force
+    ? `/api/agents/image/scan-all/${pamphletId}?force=true`
+    : `/api/agents/image/scan-all/${pamphletId}`;
+  const res = await fetch(url, {
     method: "POST",
     headers: authHeaders(),
   });

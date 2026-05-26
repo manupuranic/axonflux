@@ -19,7 +19,7 @@ const PHASES: {
     items: [
       { name: "A1 · Cash closure UI", detail: "EOD count vs system totals, manager verify/reject.", status: "shipped" },
       { name: "A2 · Daily ingestion + refresh", detail: "Pipeline trigger with run_ingestion flag. Er4u Playwright auto-export.", status: "shipped" },
-      { name: "A3 · Pamphlet generator", detail: "Client PDF, AI highlight copy via Haiku, GSheets CSV import.", status: "shipped" },
+      { name: "A3 · Pamphlet generator v2", detail: "DSL JSON tree renderer (16 node types) → server HTML → Playwright PDF/PNG. Three-column editor (Chat | Products | Preview). 6-tool AI registry. LLM image agent with Tavily + Open Food Facts, SSE streaming. CSS Grid equal-height cards, horizontal layout. Force-rescan for broken URLs. AI Settings + OpenRouter. Versioned history. Migration 010.", status: "shipped" },
       { name: "A4 · Role-based access control", detail: "Three roles: admin (full access), manager (verify cash, approve agents + blog posts), staff (submit cash, use tools). require_manager dependency. Phase E MCP gets separate api_key auth. Frontend hides elements by role.", status: "planned" },
     ],
   },

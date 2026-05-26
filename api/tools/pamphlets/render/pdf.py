@@ -1,39 +1,50 @@
 from __future__ import annotations
 import asyncio
-from typing import TYPE_CHECKING
+from concurrent.futures import ThreadPoolExecutor
 
-if TYPE_CHECKING:
-    from playwright.async_api import Browser
+_executor = ThreadPoolExecutor(max_workers=1)
 
-_render_count = 0
-_RELAUNCH_EVERY = 100
-
-
-async def render_html_to_pdf(html: str, browser: "Browser") -> bytes:
-    global _render_count
-    _render_count += 1
-    ctx = await browser.new_context()
-    page = await ctx.new_page()
-    try:
-        await page.set_content(html, wait_until="networkidle", timeout=15000)
-        pdf_bytes = await page.pdf(
-            print_background=True,
-            format="A4",
-            landscape=True,
-            margin={"top": "0", "bottom": "0", "left": "0", "right": "0"},
-        )
-    finally:
-        await ctx.close()
-    return pdf_bytes
+# A4 landscape at 96dpi: 297mm × 210mm ≈ 1123 × 794px
+_A4_W_PX = 1123
+_A4_H_PX = 794
 
 
-async def launch_browser():
-    from playwright.async_api import async_playwright
-    pw = await async_playwright().start()
-    browser = await pw.chromium.launch(headless=True, args=["--no-sandbox"])
-    return pw, browser
+def _render_pdf_sync(html: str) -> bytes:
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True, args=["--no-sandbox"])
+        try:
+            ctx = browser.new_context()
+            page = ctx.new_page()
+            page.set_content(html, wait_until="domcontentloaded", timeout=15000)
+            return page.pdf(
+                print_background=True,
+                format="A4",
+                landscape=True,
+                margin={"top": "0", "bottom": "0", "left": "0", "right": "0"},
+            )
+        finally:
+            browser.close()
 
 
-async def close_browser(pw, browser):
-    await browser.close()
-    await pw.stop()
+def _render_image_sync(html: str) -> bytes:
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True, args=["--no-sandbox"])
+        try:
+            ctx = browser.new_context(viewport={"width": _A4_W_PX, "height": _A4_H_PX})
+            page = ctx.new_page()
+            page.set_content(html, wait_until="networkidle", timeout=20000)
+            return page.screenshot(full_page=True, type="png")
+        finally:
+            browser.close()
+
+
+async def render_html_to_pdf(html: str, browser=None) -> bytes:
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(_executor, _render_pdf_sync, html)
+
+
+async def render_html_to_image(html: str) -> bytes:
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(_executor, _render_image_sync, html)

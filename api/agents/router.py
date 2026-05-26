@@ -42,10 +42,14 @@ def _token_auth(
 @router.post("/image/scan-all/{pamphlet_id}")
 def trigger_image_scan(
     pamphlet_id: str,
+    force: bool = Query(default=False),
     db=Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """Trigger an image-scan task for all items in the pamphlet that lack an image_url."""
+    """Trigger an image-scan task for all items in the pamphlet that lack an image_url.
+
+    Pass ?force=true to rescan all items regardless of whether image_url is already set.
+    """
     pamphlet = pamphlet_svc.get_pamphlet(db, pamphlet_id)
     if not pamphlet:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Pamphlet not found")
@@ -60,7 +64,7 @@ def trigger_image_scan(
             "unit": item.unit,
         }
         for item in all_items
-        if not item.image_url
+        if force or not item.image_url
     ]
 
     if not items_needing_images:
