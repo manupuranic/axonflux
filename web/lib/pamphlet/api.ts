@@ -19,7 +19,11 @@ export async function sendChatMessage(
     headers: authHeaders(),
     body: JSON.stringify({ message, provider, model }),
   });
-  if (!res.ok) throw new Error((await res.json()).detail || "Chat failed");
+  if (!res.ok) {
+    let detail = `Chat failed (${res.status})`;
+    try { detail = (await res.json()).detail || detail; } catch { detail = await res.text().catch(() => detail); }
+    throw new Error(detail);
+  }
   return res.json();
 }
 

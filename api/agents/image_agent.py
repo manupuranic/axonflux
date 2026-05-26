@@ -8,6 +8,15 @@ from typing import Optional
 
 from api.ai import ChatSession
 from api.agents.tools.infra import build_infra_tools
+from api.ai.config import get_default_provider
+
+# Cheapest tool-capable model per provider — image agent must use tool use,
+# so we can't inherit get_default_model() (user may select a non-tool model).
+_AGENT_MODELS: dict[str, str] = {
+    "anthropic": "claude-haiku-4-5-20251001",
+    "openrouter": "anthropic/claude-haiku-4-5-20251001",
+    "openai": "gpt-4o-mini",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +72,11 @@ async def find_image_for_product(
     unit: Optional[str],
 ) -> Optional[str]:
     tools = build_infra_tools()
+    provider = get_default_provider()
+    model = _AGENT_MODELS.get(provider, "claude-haiku-4-5-20251001")
     session = ChatSession(
-        provider="anthropic",
-        model="claude-haiku-4-5-20251001",
+        provider=provider,
+        model=model,
         system_prompt=_SYSTEM_PROMPT,
         tools=tools,
         history=[],
