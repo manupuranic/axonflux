@@ -73,7 +73,26 @@ def render_pamphlet(dsl: dict, theme: dict, items_lookup: dict[str, dict]) -> st
     css_vars = _theme_to_css_vars(resolved_theme)
     font_links = _collect_font_links(page)
 
-    body = _render_children(page.children, items_lookup)
+    # Detect the paginated product grid: nodes BEFORE it render normally,
+    # nodes AFTER it (banner, footer) get tucked INSIDE the last A4 page
+    # so they don't spill onto an empty extra print page.
+    children = page.children
+    grid_idx = next(
+        (i for i, c in enumerate(children)
+         if getattr(c, "type", "") == "section"
+         and getattr(c, "layout", "") == "grid"
+         and getattr(c, "cols", None)
+         and getattr(c, "rows", None)),
+        None,
+    )
+    if grid_idx is None:
+        body = _render_children(children, items_lookup)
+    else:
+        leading_html = _render_children(children[:grid_idx], items_lookup)
+        trailing_html = _render_children(children[grid_idx + 1:], items_lookup)
+        body = leading_html + _render_paginated_grid(
+            children[grid_idx], items_lookup, trailing_html=trailing_html
+        )
     pad = _SPACING.get(page.padding, "16px")
     bg_gradient = resolved_theme.get("tokens", {}).get("decoration", {}).get("bg_gradient", "")
     if bg_gradient and bg_gradient.strip().lower() not in ("", "none", "null"):
@@ -99,11 +118,12 @@ body{{width:{w};{bg_style}font-family:var(--font-body,Geist,sans-serif);color:va
 .page-root{{width:100%;}}
 .a4-page{{width:{w};height:{h};overflow:hidden;padding:{pad};break-after:page;margin-bottom:24px;outline:1px solid #e0e0e0;}}
 .a4-page:last-child{{break-after:auto;margin-bottom:0;}}
+.page-trailing{{margin-top:8px;display:flex;flex-direction:column;gap:4px;}}
 .section-grid{{display:grid;}}
 .section-flex{{display:flex;flex-direction:row;align-items:center;justify-content:space-between;}}
 .section-stack{{display:flex;flex-direction:column;}}
 .product-card{{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md,8px);padding:6px;display:flex;flex-direction:row;height:100%;overflow:hidden;min-height:0;gap:6px;}}
-.product-card .product-img-wrap{{width:38%;flex-shrink:0;align-self:stretch;border-radius:4px;background:var(--border);overflow:hidden;}}
+.product-card .product-img-wrap{{width:var(--img-w,38%);flex-shrink:0;align-self:stretch;border-radius:4px;background:var(--border);overflow:hidden;}}
 .product-card .product-img{{width:100%;height:100%;object-fit:cover;object-position:center top;}}
 .product-card .product-info{{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}}
 .product-card .product-name{{font-size:0.68rem;font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}}
@@ -244,23 +264,63 @@ def _render_section(n: SectionNode, lookup: dict) -> str:
     return f'<div class="{cls}" style="{extra}{so}">{_render_children(n.children, lookup)}</div>'
 
 
-def _render_paginated_grid(n: SectionNode, lookup: dict) -> str:
+def _node_has_content(node, lookup: dict) -> bool:
+    """Return True if node will produce visible output (used to skip deleted-product slots)."""
+    t = getattr(node, "type", "")
+    if t == "product":
+        return node.item_id in lookup
+    if t == "slot":
+        return any(_node_has_content(c, lookup) for c in node.children)
+    return True
+
+
+def _render_paginated_grid(n: SectionNode, lookup: dict, trailing_html: str = "") -> str:
     items_per_page = n.cols * n.rows
     gap = _SPACING.get(n.gap, "8px")
-    # grid-template-rows:repeat(rows,1fr) forces ALL rows equal height — no AI tool needed
-    grid_css = (
+    gap_px = {"none": 0, "xs": 4, "sm": 8, "md": 16, "lg": 24, "xl": 40}.get(n.gap, 8)
+
+    full_grid_css = (
         f"grid-template-columns:repeat({n.cols},1fr);"
         f"grid-template-rows:repeat({n.rows},1fr);"
         f"gap:{gap};height:100%;"
     )
+    # Last-page variant: fixed row height matches full-page row height so cards look identical.
+    # A4 landscape = 210mm tall; md padding = 16px each side = 32px total.
+    row_height = f"calc((210mm - 32px - {(n.rows - 1) * gap_px}px) / {n.rows})"
+    partial_grid_css = (
+        f"grid-template-columns:repeat({n.cols},1fr);"
+        f"grid-auto-rows:{row_height};"
+        f"gap:{gap};"
+    )
+
+    img_w = f"--img-w:{n.image_width_pct}%;" if n.image_width_pct else ""
     pages = []
-    children = n.children
-    for start in range(0, max(len(children), 1), items_per_page):
-        chunk = children[start : start + items_per_page]
+    children = [c for c in n.children if _node_has_content(c, lookup)]
+    chunks = [children[i : i + items_per_page] for i in range(0, max(len(children), 1), items_per_page)]
+
+    for idx, chunk in enumerate(chunks):
+        is_last_chunk = idx == len(chunks) - 1
+        is_partial = len(chunk) < items_per_page
+        grid_css = partial_grid_css if (is_last_chunk and is_partial) else full_grid_css
         cells = "".join(_render_node(c, lookup) for c in chunk)
+
+        # Tuck trailing content (banners, footer) into the LAST A4 page so they
+        # don't push themselves onto a fresh print page.
+        # Partial last page → render after the grid (room available).
+        # Full last page → flex layout so trailing sits at the very bottom and grid shrinks.
+        suffix = ""
+        page_style = img_w
+        if is_last_chunk and trailing_html:
+            suffix = f'<div class="page-trailing">{trailing_html}</div>'
+            if not is_partial:
+                # Full grid + trailing: switch to column flex so they coexist
+                page_style = f"{img_w}display:flex;flex-direction:column;"
+                grid_css += "flex:1;min-height:0;"
+
         pages.append(
-            f'<div class="a4-page">'
+            f'<div class="a4-page" style="{page_style}">'
             f'<div class="section-grid" style="{grid_css}">{cells}</div>'
+            f'{suffix}'
             f'</div>'
         )
     return "".join(pages)

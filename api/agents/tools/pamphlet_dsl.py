@@ -1,10 +1,101 @@
 from __future__ import annotations
 import copy
+import json
+import re
 import uuid
 
 from api.ai.tools import tool, Tool
 from api.tools.pamphlets.state import PamphletState, _find_node
 from api.tools.pamphlets.themes import PRESET_IDS
+
+
+_BARE_KEY = re.compile(r'([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:')
+
+
+def _coerce_ops_list(ops) -> tuple[list | None, str | None]:
+    """LLMs sometimes pass ops as a JSON string (occasionally with Python-style
+    unquoted keys / single quotes). Normalize to a Python list."""
+    if isinstance(ops, list):
+        return ops, None
+    if not isinstance(ops, str):
+        return None, f"ops must be a list, got {type(ops).__name__}"
+
+    raw = ops.strip()
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        # Try lenient repair: quote bare keys, convert single→double quotes
+        repaired = _BARE_KEY.sub(r'\1"\2":', raw)
+        repaired = repaired.replace("'", '"')
+        try:
+            parsed = json.loads(repaired)
+        except Exception as exc:
+            return None, f"could not parse ops string as JSON: {exc}"
+
+    if not isinstance(parsed, list):
+        return None, "ops string parsed but is not a list"
+    return parsed, None
+
+
+def _find_region_nodes(dsl: dict, region: str) -> list[dict]:
+    """Resolve a semantic region name to a list of DSL nodes."""
+    if region == "footer":
+        contacts: list[dict] = []
+        texts: list[dict] = []
+
+        def walk(node: dict):
+            t = node.get("type")
+            if t == "contact_strip":
+                contacts.append(node)
+            elif t == "text":
+                texts.append(node)
+            for c in node.get("children", []):
+                walk(c)
+
+        walk(dsl)
+        # contact_strip nodes are always the footer; otherwise take trailing text nodes
+        if contacts:
+            return contacts + texts[-2:] if texts else contacts
+        return texts[-3:] if texts else []
+
+    if region == "header":
+        def find_first_text(node: dict) -> dict | None:
+            if node.get("type") == "text":
+                return node
+            for c in node.get("children", []):
+                r = find_first_text(c)
+                if r:
+                    return r
+            return None
+
+        n = find_first_text(dsl)
+        return [n] if n else []
+
+    if region == "all_text":
+        out: list[dict] = []
+
+        def walk(node: dict):
+            if node.get("type") == "text":
+                out.append(node)
+            for c in node.get("children", []):
+                walk(c)
+
+        walk(dsl)
+        return out
+
+    if region == "all_headings":
+        out: list[dict] = []
+
+        def walk(node: dict):
+            if node.get("type") == "text" and node.get("variant") in ("heading", "subheading"):
+                out.append(node)
+            for c in node.get("children", []):
+                walk(c)
+
+        walk(dsl)
+        return out
+
+    return []
 
 
 def build_dsl_tools(state: PamphletState) -> list[Tool]:
@@ -401,4 +492,352 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
     def ask_user(question: str) -> dict:
         return {"ask": question}
 
-    return [get_layout, edit_layout, update_node, update_products, set_theme, ask_user]
+    @tool(
+        description=(
+            "Apply a style to a semantic REGION in one call. NO get_layout needed.\n"
+            "region: 'footer' (contact_strip + bottom text), 'header' (first text/heading), "
+            "'all_text' (every text node), 'all_headings' (text variant=heading|subheading).\n"
+            "Pass any style field(s) to apply. Existing style_overrides are merged, not replaced.\n"
+            "Use for: 'make footer bigger', 'header in red', 'all prices bold', 'larger contact text'."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "region": {"type": "string", "enum": ["footer", "header", "all_text", "all_headings"]},
+                "font_size_px": {"type": "integer", "minimum": 8, "maximum": 72},
+                "font_weight": {"type": "integer", "enum": [400, 600, 700, 900]},
+                "color_hex": {"type": "string"},
+                "color_token": {"type": "string", "enum": _COLOR_TOKENS},
+                "bg_color_hex": {"type": "string"},
+                "bg_color_token": {"type": "string", "enum": _COLOR_TOKENS},
+                "text_align": {"type": "string", "enum": ["left", "center", "right"]},
+                "text_transform": {"type": "string", "enum": ["uppercase", "lowercase", "capitalize"]},
+                "padding_token": {"type": "string", "enum": _SPACING_TOKENS},
+                "margin_token": {"type": "string", "enum": _SPACING_TOKENS},
+            },
+            "required": ["region"],
+        },
+    )
+    def style_region(
+        region: str,
+        font_size_px: int | None = None,
+        font_weight: int | None = None,
+        color_hex: str | None = None,
+        color_token: str | None = None,
+        bg_color_hex: str | None = None,
+        bg_color_token: str | None = None,
+        text_align: str | None = None,
+        text_transform: str | None = None,
+        padding_token: str | None = None,
+        margin_token: str | None = None,
+    ) -> dict:
+        overrides = {
+            k: v for k, v in {
+                "font_size_px": font_size_px,
+                "font_weight": font_weight,
+                "color_hex": color_hex,
+                "color_token": color_token,
+                "bg_color_hex": bg_color_hex,
+                "bg_color_token": bg_color_token,
+                "text_align": text_align,
+                "text_transform": text_transform,
+                "padding_token": padding_token,
+                "margin_token": margin_token,
+            }.items() if v is not None
+        }
+        if not overrides:
+            return {"error": "No style properties given. Pass font_size_px, color_hex, etc."}
+
+        targets = _find_region_nodes(state.dsl, region)
+        if not targets:
+            return {"error": f"No nodes found for region {region!r}"}
+
+        for node in targets:
+            existing = node.get("style_overrides") or {}
+            node["style_overrides"] = {**existing, **overrides}
+        state.dirty = True
+        return {
+            "ok": True,
+            "region": region,
+            "nodes_updated": len(targets),
+            "node_ids": [n.get("id") for n in targets],
+            "applied": overrides,
+        }
+
+    @tool(
+        description=(
+            "Change the product grid columns, rows, and/or image width. "
+            "Auto-discovers the product grid section — no get_layout call needed. "
+            "cols: cards per row. rows: rows per A4 page. "
+            "image_width_pct: width of the image column inside each card (default 38, range 20–60)."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "cols": {"type": "integer", "minimum": 1, "maximum": 8},
+                "rows": {"type": "integer", "minimum": 1, "maximum": 8},
+                "image_width_pct": {"type": "integer", "minimum": 20, "maximum": 60},
+            },
+            "required": [],
+        },
+    )
+    def set_grid(
+        cols: int | None = None,
+        rows: int | None = None,
+        image_width_pct: int | None = None,
+    ) -> dict:
+        def _find_grid(node: dict) -> dict | None:
+            if (
+                node.get("type") == "section"
+                and node.get("layout") == "grid"
+                and node.get("cols")
+                and node.get("rows")
+            ):
+                return node
+            for c in node.get("children", []):
+                r = _find_grid(c)
+                if r:
+                    return r
+            return None
+
+        section = _find_grid(state.dsl)
+        if section is None:
+            return {"error": "No product grid section found"}
+        if cols is not None:
+            section["cols"] = cols
+        if rows is not None:
+            section["rows"] = rows
+        if image_width_pct is not None:
+            section["image_width_pct"] = image_width_pct
+        state.dirty = True
+        return {
+            "ok": True,
+            "section_id": section["id"],
+            "cols": section["cols"],
+            "rows": section["rows"],
+            "image_width_pct": section.get("image_width_pct", 38),
+        }
+
+    @tool(
+        description=(
+            "Insert an offer banner in ONE call. NO get_layout needed.\n"
+            "position: 'top' (very first element) | 'bottom' (above the footer/contact_strip, ideal for "
+            "'above the footer' or 'on the last page'). "
+            "shape: 'ribbon' | 'badge' | 'strip'. "
+            "color_token: 'primary' | 'accent' | 'secondary' | 'success' | 'danger'."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "headline": {"type": "string"},
+                "subtext": {"type": "string"},
+                "position": {"type": "string", "enum": ["top", "bottom"]},
+                "shape": {"type": "string", "enum": ["ribbon", "badge", "strip"]},
+                "color_token": {
+                    "type": "string",
+                    "enum": ["primary", "accent", "secondary", "success", "danger"],
+                },
+            },
+            "required": ["headline", "position"],
+        },
+    )
+    def add_banner(
+        headline: str,
+        position: str,
+        subtext: str | None = None,
+        shape: str = "strip",
+        color_token: str = "accent",
+    ) -> dict:
+        banner: dict = {
+            "type": "offer_banner",
+            "id": str(uuid.uuid4())[:8],
+            "headline": headline,
+            "shape": shape,
+            "accent_color_token": color_token,
+        }
+        if subtext:
+            banner["subtext"] = subtext
+
+        page = state.dsl
+        children = page.setdefault("children", [])
+        if position == "top":
+            insert_idx = 0
+        else:
+            # bottom = above the footer. Footer is usually contact_strip OR the LAST
+            # text/section node in the page. Detect:
+            insert_idx = None
+            for i, c in enumerate(children):
+                if c.get("type") == "contact_strip":
+                    insert_idx = i
+                    break
+            if insert_idx is None:
+                # No contact_strip → assume last child is footer, insert before it
+                insert_idx = max(0, len(children) - 1)
+        children.insert(insert_idx, banner)
+
+        state.dirty = True
+        return {"ok": True, "banner_id": banner["id"], "position": position, "inserted_at": insert_idx}
+
+    @tool(
+        description=(
+            "UNIVERSAL DSL editor. Apply any number of operations in ONE call. "
+            "Use this for everything (color, layout, insert, delete, move, style). "
+            "Prefer this over individual update_node/edit_layout chains.\n\n"
+            "Each op is a dict. Supported ops:\n"
+            "  {op:'set', node_id:'<id>', field:'<name>', value:<any>}  "
+            "— set any field on a node (cols, rows, content, headline, layout, gap, etc.)\n"
+            "  {op:'style', node_id:'<id>', style:{font_size_px:18, color_hex:'#f00', ...}}  "
+            "— merge into node.style_overrides (does NOT replace existing keys)\n"
+            "  {op:'insert', parent_id:'<id>', index:<int>, node:{type:'...', ...}}  "
+            "— insert a new node; id auto-generated if missing\n"
+            "  {op:'remove', node_id:'<id>'}  — delete a node\n"
+            "  {op:'move', node_id:'<id>', new_parent_id:'<id>', index:<int>}  — relocate a node\n\n"
+            "Special parent IDs: use the page_id for the root. "
+            "Ops execute in order; if one fails, remaining ops still run and per-op results are returned."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "ops": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "op": {"type": "string", "enum": ["set", "style", "insert", "remove", "move"]},
+                            "node_id": {"type": "string"},
+                            "parent_id": {"type": "string"},
+                            "new_parent_id": {"type": "string"},
+                            "index": {"type": "integer"},
+                            "field": {"type": "string"},
+                            "style": {"type": "object"},
+                            "node": {"type": "object"},
+                        },
+                        "required": ["op"],
+                        "additionalProperties": True,
+                    },
+                },
+            },
+            "required": ["ops"],
+        },
+    )
+    def apply_dsl_patch(ops) -> dict:
+        ops, err = _coerce_ops_list(ops)
+        if err:
+            return {"error": err, "hint": "ops must be a JSON array of op dicts: [{\"op\":\"set\",\"node_id\":\"...\",\"field\":\"...\",\"value\":...}]"}
+        results: list[dict] = []
+        any_change = False
+
+        def resolve(nid: str | None) -> dict | None:
+            if not nid:
+                return None
+            if state.dsl.get("id") == nid:
+                return state.dsl
+            node, _, _ = _find_node(state.dsl, nid)
+            return node
+
+        for i, op_raw in enumerate(ops):
+            op = op_raw.get("op")
+            try:
+                if op == "set":
+                    nid = op_raw.get("node_id")
+                    field = op_raw.get("field")
+                    if not nid or not field:
+                        results.append({"i": i, "error": "set requires node_id and field"})
+                        continue
+                    node = resolve(nid)
+                    if node is None:
+                        results.append({"i": i, "error": f"node {nid!r} not found"})
+                        continue
+                    node[field] = op_raw.get("value")
+                    any_change = True
+                    results.append({"i": i, "ok": True, "op": "set", "node_id": nid, "field": field})
+
+                elif op == "style":
+                    nid = op_raw.get("node_id")
+                    style = op_raw.get("style") or {}
+                    if not nid:
+                        results.append({"i": i, "error": "style requires node_id"})
+                        continue
+                    unknown = set(style.keys()) - _STYLE_FIELDS
+                    if unknown:
+                        results.append({"i": i, "error": f"unknown style fields: {sorted(unknown)}"})
+                        continue
+                    node = resolve(nid)
+                    if node is None:
+                        results.append({"i": i, "error": f"node {nid!r} not found"})
+                        continue
+                    existing = node.get("style_overrides") or {}
+                    node["style_overrides"] = {**existing, **style}
+                    any_change = True
+                    results.append({"i": i, "ok": True, "op": "style", "node_id": nid})
+
+                elif op == "insert":
+                    pid = op_raw.get("parent_id")
+                    nd = op_raw.get("node")
+                    if not pid or nd is None:
+                        results.append({"i": i, "error": "insert requires parent_id and node"})
+                        continue
+                    parent = resolve(pid)
+                    if parent is None:
+                        results.append({"i": i, "error": f"parent {pid!r} not found"})
+                        continue
+                    if "id" not in nd:
+                        nd["id"] = str(uuid.uuid4())[:8]
+                    ch = parent.setdefault("children", [])
+                    idx = op_raw.get("index", len(ch))
+                    idx = max(0, min(idx, len(ch)))
+                    ch.insert(idx, nd)
+                    any_change = True
+                    results.append({"i": i, "ok": True, "op": "insert", "inserted_id": nd["id"]})
+
+                elif op == "remove":
+                    nid = op_raw.get("node_id")
+                    if not nid:
+                        results.append({"i": i, "error": "remove requires node_id"})
+                        continue
+                    _, parent_ch, idx = _find_node(state.dsl, nid)
+                    if parent_ch is None:
+                        results.append({"i": i, "error": f"node {nid!r} not found"})
+                        continue
+                    parent_ch.pop(idx)
+                    any_change = True
+                    results.append({"i": i, "ok": True, "op": "remove", "node_id": nid})
+
+                elif op == "move":
+                    nid = op_raw.get("node_id")
+                    new_pid = op_raw.get("new_parent_id")
+                    if not nid or not new_pid:
+                        results.append({"i": i, "error": "move requires node_id and new_parent_id"})
+                        continue
+                    node_obj, parent_ch, idx = _find_node(state.dsl, nid)
+                    if node_obj is None:
+                        results.append({"i": i, "error": f"node {nid!r} not found"})
+                        continue
+                    new_parent = resolve(new_pid)
+                    if new_parent is None:
+                        results.append({"i": i, "error": f"new parent {new_pid!r} not found"})
+                        continue
+                    parent_ch.pop(idx)
+                    ch = new_parent.setdefault("children", [])
+                    new_idx = op_raw.get("index", len(ch))
+                    new_idx = max(0, min(new_idx, len(ch)))
+                    ch.insert(new_idx, node_obj)
+                    any_change = True
+                    results.append({"i": i, "ok": True, "op": "move", "node_id": nid})
+
+                else:
+                    results.append({"i": i, "error": f"unknown op {op!r}"})
+
+            except Exception as exc:
+                results.append({"i": i, "error": str(exc)})
+
+        if any_change:
+            state.dirty = True
+        ok_count = sum(1 for r in results if r.get("ok"))
+        err_count = len(results) - ok_count
+        return {"ok": err_count == 0, "applied": ok_count, "failed": err_count, "results": results}
+
+    return [
+        get_layout, edit_layout, update_node, update_products, set_theme,
+        ask_user, set_grid, style_region, add_banner, apply_dsl_patch,
+    ]

@@ -24,7 +24,7 @@ def make_pamphlet_session(
     session = ChatSession(
         provider=provider or get_default_provider(),
         model=model or get_default_model(),
-        system_prompt=build_system_prompt(pamphlet_title, len(items)),
+        system_prompt=build_system_prompt(pamphlet_title, len(items), dsl=dsl),
         tools=tools,
         history=history,
     )

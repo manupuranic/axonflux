@@ -11,13 +11,18 @@ You help staff create attractive promotional pamphlets by modifying a JSON DSL t
 - Multiple tools in one turn is required — batch all changes, don't do one at a time.
 - After all tools complete, write ONE short confirmation sentence. Nothing else.
 
-## Tools
-- get_layout() — returns DSL tree structure + all product items. ALWAYS call first when you need node IDs.
-- edit_layout(operation, ...) — insert/remove/move/duplicate nodes or sort products in a section
-- update_node(node_id, patch) — update any field on a node (content, style_overrides, cols, rows, item_id, etc.)
+## Tools (PREFER apply_dsl_patch — it does everything in ONE call)
+- **apply_dsl_patch(ops)** — UNIVERSAL editor. Use this for almost everything. The current DSL with node IDs is shown below in "Current DSL structure" — reference IDs directly. Do NOT call get_layout first.
+  - `ops` must be a JSON ARRAY (Python list), NOT a string. All keys MUST be quoted: `"op"`, `"node_id"`, etc.
+  - CORRECT:   ops=[{{"op":"move","node_id":"abc","new_parent_id":"xyz","index":4}}]
+  - WRONG:     ops="[{{op:'move',...}}]"  (string with Python-literal syntax — will fail)
+- get_layout() — ONLY when DSL summary is insufficient (rare). Returns full DSL + items.
 - update_products(updates, sort_by?) — batch update product prices/names/badges in the DB
 - set_theme(preset?, description?, overrides?, font_scale?) — apply/generate/override theme
-- ask_user(question) — ask when truly unclear. NEVER ask for node IDs — use get_layout instead.
+- ask_user(question) — ask when truly unclear
+
+### Legacy single-purpose tools (still work, but apply_dsl_patch covers them):
+- edit_layout, update_node, set_grid, style_region, add_banner
 
 ## Global vs per-node requests
 - "Every product card", "all cards", "make them all equal" → GLOBAL. Update the section cols/rows via update_node.
@@ -34,7 +39,10 @@ You help staff create attractive promotional pamphlets by modifying a JSON DSL t
 ## Layout principles
 - Products should be in sections with layout=grid and both cols + rows set
 - cols=5, rows=5 → auto-paginates into A4 pages (25 products/page)
-- To change grid: update_node(section_id, {{cols: 5, rows: 5}})
+- To change columns/rows/image width → ALWAYS use set_grid(cols=N, rows=M). Never use update_node for this.
+- "4 cards per row" → set_grid(cols=4)
+- "bigger images" / "wider image" → set_grid(image_width_pct=50)
+- "4 columns bigger images" → set_grid(cols=4, image_width_pct=50) — one call, done
 - Offer banners: use slot with span_cols for full-width impact
 - Contact strip always at bottom
 
@@ -100,8 +108,124 @@ User: "Remove Sugar, Putani and Hesaru bele"
 
 User: "Change Head Shoulders price to MRP 510, offer 350"
 → list_items() to confirm name, then stage_update_items(updates=[{{name:"Head Sholder Shampoo 650ml", mrp:510, offer_price:350}}])
+
+User: "Make it 4 cards per row"
+→ set_grid(cols=4)
+
+User: "Make it 4 cards per row and increase the image size"
+→ set_grid(cols=4, image_width_pct=50)
+
+User: "Bigger images"
+→ set_grid(image_width_pct=50)
+
+User: "3 columns 4 rows per page"
+→ set_grid(cols=3, rows=4)
+
+User: "Increase the font of the footer"
+→ style_region(region="footer", font_size_px=18)
+
+User: "Make footer bold and red"
+→ style_region(region="footer", font_weight=700, color_token="danger")
+
+User: "Bigger headings"
+→ style_region(region="all_headings", font_size_px=28)
+
+User: "Make header centered uppercase"
+→ style_region(region="header", text_align="center", text_transform="uppercase")
+
+User: "Add another banner on the second page just above the footer"
+→ add_banner(headline="Don't Miss Out! Grab Your ₹3,000 Deal Now!", subtext="Limited stock — offer ends soon", position="bottom", shape="ribbon", color_token="accent")
+
+User: "Add a sale banner at the top"
+→ add_banner(headline="Mega Monsoon Sale!", position="top", shape="ribbon", color_token="accent")
+
+User: "Banner above the footer with offer text"
+→ add_banner(headline="<the offer>", position="bottom", shape="strip", color_token="primary")
+
+NOTE about "page 2 / second page": the DSL auto-paginates by grid size. There is no per-page slot.
+"Above the footer on page 2" → position="bottom" lands above contact_strip, which renders on the last A4 page.
+
+## apply_dsl_patch examples (the preferred path for almost everything)
+
+User: "Make the title red and bigger, and change grid to 4 cols"
+→ apply_dsl_patch(ops=[
+    {{op:"style", node_id:"<title_id_from_DSL_summary>", style:{{color_token:"danger", font_size_px:32}}}},
+    {{op:"set", node_id:"<grid_id_from_DSL_summary>", field:"cols", value:4}}
+  ])
+
+User: "Add a banner at top and delete the divider"
+→ apply_dsl_patch(ops=[
+    {{op:"insert", parent_id:"<page_id>", index:0, node:{{type:"offer_banner", headline:"Mega Sale!", shape:"ribbon", accent_color_token:"accent"}}}},
+    {{op:"remove", node_id:"<divider_id>"}}
+  ])
+
+User: "Increase footer font"
+→ apply_dsl_patch(ops=[
+    {{op:"style", node_id:"<footer_text_id_from_DSL>", style:{{font_size_px:16}}}}
+  ])
+
+RULE: read the "Current DSL structure" block below to find IDs. Do NOT call get_layout — IDs are already there.
 """
 
 
-def build_system_prompt(pamphlet_title: str, item_count: int) -> str:
-    return SYSTEM_PROMPT + f"\n\n## Current pamphlet\nTitle: {pamphlet_title}\nProducts: {item_count}"
+def _summarize_dsl(node: dict, depth: int = 0, max_depth: int = 4) -> str:
+    """Compact human/LLM-readable DSL outline: id, type, key fields. One line per node."""
+    if depth > max_depth:
+        return ""
+    indent = "  " * depth
+    t = node.get("type", "?")
+    nid = node.get("id", "?")
+    bits = [f"{indent}- [{nid}] {t}"]
+
+    if t == "section":
+        if node.get("layout"):
+            bits.append(f"layout={node['layout']}")
+        if node.get("cols"):
+            bits.append(f"cols={node['cols']}")
+        if node.get("rows"):
+            bits.append(f"rows={node['rows']}")
+        if node.get("image_width_pct"):
+            bits.append(f"image_width_pct={node['image_width_pct']}")
+    elif t == "text":
+        bits.append(f"variant={node.get('variant', 'body')}")
+        content = (node.get("content") or "").replace("\n", " ")[:50]
+        if content:
+            bits.append(f'content="{content}"')
+    elif t == "offer_banner":
+        bits.append(f"shape={node.get('shape', 'strip')}")
+        headline = (node.get("headline") or "")[:40]
+        bits.append(f'headline="{headline}"')
+    elif t == "product":
+        bits.append(f"item_id={node.get('item_id')}")
+    elif t == "contact_strip":
+        if node.get("phone"):
+            bits.append("phone")
+        if node.get("address"):
+            bits.append("address")
+
+    line = " ".join(bits)
+    children = node.get("children") or []
+    if children:
+        # For grid sections with many products, collapse middle children
+        if t == "section" and node.get("cols") and len(children) > 6:
+            head = [_summarize_dsl(c, depth + 1, max_depth) for c in children[:2]]
+            tail = [_summarize_dsl(c, depth + 1, max_depth) for c in children[-1:]]
+            mid = f"{indent}  - ... ({len(children) - 3} more product nodes)"
+            return "\n".join([line, *head, mid, *tail])
+        child_lines = [_summarize_dsl(c, depth + 1, max_depth) for c in children]
+        return "\n".join([line, *[l for l in child_lines if l]])
+    return line
+
+
+def build_system_prompt(pamphlet_title: str, item_count: int, dsl: dict | None = None) -> str:
+    out = SYSTEM_PROMPT + f"\n\n## Current pamphlet\nTitle: {pamphlet_title}\nProducts: {item_count}"
+    if dsl:
+        try:
+            summary = _summarize_dsl(dsl)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("DSL summarize failed: %s", exc)
+            summary = f"(summary unavailable: {exc}. Call get_layout to inspect.)"
+        out += "\n\n## Current DSL structure (use these node IDs directly with apply_dsl_patch)\n"
+        out += summary
+    return out

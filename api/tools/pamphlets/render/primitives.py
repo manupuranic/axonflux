@@ -54,6 +54,7 @@ class SectionNode(BaseModel):
     rows: Optional[int] = None
     gap: Literal["none","xs","sm","md","lg","xl"] = "md"
     align: Literal["start","center","end","stretch"] = "start"
+    image_width_pct: Optional[int] = None  # product card image column width (default 38)
     children: list[AnyNode] = Field(default_factory=list)
     style_overrides: Optional[StyleOverrides] = None
 
