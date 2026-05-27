@@ -211,7 +211,7 @@ function ConceptCard({ concept }: { concept: Concept }) {
   return (
     <button
       onClick={() => setFlipped((f) => !f)}
-      className="relative w-full h-[340px] [perspective:1500px] text-left"
+      className="relative w-full h-[420px] [perspective:1500px] text-left"
     >
       <m.div
         animate={{ rotateY: flipped ? 180 : 0 }}

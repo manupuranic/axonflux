@@ -29,6 +29,10 @@ const ConceptsGrid = dynamic(() => import("./sections/ConceptsGrid").then((m) =>
   ssr: false,
   loading: () => <SectionSkeleton />,
 });
+const AgenticArchitecture = dynamic(() => import("./sections/AgenticArchitecture").then((m) => m.AgenticArchitecture), {
+  ssr: false,
+  loading: () => <SectionSkeleton />,
+});
 const Tradeoffs = dynamic(() => import("./sections/Tradeoffs").then((m) => m.Tradeoffs), {
   ssr: false,
   loading: () => <SectionSkeleton />,
@@ -78,6 +82,7 @@ const NAV: { id: string; label: string }[] = [
   { id: "codebase", label: "Codebase" },
   { id: "sql", label: "SQL Deep Dive" },
   { id: "concepts", label: "Concepts" },
+  { id: "agentic", label: "Agentic" },
   { id: "tradeoffs", label: "Trade-offs" },
   { id: "failures", label: "Edge Cases" },
   { id: "scaling", label: "Scaling" },
@@ -182,6 +187,7 @@ export function ExplainerPage() {
             <CodebaseTree />
             <SqlDeepDive />
             <ConceptsGrid />
+            <AgenticArchitecture />
             <Tradeoffs />
             <FailureCases />
             <Scaling />
