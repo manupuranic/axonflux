@@ -91,14 +91,23 @@ def render_pamphlet(dsl: dict, theme: dict, items_lookup: dict[str, dict]) -> st
         leading_html = _render_children(children[:grid_idx], items_lookup)
         trailing_html = _render_children(children[grid_idx + 1:], items_lookup)
         body = leading_html + _render_paginated_grid(
-            children[grid_idx], items_lookup, trailing_html=trailing_html
+            children[grid_idx], items_lookup, trailing_html=trailing_html,
+            page_height_mm=page.height_mm, page_padding=page.padding,
         )
     pad = _SPACING.get(page.padding, "16px")
-    bg_gradient = resolved_theme.get("tokens", {}).get("decoration", {}).get("bg_gradient", "")
-    if bg_gradient and bg_gradient.strip().lower() not in ("", "none", "null"):
-        bg_style = f"background: {bg_gradient};"
+
+    # Page-level style_overrides bg takes highest priority (set via update_node on page)
+    page_so = page.style_overrides
+    if page_so and page_so.bg_color_hex:
+        bg_style = f"background: {page_so.bg_color_hex};"
+    elif page_so and page_so.bg_color_token:
+        bg_style = f"background: var(--{page_so.bg_color_token.replace('_','-')});"
     else:
-        bg_style = "background: var(--bg);"
+        bg_gradient = resolved_theme.get("tokens", {}).get("decoration", {}).get("bg_gradient", "")
+        if bg_gradient and bg_gradient.strip().lower() not in ("", "none", "null"):
+            bg_style = f"background: {bg_gradient};"
+        else:
+            bg_style = "background: var(--bg);"
 
     w = _fmt_mm(page.width_mm)
     h = _fmt_mm(page.height_mm)
@@ -122,15 +131,15 @@ body{{width:{w};{bg_style}font-family:var(--font-body,Geist,sans-serif);color:va
 .section-grid{{display:grid;}}
 .section-flex{{display:flex;flex-direction:row;align-items:center;justify-content:space-between;}}
 .section-stack{{display:flex;flex-direction:column;}}
-.product-card{{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md,8px);padding:6px;display:flex;flex-direction:row;height:100%;overflow:hidden;min-height:0;gap:6px;}}
+.product-card{{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md,8px);padding:6px;display:flex;flex-direction:row;height:100%;overflow:hidden;min-height:0;gap:6px;font-size:var(--card-base,0.82rem);}}
 .product-card .product-img-wrap{{width:var(--img-w,38%);flex-shrink:0;align-self:stretch;border-radius:4px;background:var(--border);overflow:hidden;}}
 .product-card .product-img{{width:100%;height:100%;object-fit:cover;object-position:center top;}}
 .product-card .product-info{{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}}
-.product-card .product-name{{font-size:0.68rem;font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}}
+.product-card .product-name{{font-size:0.83em;font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}}
 .product-card .product-prices{{display:flex;gap:4px;align-items:baseline;margin-top:auto;flex-wrap:wrap;padding-top:4px;}}
-.product-badge{{background:var(--accent);color:#fff;font-size:0.58rem;padding:2px 4px;border-radius:99px;align-self:flex-start;flex-shrink:0;margin-bottom:2px;}}
-.price-offer{{color:var(--accent);font-weight:700;}}
-.price-mrp{{color:var(--text-muted);font-size:0.75rem;text-decoration:line-through;}}
+.product-badge{{background:var(--accent);color:#fff;font-size:0.71em;padding:2px 4px;border-radius:99px;align-self:flex-start;flex-shrink:0;margin-bottom:2px;}}
+.price-offer{{color:var(--accent);font-weight:700;font-size:1em;}}
+.price-mrp{{color:var(--text-muted);font-size:0.91em;text-decoration:line-through;}}
 .offer-banner-strip{{background:var(--accent);color:#fff;padding:12px 24px;text-align:center;border-radius:var(--radius-md,8px);}}
 .offer-banner-ribbon{{background:var(--accent);color:#fff;padding:8px 32px;clip-path:polygon(0 0,100% 0,calc(100% - 16px) 50%,100% 100%,0 100%,16px 50%);text-align:center;}}
 .offer-banner-badge{{background:var(--accent);color:#fff;border-radius:50%;width:120px;height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:auto;}}
@@ -141,6 +150,7 @@ body{{width:{w};{bg_style}font-family:var(--font-body,Geist,sans-serif);color:va
 <div class="page-root">{body}</div>
 </body>
 </html>"""
+
 
 
 def _resolve_theme(theme: dict, fallback_id: str) -> dict:
@@ -159,7 +169,10 @@ def _theme_to_css_vars(theme: dict) -> str:
     for k, v in tokens.get("colors", {}).items():
         lines.append(f"--{k.replace('_','-')}:{v};")
     for k, v in tokens.get("typography", {}).items():
-        lines.append(f"--font-{k.replace('_','-')}:{v};")
+        if k == "card_base_rem":
+            lines.append(f"--card-base:{v}rem;")
+        else:
+            lines.append(f"--font-{k.replace('_','-')}:{v};")
     for k, v in tokens.get("radii", {}).items():
         lines.append(f"--radius-{k}:{v};")
     return "".join(lines)
@@ -244,7 +257,9 @@ def _render_node(node, lookup: dict) -> str:
 
 
 def _render_section(n: SectionNode, lookup: dict) -> str:
-    # cols + rows → paginated A4 pages with equal-height grid cells
+    # cols + rows → paginated pages with equal-height grid cells.
+    # Page dimensions are not available here (we're deep in the node tree),
+    # so use A4 landscape defaults — the correct path goes through render_pamphlet.
     if n.layout == "grid" and n.cols and n.rows:
         return _render_paginated_grid(n, lookup)
     cls = f"section-{n.layout}"
@@ -274,7 +289,13 @@ def _node_has_content(node, lookup: dict) -> bool:
     return True
 
 
-def _render_paginated_grid(n: SectionNode, lookup: dict, trailing_html: str = "") -> str:
+def _render_paginated_grid(
+    n: SectionNode,
+    lookup: dict,
+    trailing_html: str = "",
+    page_height_mm: float = 210.0,
+    page_padding: str = "md",
+) -> str:
     items_per_page = n.cols * n.rows
     gap = _SPACING.get(n.gap, "8px")
     gap_px = {"none": 0, "xs": 4, "sm": 8, "md": 16, "lg": 24, "xl": 40}.get(n.gap, 8)
@@ -285,8 +306,11 @@ def _render_paginated_grid(n: SectionNode, lookup: dict, trailing_html: str = ""
         f"gap:{gap};height:100%;"
     )
     # Last-page variant: fixed row height matches full-page row height so cards look identical.
-    # A4 landscape = 210mm tall; md padding = 16px each side = 32px total.
-    row_height = f"calc((210mm - 32px - {(n.rows - 1) * gap_px}px) / {n.rows})"
+    # Padding is applied on both sides, so doubled. Map spacing token → px.
+    _PAD_PX = {"xs": 8, "sm": 16, "md": 32, "lg": 48}
+    pad_total_px = _PAD_PX.get(page_padding, 32)
+    h_mm = _fmt_mm(page_height_mm)
+    row_height = f"calc(({h_mm} - {pad_total_px}px - {(n.rows - 1) * gap_px}px) / {n.rows})"
     partial_grid_css = (
         f"grid-template-columns:repeat({n.cols},1fr);"
         f"grid-auto-rows:{row_height};"
@@ -403,7 +427,12 @@ def _render_offer_banner(n: OfferBannerNode) -> str:
     accent = f"background:var(--{n.accent_color_token.replace('_','-')});" if n.accent_color_token else ""
     sub = f'<p style="font-size:0.75rem;opacity:0.9;">{n.subtext}</p>' if n.subtext else ""
     so = _style_overrides(n.style_overrides)
-    return f'<div class="{cls}" style="{accent}{so}"><strong style="font-size:1.1rem;">{n.headline}</strong>{sub}</div>'
+    # font_size_px on banner applies to headline text, not wrapper
+    headline_font = f"font-size:{n.style_overrides.font_size_px}px;" if (n.style_overrides and n.style_overrides.font_size_px) else "font-size:1.1rem;"
+    # padding_token on banner increases height
+    pad = _SPACING.get(getattr(n.style_overrides, "padding_token", None) or "", "")
+    pad_style = f"padding:{pad};" if pad else ""
+    return f'<div class="{cls}" style="{accent}{pad_style}{so}"><strong style="{headline_font}">{n.headline}</strong>{sub}</div>'
 
 
 def _render_logo(n: LogoNode) -> str:

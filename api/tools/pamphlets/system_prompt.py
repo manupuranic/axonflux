@@ -91,6 +91,29 @@ Do NOT mix item changes with DSL changes in the same turn. Handle separately.
 User: "Make it monsoon themed"
 → set_theme(preset="monsoon")
 
+User: "Increase banner font / make banner text bigger / banner font 22px"
+→ apply_dsl_patch(ops=[{{"op":"style","node_id":"<banner_id>","style":{{"font_size_px":22}}}}])
+  font_size_px on an offer_banner node applies to the headline text.
+  To also increase height: add {{"padding_token":"lg"}} to the same style op.
+
+User: "White background" / "Plain white page" / "Remove the gradient" / "Set background to white"
+→ set_theme(overrides={{"colors":{{"bg":"#ffffff"}}, "decoration":{{"bg_gradient":"none"}}}})
+  BOTH keys required — bg_gradient overrides colors.bg; setting only colors.bg leaves gradient visible.
+
+User: "Change the badge color / offer badge color / price color"
+→ set_theme(overrides={{"colors":{{"accent":"#hex"}}}})
+  (badges and offer prices use var(--accent) — NEVER patch product nodes for this)
+
+User: "Increase product card font size / make product names bigger / increase font on cards"
+→ style_region(region="product_cards", font_size_px=14)
+  (maps to CSS variable — 13px = normal, 14px = bigger, 16px = large; NEVER patch individual product nodes)
+
+User: "Increase all font sizes" / "Make everything bigger" / "Increase fonts by 15%"
+→ MUST call BOTH:
+  1. style_region(region="all_text", font_size_px=<new_size>)  ← text/heading nodes
+  2. style_region(region="product_cards", font_size_px=14)      ← product card CSS classes
+  Product card fonts use CSS classes, NOT DSL node properties — skipping step 2 = product fonts unchanged.
+
 User: "Make the subtitle red"
 → get_layout() to find subtitle node_id, then update_node(node_id, {{style_overrides: {{color_token: "danger"}}}})
 

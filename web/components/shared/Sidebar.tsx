@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { PipelineTriggerModal } from "@/components/pipeline/PipelineTriggerModal";
 import {
   LayoutDashboard, Activity, Package, Users, BarChart2,
-  Wallet, FileText, GitMerge, Layers, BookOpen, Zap, FlaskConical, Settings,
+  Wallet, FileText, GitMerge, Layers, BookOpen, Zap, FlaskConical, Settings, Sparkles,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -48,6 +48,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     { href: "/dashboard/replenishment",    label: "Replenishment",    icon: <Package className={sz} /> },
     { href: "/customers",                  label: "Customers",        icon: <Users className={sz} /> },
     { href: "/customers/lapsed",           label: "Customer Activity",icon: <BarChart2 className={sz} /> },
+    { href: "/tools/campaign-studio",       label: "Campaign Studio",  icon: <Sparkles className={sz} /> },
     { href: "/tools/cash-closure",         label: "Cash Closure",     icon: <Wallet className={sz} /> },
     { href: "/tools/pamphlet-generator",   label: "Pamphlets",        icon: <FileText className={sz} /> },
     { href: "/tools/entity-resolution",    label: "Entity Resolution",icon: <GitMerge className={sz} /> },

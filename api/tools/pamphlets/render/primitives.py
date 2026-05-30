@@ -44,6 +44,7 @@ class PageNode(BaseModel):
     theme_id: str = "minimal_light"
     lang: Literal["en","hi","kn"] = "en"
     children: list[AnyNode] = Field(default_factory=list)
+    style_overrides: Optional[StyleOverrides] = None
 
 
 class SectionNode(BaseModel):

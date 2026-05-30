@@ -519,3 +519,177 @@ export interface HotoCreate {
   denominations_sales?: Record<string, number>;
   notes?: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Campaign Studio
+// ---------------------------------------------------------------------------
+
+export type CampaignStatus = "draft" | "active" | "archived";
+export type ProductPriority = "hero" | "feature" | "supporting";
+export type DesignStatus = "draft" | "approved" | "exported";
+
+export interface CampaignSummary {
+  id: string;
+  title: string;
+  campaign_type: string | null;
+  objective: string | null;
+  channels: string[];
+  status: CampaignStatus;
+  created_at: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  product_count: number;
+  design_count: number;
+}
+
+export interface Campaign extends CampaignSummary {
+  audience: string | null;
+  theme_id: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface CampaignCreate {
+  title: string;
+  campaign_type?: string | null;
+  objective?: string | null;
+  audience?: string | null;
+  theme_id?: string | null;
+  channels?: string[];
+  valid_from?: string | null;
+  valid_until?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface CampaignUpdate {
+  title?: string;
+  campaign_type?: string | null;
+  objective?: string | null;
+  audience?: string | null;
+  theme_id?: string | null;
+  channels?: string[];
+  status?: CampaignStatus;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface CampaignProduct {
+  id: string;
+  campaign_id: string;
+  barcode: string | null;
+  display_name: string | null;
+  priority: ProductPriority;
+  role: string | null;
+  sort_order: number;
+  offer_price: number | null;
+  original_price: number | null;
+  highlight_text: string | null;
+  image_url: string | null;
+  category: string | null;
+  unit: string | null;
+}
+
+export interface CampaignProductCreate {
+  barcode?: string | null;
+  display_name?: string | null;
+  priority?: ProductPriority;
+  role?: string | null;
+  sort_order?: number;
+  offer_price?: number | null;
+  original_price?: number | null;
+  highlight_text?: string | null;
+  image_url?: string | null;
+  category?: string | null;
+  unit?: string | null;
+}
+
+export interface CampaignProductUpdate {
+  display_name?: string | null;
+  priority?: string | null;
+  role?: string | null;
+  sort_order?: number | null;
+  offer_price?: number | null;
+  original_price?: number | null;
+  highlight_text?: string | null;
+  image_url?: string | null;
+  category?: string | null;
+  unit?: string | null;
+}
+
+export interface CampaignDesignSummary {
+  id: string;
+  campaign_id: string;
+  title: string;
+  design_type: string;
+  target: string;
+  status: DesignStatus;
+  created_at: string | null;
+}
+
+export interface CampaignDesign extends CampaignDesignSummary {
+  target_width_px: number | null;
+  target_height_px: number | null;
+  dsl: Record<string, unknown> | null;
+  theme: Record<string, unknown> | null;
+  current_version_id: string | null;
+  version_retention: number;
+}
+
+export interface CampaignDesignCreate {
+  title?: string;
+  design_type: string;
+  target: string;
+  target_width_px?: number | null;
+  target_height_px?: number | null;
+  version_retention?: number;
+}
+
+export interface CampaignDesignUpdate {
+  title?: string | null;
+  status?: string | null;
+  dsl?: Record<string, unknown> | null;
+  theme?: Record<string, unknown> | null;
+  version_retention?: number | null;
+}
+
+export interface AssetLibraryItem {
+  id: string;
+  kind: string;
+  url: string;
+  alt: string | null;
+  tags: string[];
+  metadata: Record<string, unknown> | null;
+  created_at: string | null;
+}
+
+export interface CampaignStudioMeta {
+  campaign_types: string[];
+  objectives: string[];
+  design_types: string[];
+  targets: string[];
+  asset_kinds: string[];
+}
+
+export interface DesignChatRequest {
+  message: string;
+  provider?: string | null;
+  model?: string | null;
+}
+
+export interface DesignToolCall {
+  tool_name: string;
+  args: Record<string, unknown>;
+  result: unknown;
+  is_error: boolean;
+}
+
+export interface DesignChatResponse {
+  assistant_text: string | null;
+  tool_calls: DesignToolCall[];
+  version_id: string | null;
+  dsl: Record<string, unknown> | null;
+  theme: Record<string, unknown> | null;
+  cost_usd: number;
+  provider: string;
+  model: string;
+}

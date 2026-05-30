@@ -1,7 +1,9 @@
 import time
+from pathlib import Path
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from api.core.config import settings
 from api.routers import auth, analytics, customers, products, suppliers, pipeline, docs
@@ -43,6 +45,16 @@ app.include_router(suppliers.router)
 app.include_router(pipeline.router)
 app.include_router(docs.router)
 app.include_router(agents_router)
+
+# ---------------------------------------------------------------------------
+# Static file serving for local asset uploads (Phase 1 AssetService)
+# ---------------------------------------------------------------------------
+_uploads_dir = Path(__file__).parents[1] / "data" / "uploads"
+_uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static/uploads", StaticFiles(directory=str(_uploads_dir)), name="uploads")
+# /uploads alias — used by the campaign asset upload endpoint so the frontend
+# can construct image URLs without knowing the /static prefix.
+app.mount("/uploads", StaticFiles(directory=str(_uploads_dir)), name="uploads_alias")
 
 # ---------------------------------------------------------------------------
 # Tool plugin routers (auto-discovered)

@@ -178,6 +178,24 @@ const CONCEPTS: Concept[] = [
     pitch: "Rewriting historical data to merge entities is irreversible and risky. Remap-at-source keeps raw immutable; merges become reversible config changes.",
     accent: "from-lime-50 to-green-50 border-lime-200",
   },
+  {
+    emoji: "📐",
+    title: "Format as data in DSL",
+    definition: "Document dimensions (width, height, format) live in the DSL root node — not in the renderer. Every layer derives its viewport from the document, never from hardcoded constants.",
+    analogy: "A page's paper size belongs in the print settings, not in the printer firmware.",
+    here: "Campaign Studio DSL: page.width_mm / page.height_mm. render_html_to_image(width_px, height_px), PDF exporter, and the preview iframe all read from the same source. Adding a WhatsApp 1080×1080 or Story 1080×1920 format = one DSL field change; zero renderer code change.",
+    pitch: "When format is a constant in code, every new format is a deployment. When it's data in the document, format is config at the right level of abstraction — and the renderer becomes format-agnostic by construction.",
+    accent: "from-slate-50 to-gray-50 border-slate-200",
+  },
+  {
+    emoji: "🗂️",
+    title: "StaticFiles as dev-time object storage",
+    definition: "Uploaded files land on disk; FastAPI's StaticFiles serve them. The URL structure mirrors what a real CDN would return — so production swap is one env var.",
+    analogy: "A sticky note on your desk — same information content as a cloud note, no account required.",
+    here: "POST /campaigns/{id}/assets/upload saves to data/uploads/campaign_assets/. app.mount('/uploads', StaticFiles(…)) serves them. Frontend constructs ${API_BASE}/uploads/... — the same URL shape it would use against R2 or S3 in prod. Switching to real object storage = change two env vars, zero frontend code.",
+    pitch: "Don't stand up MinIO or real S3 in local dev. A folder + StaticFiles is your object storage until you actually need CDN characteristics. But design the URL surface as if it's a CDN from day one — then the swap costs nothing.",
+    accent: "from-pink-50 to-rose-50 border-pink-200",
+  },
 ];
 
 export function ConceptsGrid() {

@@ -42,6 +42,21 @@ import type {
   AliasListResponse,
   ProductDetail,
   LapsedExportParams,
+  CampaignStudioMeta,
+  CampaignSummary,
+  Campaign,
+  CampaignCreate,
+  CampaignUpdate,
+  CampaignProduct,
+  CampaignProductCreate,
+  CampaignProductUpdate,
+  CampaignDesignSummary,
+  CampaignDesign,
+  CampaignDesignCreate,
+  CampaignDesignUpdate,
+  AssetLibraryItem,
+  DesignChatRequest,
+  DesignChatResponse,
 } from "@/types/api";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -436,5 +451,228 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ status, notes }),
       }),
+  },
+
+  // Campaign Studio
+  campaignStudio: {
+    meta: () =>
+      apiFetch<CampaignStudioMeta>("/api/tools/campaign-studio/meta"),
+
+    listCampaigns: (params: { limit?: number; offset?: number; status?: string } = {}) =>
+      apiFetch<{ total: number; limit: number; offset: number; items: CampaignSummary[] }>(
+        `/api/tools/campaign-studio/campaigns${buildQuery(params)}`
+      ),
+
+    getCampaign: (id: string) =>
+      apiFetch<Campaign>(`/api/tools/campaign-studio/campaigns/${id}`),
+
+    createCampaign: (body: CampaignCreate) =>
+      apiFetch<Campaign>("/api/tools/campaign-studio/campaigns", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+
+    updateCampaign: (id: string, body: CampaignUpdate) =>
+      apiFetch<Campaign>(`/api/tools/campaign-studio/campaigns/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+
+    deleteCampaign: (id: string) =>
+      apiFetch<void>(`/api/tools/campaign-studio/campaigns/${id}`, { method: "DELETE" }),
+
+    duplicateCampaign: (id: string) =>
+      apiFetch<Campaign>(`/api/tools/campaign-studio/campaigns/${id}/duplicate`, { method: "POST" }),
+
+    listProducts: (campaignId: string) =>
+      apiFetch<CampaignProduct[]>(`/api/tools/campaign-studio/campaigns/${campaignId}/products`),
+
+    addProduct: (campaignId: string, body: CampaignProductCreate) =>
+      apiFetch<CampaignProduct>(`/api/tools/campaign-studio/campaigns/${campaignId}/products`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+
+    bulkAddProducts: (campaignId: string, barcodes: string[]) =>
+      apiFetch<CampaignProduct[]>(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/products/bulk-add`,
+        { method: "POST", body: JSON.stringify({ barcodes }) }
+      ),
+
+    updateProduct: (campaignId: string, productId: string, body: CampaignProductUpdate) =>
+      apiFetch<CampaignProduct>(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/products/${productId}`,
+        { method: "PATCH", body: JSON.stringify(body) }
+      ),
+
+    removeProduct: (campaignId: string, productId: string) =>
+      apiFetch<void>(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/products/${productId}`,
+        { method: "DELETE" }
+      ),
+
+    importFromPamphlet: (campaignId: string, pamphletId: string) =>
+      apiFetch<CampaignProduct[]>(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/products/import-pamphlet`,
+        { method: "POST", body: JSON.stringify({ pamphlet_id: pamphletId }) }
+      ),
+
+    listDesigns: (campaignId: string) =>
+      apiFetch<CampaignDesignSummary[]>(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/designs`
+      ),
+
+    createDesign: (campaignId: string, body: CampaignDesignCreate) =>
+      apiFetch<CampaignDesign>(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/designs`,
+        { method: "POST", body: JSON.stringify(body) }
+      ),
+
+    getDesign: (campaignId: string, designId: string) =>
+      apiFetch<CampaignDesign>(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/designs/${designId}`
+      ),
+
+    updateDesign: (campaignId: string, designId: string, body: CampaignDesignUpdate) =>
+      apiFetch<CampaignDesign>(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/designs/${designId}`,
+        { method: "PATCH", body: JSON.stringify(body) }
+      ),
+
+    deleteDesign: (campaignId: string, designId: string) =>
+      apiFetch<void>(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/designs/${designId}`,
+        { method: "DELETE" }
+      ),
+
+    previewDesign: async (
+      campaignId: string,
+      designId: string,
+      dsl?: Record<string, unknown> | null,
+      theme?: Record<string, unknown> | null
+    ): Promise<string> => {
+      const token = getToken();
+      const res = await fetch(
+        `${BASE}/api/tools/campaign-studio/campaigns/${campaignId}/designs/${designId}/preview`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ dsl, theme }),
+        }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.text();
+    },
+
+    duplicateDesign: (campaignId: string, designId: string) =>
+      apiFetch<CampaignDesign>(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/designs/${designId}/duplicate`,
+        { method: "POST" }
+      ),
+
+    exportDesignPdf: (campaignId: string, designId: string, title: string) =>
+      downloadWithAuth(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/designs/${designId}/export-pdf`,
+        `${title}.pdf`
+      ),
+
+    exportDesignImage: (campaignId: string, designId: string, title: string) =>
+      downloadWithAuth(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/designs/${designId}/export-image`,
+        `${title}.png`
+      ),
+
+    exportAsPamphlet: (
+      campaignId: string,
+      body: { design_id: string; pamphlet_title?: string; valid_from?: string; valid_until?: string }
+    ) =>
+      apiFetch<{ pamphlet_id: string; title: string }>(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/export-as-pamphlet`,
+        { method: "POST", body: JSON.stringify(body) }
+      ),
+
+    listAssets: (kind?: string) =>
+      apiFetch<AssetLibraryItem[]>(
+        `/api/tools/campaign-studio/assets${buildQuery({ kind })}`
+      ),
+
+    uploadAsset: async (file: File, kind: string, alt?: string): Promise<AssetLibraryItem> => {
+      const token = getToken();
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(
+        `${BASE}/api/tools/campaign-studio/assets/upload${buildQuery({ kind, alt })}`,
+        {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: form,
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? `HTTP ${res.status}`);
+      }
+      return res.json();
+    },
+
+    uploadCampaignAsset: async (campaignId: string, file: File): Promise<string> => {
+      const token = getToken();
+      const formData = new FormData();
+      formData.append("file", file);
+      const resp = await fetch(
+        `${BASE}/api/tools/campaign-studio/campaigns/${campaignId}/assets/upload`,
+        {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        }
+      );
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail ?? "Upload failed");
+      }
+      const data = await resp.json();
+      return `${BASE}${data.url}`;
+    },
+
+    deleteAsset: (id: string) =>
+      apiFetch<void>(`/api/tools/campaign-studio/assets/${id}`, { method: "DELETE" }),
+
+    getDesignChatHistory: (campaignId: string, designId: string) =>
+      apiFetch<{ role: string; content: string }[]>(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/designs/${designId}/chat`
+      ),
+
+    clearDesignChat: (campaignId: string, designId: string) =>
+      apiFetch<{ deleted: number }>(
+        `/api/tools/campaign-studio/campaigns/${campaignId}/designs/${designId}/chat`,
+        { method: "DELETE" }
+      ),
+
+    chatDesign: async (campaignId: string, designId: string, body: DesignChatRequest): Promise<DesignChatResponse> => {
+      // AI chat can take 60-120s — route through long-timeout proxy instead of
+      // the rewrite-based proxy which drops connections after ~30s.
+      const backendPath = `/api/tools/campaign-studio/campaigns/${campaignId}/designs/${designId}/chat`;
+      const token = getToken();
+      const res = await fetch(
+        `/api/chat-proxy?path=${encodeURIComponent(backendPath)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(body),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? err.error ?? `HTTP ${res.status}`);
+      }
+      return res.json();
+    },
   },
 };

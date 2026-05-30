@@ -95,6 +95,10 @@ def _find_region_nodes(dsl: dict, region: str) -> list[dict]:
         walk(dsl)
         return out
 
+    if region == "product_cards":
+        # Sentinel — style_region handles this specially via CSS variable, not DSL nodes
+        return [{"__product_cards_sentinel__": True}]
+
     return []
 
 
@@ -469,6 +473,10 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
         if overrides:
             for section, tokens in overrides.items():
                 state.theme.setdefault("overrides", {}).setdefault(section, {}).update(tokens)
+            # Auto-clear bg_gradient when bg color is explicitly overridden —
+            # gradient always wins over colors.bg if left intact
+            if "bg" in overrides.get("colors", {}):
+                state.theme.setdefault("overrides", {}).setdefault("decoration", {})["bg_gradient"] = "none"
             state.dirty = True
 
         if font_scale:
@@ -496,14 +504,16 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
         description=(
             "Apply a style to a semantic REGION in one call. NO get_layout needed.\n"
             "region: 'footer' (contact_strip + bottom text), 'header' (first text/heading), "
-            "'all_text' (every text node), 'all_headings' (text variant=heading|subheading).\n"
+            "'all_text' (every text node), 'all_headings' (text variant=heading|subheading), "
+            "'product_cards' (product name/badge/price fonts — uses CSS variable, font_size_px only).\n"
             "Pass any style field(s) to apply. Existing style_overrides are merged, not replaced.\n"
-            "Use for: 'make footer bigger', 'header in red', 'all prices bold', 'larger contact text'."
+            "Use for: 'make footer bigger', 'header in red', 'all prices bold', 'larger contact text', "
+            "'bigger product names'."
         ),
         parameters={
             "type": "object",
             "properties": {
-                "region": {"type": "string", "enum": ["footer", "header", "all_text", "all_headings"]},
+                "region": {"type": "string", "enum": ["footer", "header", "all_text", "all_headings", "product_cards"]},
                 "font_size_px": {"type": "integer", "minimum": 8, "maximum": 72},
                 "font_weight": {"type": "integer", "enum": [400, 600, 700, 900]},
                 "color_hex": {"type": "string"},
@@ -548,19 +558,30 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
         if not overrides:
             return {"error": "No style properties given. Pass font_size_px, color_hex, etc."}
 
+        # product_cards region: map font_size_px → CSS variable via theme override
+        if region == "product_cards":
+            if font_size_px is None:
+                return {"error": "product_cards region only supports font_size_px"}
+            card_base_rem = round(font_size_px / 16, 3)
+            state.theme.setdefault("overrides", {}).setdefault("typography", {})["card_base_rem"] = card_base_rem
+            state.dirty = True
+            return {"ok": True, "region": "product_cards", "card_base_rem": card_base_rem, "font_size_px": font_size_px}
+
         targets = _find_region_nodes(state.dsl, region)
         if not targets:
             return {"error": f"No nodes found for region {region!r}"}
 
-        for node in targets:
+        # Filter out any sentinels (shouldn't happen for other regions but guard anyway)
+        real_targets = [n for n in targets if not n.get("__product_cards_sentinel__")]
+        for node in real_targets:
             existing = node.get("style_overrides") or {}
             node["style_overrides"] = {**existing, **overrides}
         state.dirty = True
         return {
             "ok": True,
             "region": region,
-            "nodes_updated": len(targets),
-            "node_ids": [n.get("id") for n in targets],
+            "nodes_updated": len(real_targets),
+            "node_ids": [n.get("id") for n in real_targets],
             "applied": overrides,
         }
 

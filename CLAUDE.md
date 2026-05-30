@@ -356,7 +356,7 @@ Parallel agents use async fan-out; sequential agents pass structured output betw
 | **Reorder Agent** | Parallel per supplier → merge | Reads replenishment sheet + stock + lead times → draft PO per supplier |
 | **Weekly Intelligence Agent** | Sequential pipeline | Sales → stock alerts → lapsed customers → cash status → one-screen weekly report |
 | **Dead Stock Clearance Agent** | Parallel per category → rank | 4,661 dead stock products → cross-ref basket associations → ranked clearance + bundle suggestions |
-| **Pamphlet Intelligence Agent** | Parallel fan-out → rank | Demand signals + expiry risk + basket associations → suggested product list for next pamphlet |
+| **Pamphlet Intelligence Agent** | Parallel fan-out → rank | Demand signals + expiry risk + basket associations → suggested product list for next pamphlet. Surfaced in Campaign Studio as "Suggest Products" button — populates campaign product list from analytics, no manual search needed. Campaign Studio Phase 5. |
 | **Cash Discrepancy Agent** | Sequential analysis | 30-day closure history → pattern detection (recurring? day-of-week bias? worsening?) → severity flag |
 | **Supplier Performance Agent** | Parallel per supplier | Spend trend, top products, stockout frequency → one-page brief per vendor |
 | **Storefront Agent Group** | Coordinator + 4 sub-agents | Product Selection → parallel (Image Agent + Content Agent + SEO Agent) → Publisher Agent |
