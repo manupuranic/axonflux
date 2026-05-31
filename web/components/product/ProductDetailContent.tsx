@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useRef, useState } from "react";
 import { useFetch } from "@/hooks/useFetch";
 import { api } from "@/lib/api";
 import { DataStateWrapper } from "@/components/shared/DataStateWrapper";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatInr, formatQty } from "@/lib/formatters";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Package, Zap, ShoppingBasket } from "lucide-react";
+import { ArrowLeft, Image as ImageIcon, Package, Upload, Zap, ShoppingBasket } from "lucide-react";
 import type { ProductRecommendation } from "@/types/api";
 import { format } from "date-fns";
 
@@ -26,7 +26,13 @@ export function ProductDetailContent({
   const trend = useFetch(() => api.demandTrend(barcode, 60), [barcode]);
   const recs = useFetch(() => api.productRecommendations(barcode, 8), [barcode]);
 
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const product = details.data as Record<string, unknown> | undefined;
+  const currentImage = imageUrl ?? (product?.image_url as string | null | undefined) ?? null;
 
   const isLoading = details.loading || trend.loading;
   const hasError = details.error || trend.error;
@@ -48,6 +54,61 @@ export function ProductDetailContent({
           </p>
         </div>
       </div>
+
+      {/* Image card — always visible, not gated on DataStateWrapper */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ImageIcon className="h-5 w-5" />
+            Product Image
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-start gap-6">
+          <div className="w-40 h-40 rounded-lg border bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
+            {currentImage ? (
+              <img src={currentImage} alt="Product" className="object-contain w-full h-full" />
+            ) : (
+              <ImageIcon className="h-12 w-12 text-gray-300" />
+            )}
+          </div>
+          <div className="space-y-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={uploading}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              {uploading ? "Uploading…" : currentImage ? "Replace image" : "Upload image"}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setUploading(true);
+                setUploadError(null);
+                try {
+                  const { image_url } = await api.uploadProductImage(barcode, file);
+                  setImageUrl(image_url);
+                } catch (err) {
+                  setUploadError(err instanceof Error ? err.message : "Upload failed");
+                } finally {
+                  setUploading(false);
+                  e.target.value = "";
+                }
+              }}
+            />
+            {uploadError && <p className="text-sm text-red-600">{uploadError}</p>}
+            {currentImage && (
+              <p className="text-xs text-gray-400 font-mono break-all max-w-xs">{currentImage}</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <DataStateWrapper
         loading={isLoading}

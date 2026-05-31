@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_conn, get_db, get_current_user, require_admin
+from api.storage.client import get_storage_client
 from api.models.app import AppProduct
 from api.schemas.auth import CurrentUser
 from api.schemas.products import (
@@ -230,6 +231,49 @@ def get_product(
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     return dict(row)
+
+
+_ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+_IMAGE_EXTENSIONS = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+
+
+@router.post("/{barcode}/image", response_model=dict)
+async def upload_product_image(
+    barcode: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(get_current_user),
+):
+    """Upload a product image to storage (R2 or local). Returns {image_url}."""
+    ct = (file.content_type or "").split(";")[0].strip()
+    if ct not in _ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported image type '{ct}'. Must be jpeg, png, or webp.",
+        )
+
+    data = await file.read()
+    if len(data) > 10 * 1024 * 1024:  # 10 MB hard limit
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Image exceeds 10 MB limit.")
+
+    ext = _IMAGE_EXTENSIONS[ct]
+    key = f"products/{barcode}.{ext}"
+    cdn_url = get_storage_client().upload(key, data, ct)
+
+    product = db.query(AppProduct).filter(AppProduct.barcode == barcode).first()
+    if not product:
+        product = AppProduct(
+            barcode=barcode,
+            canonical_name=barcode,
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(product)
+
+    product.image_url = cdn_url
+    product.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return {"image_url": cdn_url}
 
 
 @router.patch("/{barcode}", response_model=ProductResponse)

@@ -33,7 +33,7 @@ const PHASES: {
       { name: "B2 · Basket analysis", detail: "30,018 pairs in derived.product_associations. Frequently Bought Together UI.", status: "shipped" },
       { name: "B3 · Product entity resolution", detail: "RapidFuzz clustering, staff review UI, alias remap at aggregation source.", status: "shipped" },
       { name: "B4 · BOM Manager", detail: "In-house repackaging: loose raw materials (wheat, pulses, spices) → branded retail packets. app.product_bom with yield-based qty_per_unit. Auto-suggest on every rebuild. Step 04 stock position corrected: BOM consumption deducted, finished goods excluded.", status: "shipped" },
-      { name: "B5 · Test Baseline", detail: "Critical path tests before Phase C: auth + role enforcement, lapsed tier math (30/60/90d), BOM yield consumption, customer activity counts, LocalStorageClient. Not exhaustive — protects against regressions in auth, BOM math, and customer logic.", status: "planned" },
+      { name: "B5 · Test Baseline", detail: "Critical path tests before Phase C: auth + role enforcement, lapsed tier math (30/60/90d), BOM yield consumption, customer activity counts, LocalStorageClient. 6 test files, persistent axonflux_test DB, UUID isolation per test. 12 storage tests including API-level image upload endpoint coverage.", status: "shipped" },
     ],
   },
   {
@@ -42,7 +42,7 @@ const PHASES: {
     blurb: "LLM-powered content + decision support layered on the data foundation.",
     items: [
       { name: "C1 · Product content generation", detail: "Claude generates description, tags, key benefits for promoted products.", status: "planned" },
-      { name: "C2 · Product images", detail: "Open Food Facts → Cloudflare R2 → app.products.image_url.", status: "planned" },
+      { name: "C2 · Storage abstraction + product images", detail: "StorageClient ABC over boto3: LocalStorageClient (dev, data/uploads/ → /static/uploads) + R2StorageClient (prod, Cloudflare R2). Factory reads STORAGE_* env vars — switching provider = change .env only, zero code changes. Migration 012 adds image_url TEXT to app.products. POST /api/products/{barcode}/image endpoint (jpeg/png/webp, 10 MB limit). Image upload card in product detail UI. Bulk fetcher via Open Food Facts (scripts/fetch_product_images.py) — ~0% hit rate for Indian catalog; staff manual upload is primary path. All 12 storage tests green.", status: "shipped" },
       { name: "C3 · Embedding pipeline + pgvector", detail: "Catalog → vectors stored alongside in Postgres.", status: "planned" },
       { name: "C4 · RAG chatbot", detail: "Ask 'what should I reorder?' — answered from real signals.", status: "planned" },
       { name: "C5 · Daily decision engine", detail: "Briefing combining restock, demand spikes, dead stock, cash flags.", status: "planned" },

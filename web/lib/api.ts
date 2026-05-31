@@ -203,6 +203,20 @@ export const api = {
       `/api/products/${encodeURIComponent(barcode)}`
     ),
 
+  uploadProductImage: async (barcode: string, file: File): Promise<{ image_url: string }> => {
+    const token = getToken();
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/api/products/${encodeURIComponent(barcode)}/image`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (res.status === 401) { clearToken(); window.location.href = "/login"; throw new Error("Unauthorized"); }
+    if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+    return res.json();
+  },
+
   // Customers
   customers: (params: CustomerParams) =>
     apiFetch<PaginatedResponse<CustomerListItem>>(

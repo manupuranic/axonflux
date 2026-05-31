@@ -13,6 +13,18 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    date: "2026-05-31",
+    title: "Phase C2 — Storage abstraction + Cloudflare R2 integration",
+    detail: "StorageClient ABC with two implementations: LocalStorageClient (dev — writes to data/uploads/, served via FastAPI StaticFiles at /static/uploads) and R2StorageClient (prod — Cloudflare R2 via boto3 S3-compatible API). Factory function get_storage_client() reads STORAGE_* env vars — switching storage provider requires zero code changes, only .env edits. Migration 012 adds image_url TEXT to app.products. New endpoint POST /api/products/{barcode}/image: validates content-type (jpeg/png/webp), 10 MB limit, uploads to storage, upserts image_url. Product detail page gains an image card with preview + upload button. Bulk fetcher script (scripts/fetch_product_images.py) queries Open Food Facts by EAN-13 barcode — discovered ~0% hit rate for Indian supermarket catalog (even Parle-G, Maggi, Colgate absent from OFF). Staff manual upload is primary image sourcing path. 12 storage tests green including API-level upload/reject/auth checks.",
+    type: "feature",
+  },
+  {
+    date: "2026-05-31",
+    title: "Phase B5 — Test baseline",
+    detail: "6 new test files covering the critical path before Phase C: test_api_auth.py (login, token decode, role enforcement), test_api_customers.py (lapsed tier math 30/60/90d, active filter, summary counts), test_api_analytics.py (summary endpoint, health signal flags), test_api_bom.py (confirm requires qty>0, reject marks status, duplicate prevention), test_pipeline_step04.py (BOM consumption math — wrong yield factor = daily stock error), test_storage.py (LocalStorageClient + R2StorageClient + image upload API). Persistent axonflux_test DB via scripts/setup_test_db.py. UUID isolation per test, dependency override pattern for test DB swap. pytest.ini registers integration mark for real-credential tests.",
+    type: "feature",
+  },
+  {
     date: "2026-05-27",
     title: "Pamphlet renderer + AI overhaul — atomic tools, universal patch, A4 reflow",
     detail: "Two-pronged fix for chat reliability + render layout. RENDERER: (1) Empty product slots (deleted items) auto-skipped pre-chunking so the 5×5 grid reflows without phantom blanks. (2) Last A4 page uses grid-auto-rows with pre-computed calc((210mm-32px-(rows-1)*gap)/rows) row height so partial pages render identical card sizes to full pages, killing the dead row at page bottom. (3) Trailing nodes (banners, contact_strip, footer text) get tucked INSIDE the last A4 page div instead of spilling onto a fresh print sheet — partial pages place trailing below the grid in remaining row space; full pages use flex column with grid:flex 1 + trailing pinned to bottom. CHAT: root-caused 'AI says Done but nothing happens' to Haiku failing to chain get_layout → update_node calls. Fix: collapsed N-step chains into atomic single-call tools — set_grid(cols, rows, image_width_pct), style_region(region: footer|header|all_text|all_headings, ...), add_banner(headline, position: top|bottom, ...). Then went one level deeper: universal apply_dsl_patch(ops=[{op:set|style|insert|remove|move, ...}]) tool covers all DSL mutations in one call, lenient JSON parser repairs Python-literal mistakes from LLM. System prompt now injects compact DSL summary (node IDs visible inline) so LLM emits patches without prior get_layout round-trip. New image_width_pct field on SectionNode → CSS --img-w variable → product card image width configurable per pamphlet (default 38%, range 20–60). Also fixed banner-below-footer bug (text-based footers not detected), f-string brace escape crash in system prompt.",
