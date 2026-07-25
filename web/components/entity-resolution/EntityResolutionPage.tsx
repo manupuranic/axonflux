@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { api } from "@/lib/api";
-import { hasRole } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { SuggestionClusterCard } from "@/components/entity-resolution/SuggestionClusterCard";
 import { AliasTable } from "@/components/entity-resolution/AliasTable";
 import type { SuggestionCluster, AliasResponse } from "@/types/api";
@@ -30,8 +30,8 @@ export function EntityResolutionPage() {
   const [aliasesLoading, setAliasesLoading] = useState(false);
 
   useEffect(() => {
-    setCanModerate(hasRole("manager"));
-    setCanDelete(hasRole("admin"));
+    setCanModerate(can("moderateAliases"));
+    setCanDelete(can("deleteAlias"));
   }, []);
 
   const loadClusters = useCallback(async () => {

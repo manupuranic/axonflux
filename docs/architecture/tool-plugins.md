@@ -28,8 +28,8 @@ MANIFEST = ToolManifest(
     name="My Tool",
     description="What it does.",
     icon="Wrench",           # Lucide icon name
-    required_role="staff",   # "staff" or "admin"
     tags=["ops"],
+    # No role field — see "Access control" below.
 )
 ```
 
@@ -43,10 +43,27 @@ That's it. `api/tools/__init__.py:register_tools()` auto-discovers any subdirect
 
 ### Frontend (2 steps)
 
-1. Create `web/src/tools/my-tool/index.tsx` — the tool's UI entry component
-2. Add its manifest entry to `web/src/tools/registry.ts`
+1. Create the page under `web/app/(internal)/tools/my-tool/page.tsx`
+2. Add an entry to the `links` array in `web/components/shared/Sidebar.tsx`, with
+   `minRole` if the nav entry should be hidden below a role
 
-The internal dashboard sidebar and routing update automatically.
+The sidebar is a static array, not server-driven — adding a tool is a deliberate
+two-line frontend edit.
+
+## Access control
+
+Two separate questions, deliberately answered in two places:
+
+| Question | Answered by | Nature |
+|---|---|---|
+| May this request proceed? | `Depends(require_staff / require_manager / require_admin)` on each route | Security boundary |
+| Should this nav entry render? | `minRole` on the sidebar links array | UX only |
+
+They are not duplicates of one fact. Endpoints inside a single tool can sit at
+different levels — cash closure accepts submissions at staff and verifications at
+manager — so "the tool's role" is not a well-formed concept. The manifest carries
+no role field for exactly this reason; one existed until 2026-07, was read by
+nothing, and made unguarded routes look protected.
 
 ## Discovery Mechanism
 
@@ -57,14 +74,19 @@ The internal dashboard sidebar and routing update automatically.
 
 ## Existing Tools
 
-| Tool | ID | Tables Used | Required Role |
+| Tool | ID | Tables Used | Route gates |
 |---|---|---|---|
-| Cash Closure | `cash-closure` | `app.cash_closure_records`, `raw.raw_sales_billwise` | staff |
+| Cash Closure | `cash-closure` | `app.cash_closure_records`, `raw.raw_sales_billwise` | staff; verify/reject at manager |
 | Pamphlet Generator | `pamphlets` | `app.pamphlets`, `app.pamphlet_items` | staff |
+| Campaign Studio | `campaign-studio` | `app.campaigns`, `app.campaign_products` | staff |
+| Entity Resolution | `entity-resolution` | `app.product_aliases`, `app.product_merge_suggestions` | staff reads; confirm/reject at manager; recompute + alias delete at admin |
+| BOM Manager | `bom` | `app.product_bom`, `app.product_bom_suggestions` | staff |
 
 ## `GET /api/tools` Endpoint
 
-Returns all registered tool manifests as JSON. The frontend fetches this once on load to build the sidebar — no hardcoded tool names in the frontend bundle.
+Returns all registered tool manifests as JSON (staff-gated). Intended for
+server-driven nav; **currently unused** — the sidebar is a static array. Kept as a
+discovery endpoint, but treat it as unproven until something reads it.
 
 ```json
 [
@@ -73,7 +95,6 @@ Returns all registered tool manifests as JSON. The frontend fetches this once on
     "name": "Cash Closure",
     "description": "End-of-day cash reconciliation...",
     "icon": "Wallet",
-    "required_role": "staff",
     "tags": ["finance", "daily-ops"]
   }
 ]

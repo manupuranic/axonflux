@@ -463,7 +463,7 @@ The health signals endpoint was joining a VIEW. A PostgreSQL VIEW re-executes it
 
 **Q15: What is the MANIFEST in the tool plugin system?**
 
-Each tool plugin directory has an `__init__.py` exporting a `MANIFEST` — a `ToolManifest` dataclass with: `id`, `name`, `description`, `icon`, `required_role`, `tags`. The auto-discovery in `register_tools()` scans directories, imports the manifest, and mounts the router with the appropriate prefix. The manifest also drives the frontend sidebar (icon, title, role-gated visibility). Adding a new tool requires zero changes to `main.py` or the sidebar component.
+Each tool plugin directory has an `__init__.py` exporting a `MANIFEST` — a `ToolManifest` dataclass with: `id`, `name`, `description`, `icon`, `tags`. The auto-discovery in `register_tools()` scans directories, imports the manifest, and mounts the router with the appropriate prefix. Adding a new tool requires zero changes to `main.py`; the sidebar entry is a deliberate one-line addition, since nav visibility (`minRole`) is a UX decision distinct from per-route access guards.
 
 ---
 

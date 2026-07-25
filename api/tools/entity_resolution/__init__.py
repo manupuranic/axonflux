@@ -5,6 +5,5 @@ MANIFEST = ToolManifest(
     name="Entity Resolution",
     description="Detect and merge duplicate barcodes — review RapidFuzz clusters and confirm canonical product identities.",
     icon="GitMerge",
-    required_role="staff",
     tags=["data-quality", "products"],
 )

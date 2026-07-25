@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { HotoForm } from "@/components/cash-closure/HotoForm";
 import { HotoHistory } from "@/components/cash-closure/HotoHistory";
 import { api } from "@/lib/api";
-import { hasRole } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import type { HotoResponse } from "@/types/api";
 
 export default function CashClosurePage() {
@@ -21,7 +21,7 @@ export default function CashClosurePage() {
   const hiddenAtRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setCanVerify(hasRole("manager"));
+    setCanVerify(can("verifyCashClosure"));
   }, []);
 
   const fetchToday = useCallback(() => {

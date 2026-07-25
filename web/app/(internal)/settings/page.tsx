@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ALLOWED_MODELS_BY_PROVIDER, PROVIDERS } from "@/lib/ai-settings";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
-import { getToken, hasRole } from "@/lib/auth";
+import { getToken } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { UsersSection } from "@/components/settings/UsersSection";
 
 type TestResult = { ok: boolean; response?: string; error?: string; latency_ms: number } | null;
@@ -38,7 +39,7 @@ export default function AISettingsPage() {
   // Gated in useEffect (not render) so SSR/first paint never renders admin-only
   // UI before localStorage-backed role info is available on the client.
   useEffect(() => {
-    setShowUsers(hasRole("admin"));
+    setShowUsers(can("manageUsers"));
   }, []);
 
   useEffect(() => {

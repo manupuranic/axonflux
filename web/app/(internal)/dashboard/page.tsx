@@ -12,7 +12,7 @@ import { TopProductsCard } from "@/components/dashboard/TopProductsCard";
 import { PipelineTriggerModal } from "@/components/pipeline/PipelineTriggerModal";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { hasRole } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 
 export default function DashboardPage() {
   const [topSort, setTopSort] = useState<"revenue" | "qty">("revenue");
@@ -20,7 +20,7 @@ export default function DashboardPage() {
   const [canRefresh, setCanRefresh] = useState(false);
 
   useEffect(() => {
-    setCanRefresh(hasRole("manager"));
+    setCanRefresh(can("runPipeline"));
   }, []);
 
   const summary = useFetch(() => api.summary());

@@ -112,7 +112,6 @@ def list_tools(_=Depends(require_staff)):
             "name": m.name,
             "description": m.description,
             "icon": m.icon,
-            "required_role": m.required_role,
             "tags": m.tags,
         }
         for m in get_manifests()

@@ -5,6 +5,5 @@ MANIFEST = ToolManifest(
     name="BOM Manager",
     description="Define raw material → finished product relationships for accurate stock position.",
     icon="FlaskConical",
-    required_role="staff",
     tags=["inventory", "stock"],
 )

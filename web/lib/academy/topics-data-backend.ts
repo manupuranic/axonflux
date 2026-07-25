@@ -640,7 +640,7 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
     prereqs: ["dependency-injection"],
     unlocks: [],
     level1: [
-      "Contract: each tool is a package under api/tools/<name>/ with __init__.py exporting MANIFEST (id, name, icon, required_role, tags) and router.py exporting an APIRouter. register_tools() scans the directory, imports each package, mounts its router, collects manifests.",
+      "Contract: each tool is a package under api/tools/<name>/ with __init__.py exporting MANIFEST (id, name, description, icon, tags) and router.py exporting an APIRouter. register_tools() scans the directory, imports each package, mounts its router, collects manifests.",
       "GET /api/tools serves the collected manifests — the frontend sidebar renders from it. Add a tool: create a folder. Remove: delete it. main.py never changes.",
     ],
     level2: [
@@ -650,7 +650,7 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       },
       {
         heading: "The manifest is a boundary object",
-        body: "MANIFEST carries UI concerns (icon, name), authz hints (required_role), and taxonomy (tags) across the backend/frontend boundary in one typed shape. The frontend stays generic — it renders whatever the registry reports. This is the same 'metadata travels with the unit' idea as Python entry_points, VS Code extension manifests, and Kubernetes CRDs.",
+        body: "MANIFEST carries UI concerns (icon, name) and taxonomy (tags) across the backend/frontend boundary in one typed shape — the same 'metadata travels with the unit' idea as Python entry_points, VS Code extension manifests, and Kubernetes CRDs. It deliberately carries NO role: it once did, nothing read it, and an inert field next to a route made the route look guarded when it wasn't. Metadata may describe a unit; it must never look like it enforces something it cannot reach.",
       },
     ],
     level3: [

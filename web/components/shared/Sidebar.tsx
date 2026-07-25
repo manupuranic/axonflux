@@ -3,7 +3,8 @@
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { clearToken, getUser, hasRole } from "@/lib/auth";
+import { clearToken, getUser, hasRole, type Role } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { PipelineTriggerModal } from "@/components/pipeline/PipelineTriggerModal";
@@ -29,7 +30,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
   useEffect(() => {
     setUser(getUser());
-    setCanRunPipeline(hasRole("manager"));
+    setCanRunPipeline(can("runPipeline"));
     setMounted(true);
   }, []);
 
@@ -45,7 +46,9 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   };
 
   const sz = "h-4 w-4 shrink-0";
-  const links: { href: string; label: string; icon: ReactNode }[] = [
+  // minRole omitted = visible to any authenticated user. This array is the only
+  // place nav visibility is decided; page access itself is enforced server-side.
+  const links: { href: string; label: string; icon: ReactNode; minRole?: Role }[] = [
     { href: "/dashboard",                  label: "Dashboard",        icon: <LayoutDashboard className={sz} /> },
     { href: "/dashboard/health",           label: "Product Health",   icon: <Activity className={sz} /> },
     { href: "/dashboard/replenishment",    label: "Replenishment",    icon: <Package className={sz} /> },
@@ -59,6 +62,11 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     { href: "/academy",                    label: "Academy",          icon: <GraduationCap className={sz} /> },
     { href: "/settings",                   label: "AI Settings",      icon: <Settings className={sz} /> },
   ];
+
+  // Restricted links stay hidden until after mount — the role lives in
+  // localStorage, which SSR cannot read, so rendering them earlier would
+  // produce a hydration mismatch.
+  const visibleLinks = links.filter((l) => !l.minRole || (mounted && hasRole(l.minRole)));
 
   return (
     <>
@@ -100,7 +108,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
         {/* Nav Links */}
         <nav className="space-y-2 p-4">
-          {links.map((link) => {
+          {visibleLinks.map((link) => {
             const isActive = pathname === link.href;
             return (
               <Link key={link.href} href={link.href}>
