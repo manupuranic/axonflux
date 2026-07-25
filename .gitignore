@@ -1,5 +1,8 @@
 # ---- Claude Code working directory ----
-.claude/
+# ignore contents (not the dir itself) so skills/ can be re-included below —
+# git never descends into a fully-excluded directory
+.claude/*
+!.claude/skills/
 
 # ---- Skills (project-local, not tracked) ----
 .agents/
