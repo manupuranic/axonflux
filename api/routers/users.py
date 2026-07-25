@@ -1,6 +1,8 @@
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api.core.security import hash_password
@@ -10,6 +12,11 @@ from api.schemas.auth import CurrentUser
 from api.schemas.users import UserCreate, UserOut, UserPatch
 
 router = APIRouter(prefix="/api/users", tags=["users"])
+
+
+def _username_taken(db: Session, username: str) -> bool:
+    """Fast-path duplicate check; the DB unique constraint is the real gate."""
+    return db.query(AppUser).filter(AppUser.username == username).first() is not None
 
 
 def _to_out(u: AppUser) -> UserOut:
@@ -39,8 +46,7 @@ def create_user(
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(require_admin),
 ):
-    exists = db.query(AppUser).filter(AppUser.username == body.username).first()
-    if exists:
+    if _username_taken(db, body.username):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
 
     user = AppUser(
@@ -52,7 +58,12 @@ def create_user(
         created_at=datetime.now(timezone.utc),
     )
     db.add(user)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # Concurrent create raced past the pre-check; the DB unique constraint wins
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
     return _to_out(user)
 
 
@@ -63,7 +74,12 @@ def patch_user(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ):
-    user = db.query(AppUser).filter(AppUser.id == user_id).first()
+    try:
+        uid = uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user = db.query(AppUser).filter(AppUser.id == uid).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 

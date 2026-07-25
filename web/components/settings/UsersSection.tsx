@@ -83,6 +83,10 @@ export function UsersSection() {
   async function resetPassword(u: AppUserOut) {
     const pw = window.prompt(`New password for ${u.username} (min 8 chars):`);
     if (!pw) return;
+    if (pw.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
     setBusyId(u.id);
     await run(() => usersApi.patch(u.id, { password: pw }));
     setBusyId(null);

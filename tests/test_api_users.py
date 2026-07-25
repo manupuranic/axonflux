@@ -85,6 +85,22 @@ class TestCrud:
         resp = client.patch(f"/api/users/{uuid.uuid4()}", headers=admin_headers, json={"role": "staff"})
         assert resp.status_code == 404
 
+    def test_non_uuid_user_id_404(self, client, admin_headers):
+        resp = client.patch("/api/users/not-a-uuid", headers=admin_headers, json={"role": "staff"})
+        assert resp.status_code == 404
+
+    def test_duplicate_username_race_hits_db_constraint(self, client, admin_headers, monkeypatch):
+        """Simulate the check-then-insert race: blind the pre-check so the INSERT
+        reaches the DB unique constraint, which must still surface as 409."""
+        import api.routers.users as users_module
+
+        _, username = _create(client, admin_headers)
+        monkeypatch.setattr(users_module, "_username_taken", lambda db, u: False)
+        resp = client.post("/api/users", headers=admin_headers, json={
+            "username": username, "password": TEST_PASSWORD, "full_name": None, "role": "staff",
+        })
+        assert resp.status_code == 409
+
 
 class TestSafetyRails:
     def _admin_id(self, client, admin_headers):
