@@ -236,24 +236,8 @@ Superseded the client-side PDF builder:
 - Campaign Studio (`api/tools/campaign_studio/`): format-as-data canvas (A4/A5/WhatsApp/Instagram/Facebook stored as data rows, not code branches), bulk product management, canvas image upload, one-way export to Pamphlets, 24 QA unit tests
 - Shared chat tools carry the backing product model in state (`PamphletItem` default, `CampaignProduct` injected) — see fix `1c1037d`
 
-**A4 — Role-Based Access Control** *(before Phase D)*
-
-Current state: JWT auth works, two roles exist (`staff`, `admin`), `require_admin` dependency exists.
-Missing: `manager` role, `require_manager` dependency, enforcement on all tool endpoints.
-
-**Three roles:**
-| Role | Who | Access |
-|---|---|---|
-| `admin` | Developer | Everything + system config + MCP API key management |
-| `manager` | Store manager | Verify cash closure, approve agent outputs, approve blog posts, all reports |
-| `staff` | Counter staff | Submit cash closure, pamphlet generator, BOM review, trigger pipeline |
-
-**Work:**
-- Add `manager` to `app.users.role` check constraint
-- Add `require_manager` dependency to `api/dependencies.py`
-- Audit all tool endpoints: cash closure verify → `require_manager`, BOM confirm → `require_staff`, agent trigger → `require_manager`
-- Phase E MCP needs separate `api_key` auth (machine credential, not user role)
-- Frontend: show/hide UI elements based on role from JWT
+**A4 — Role-Based Access Control** ✅
+Three-role lattice `staff(1) < manager(2) < admin(3)` via `require_role()` factory in `api/dependencies.py` — adding a role = one dict line. Migration 013 CHECK constraint on `app.users.role`. Endpoint audit: pipeline trigger/cancel manager+, pipeline reads staff+, cash verify manager+, entity confirm/reject manager+ (recompute/alias-delete stay admin), all business routes `require_staff` (garbage-role tokens 403). Admin user-management API (`/api/users`) + Settings UI section. Frontend `hasRole()` mirrors the lattice. Machine/agent identities are NOT roles — Phase E API-key plane. See `docs/superpowers/specs/2026-07-26-a4-rbac-design.md`.
 
 ---
 
