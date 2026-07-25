@@ -186,6 +186,7 @@ export function EntityResolutionPage() {
                   <SuggestionClusterCard
                     key={cluster.cluster_key}
                     cluster={cluster}
+                    canModerate={canModerate}
                     onConfirm={handleConfirm}
                     onReject={handleReject}
                   />

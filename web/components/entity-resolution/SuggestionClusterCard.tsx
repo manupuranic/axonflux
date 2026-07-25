@@ -8,6 +8,7 @@ import { ArrowRight, ArrowLeftRight, Check, X, Info } from "lucide-react";
 
 interface Props {
   cluster: SuggestionCluster;
+  canModerate: boolean;
   onConfirm: (aliasBarcode: string, canonicalBarcode: string) => Promise<void>;
   onReject: (suggestionId: string) => Promise<void>;
 }
@@ -140,7 +141,7 @@ function BarcodeTag({ barcode, name, label, accent }: {
 
 /* ── Main cluster card ── */
 
-export function SuggestionClusterCard({ cluster, onConfirm, onReject }: Props) {
+export function SuggestionClusterCard({ cluster, canModerate, onConfirm, onReject }: Props) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -230,7 +231,7 @@ export function SuggestionClusterCard({ cluster, onConfirm, onReject }: Props) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-gray-400">{scoreRange}</span>
-          {allHighConfidence && visibleMembers.length > 1 && (
+          {canModerate && allHighConfidence && visibleMembers.length > 1 && (
             <Button
               size="sm"
               className="h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -262,13 +263,15 @@ export function SuggestionClusterCard({ cluster, onConfirm, onReject }: Props) {
 
                 {/* Swap + Arrow */}
                 <div className="flex flex-col items-center gap-1 shrink-0 px-1">
-                  <button
-                    onClick={() => toggleSwap(member.id)}
-                    className="rounded-full p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                    title="Swap direction"
-                  >
-                    <ArrowLeftRight className="h-3.5 w-3.5" />
-                  </button>
+                  {canModerate && (
+                    <button
+                      onClick={() => toggleSwap(member.id)}
+                      className="rounded-full p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                      title="Swap direction"
+                    >
+                      <ArrowLeftRight className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                   <ArrowRight className="h-3.5 w-3.5 text-gray-300" />
                 </div>
 
@@ -286,35 +289,37 @@ export function SuggestionClusterCard({ cluster, onConfirm, onReject }: Props) {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-1 shrink-0">
-                  <Button
-                    size="sm"
-                    className="h-8 w-8 p-0 bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={() => handleConfirm(member)}
-                    disabled={busy}
-                    title="Confirm merge"
-                  >
-                    {loadingId === member.id ? (
-                      <span className="text-xs">...</span>
-                    ) : (
-                      <Check className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 w-8 p-0 text-red-500 border-red-200 hover:bg-red-50"
-                    onClick={() => handleReject(member)}
-                    disabled={busy}
-                    title="Reject"
-                  >
-                    {rejectingId === member.id ? (
-                      <span className="text-xs">...</span>
-                    ) : (
-                      <X className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
+                {canModerate && (
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      size="sm"
+                      className="h-8 w-8 p-0 bg-emerald-600 hover:bg-emerald-700 text-white"
+                      onClick={() => handleConfirm(member)}
+                      disabled={busy}
+                      title="Confirm merge"
+                    >
+                      {loadingId === member.id ? (
+                        <span className="text-xs">...</span>
+                      ) : (
+                        <Check className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 w-8 p-0 text-red-500 border-red-200 hover:bg-red-50"
+                      onClick={() => handleReject(member)}
+                      disabled={busy}
+                      title="Reject"
+                    >
+                      {rejectingId === member.id ? (
+                        <span className="text-xs">...</span>
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           );
