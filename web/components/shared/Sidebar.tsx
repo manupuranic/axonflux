@@ -3,7 +3,7 @@
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { clearToken, getUser } from "@/lib/auth";
+import { clearToken, getUser, hasRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { PipelineTriggerModal } from "@/components/pipeline/PipelineTriggerModal";
@@ -24,10 +24,12 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const router = useRouter();
   const [user, setUser] = useState<{ full_name: string | null; role: string } | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [canRunPipeline, setCanRunPipeline] = useState(false);
   const [isPipelineModalOpen, setIsPipelineModalOpen] = useState(false);
 
   useEffect(() => {
     setUser(getUser());
+    setCanRunPipeline(hasRole("manager"));
     setMounted(true);
   }, []);
 
@@ -120,17 +122,19 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         <Separator />
 
         {/* Pipeline Trigger */}
-        <div className="p-4">
-          <Button
-            onClick={() => setIsPipelineModalOpen(true)}
-            variant="outline"
-            size="sm"
-            className="w-full justify-start"
-          >
-            <Zap className="mr-2 h-4 w-4" />
-            Run Pipeline
-          </Button>
-        </div>
+        {canRunPipeline && (
+          <div className="p-4">
+            <Button
+              onClick={() => setIsPipelineModalOpen(true)}
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+            >
+              <Zap className="mr-2 h-4 w-4" />
+              Run Pipeline
+            </Button>
+          </div>
+        )}
 
         <Separator />
 
