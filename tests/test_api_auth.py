@@ -62,12 +62,75 @@ class TestProtectedRoutes:
         assert resp.status_code == 200
 
 
-class TestAdminEnforcement:
-    def test_staff_cannot_access_admin_route(self, client, staff_headers):
-        resp = client.post("/api/pipeline/trigger", headers=staff_headers, json={})
+class TestRoleEnforcementMatrix:
+    """Live-endpoint matrix. 403 = gate works; non-403 = gate passed
+    (2xx/404/409/422 depending on body/state — auth is what's under test)."""
+
+    # -- pipeline trigger: manager+ ------------------------------------
+    def test_pipeline_trigger_staff_403(self, client, staff_headers):
+        assert client.post("/api/pipeline/trigger", headers=staff_headers).status_code == 403
+
+    def test_pipeline_trigger_manager_passes(self, client, manager_headers, monkeypatch):
+        # TestClient runs BackgroundTasks synchronously — neuter the runner
+        # or this test would execute the real pipeline subprocess.
+        import api.routers.pipeline as pl
+        monkeypatch.setattr(pl, "_run_pipeline", lambda *a, **k: None)
+        resp = client.post("/api/pipeline/trigger?run_ingestion=false", headers=manager_headers)
+        assert resp.status_code == 202
+
+    # -- pipeline reads: staff+ ----------------------------------------
+    def test_pipeline_status_staff_passes(self, client, staff_headers):
+        assert client.get("/api/pipeline/status", headers=staff_headers).status_code == 200
+
+    def test_pipeline_last_data_date_staff_passes(self, client, staff_headers):
+        assert client.get("/api/pipeline/last-data-date", headers=staff_headers).status_code == 200
+
+    # -- cash closure verify: manager+ ---------------------------------
+    def test_cash_verify_staff_403(self, client, staff_headers):
+        resp = client.patch(
+            "/api/tools/cash-closure/00000000-0000-0000-0000-000000000000/verify",
+            headers=staff_headers, json={"status": "verified", "notes": None},
+        )
         assert resp.status_code == 403
 
-    def test_admin_can_access_admin_route(self, client, admin_headers):
-        # 422 = request body validation failed (not an auth failure) — auth passed
-        resp = client.post("/api/pipeline/trigger", headers=admin_headers, json={})
-        assert resp.status_code in (200, 202, 422)
+    def test_cash_verify_manager_passes_gate(self, client, manager_headers):
+        resp = client.patch(
+            "/api/tools/cash-closure/00000000-0000-0000-0000-000000000000/verify",
+            headers=manager_headers, json={"status": "verified", "notes": None},
+        )
+        assert resp.status_code == 404  # gate passed, record doesn't exist
+
+    # -- entity resolution confirm/reject: manager+ --------------------
+    def test_entity_confirm_staff_403(self, client, staff_headers):
+        resp = client.post("/api/tools/entity-resolution/confirm", headers=staff_headers, json={})
+        assert resp.status_code == 403
+
+    def test_entity_reject_staff_403(self, client, staff_headers):
+        resp = client.post("/api/tools/entity-resolution/reject", headers=staff_headers, json={})
+        assert resp.status_code == 403
+
+    def test_entity_confirm_manager_passes_gate(self, client, manager_headers):
+        resp = client.post("/api/tools/entity-resolution/confirm", headers=manager_headers, json={})
+        assert resp.status_code == 422  # gate passed, empty body fails validation
+
+    # -- entity resolution admin ops stay admin ------------------------
+    def test_entity_recompute_manager_403(self, client, manager_headers):
+        assert client.post("/api/tools/entity-resolution/recompute", headers=manager_headers).status_code == 403
+
+    # -- BOM confirm: staff+ -------------------------------------------
+    def test_bom_confirm_staff_passes_gate(self, client, staff_headers):
+        resp = client.post("/api/tools/bom/confirm", headers=staff_headers, json={})
+        assert resp.status_code == 422  # gate passed, empty body fails validation
+
+    # -- forged token without role claim: 403 everywhere ---------------
+    def test_token_missing_role_claim_403(self, client):
+        from jose import jwt
+        from datetime import datetime, timedelta, timezone
+        from api.core.config import settings
+
+        token = jwt.encode(
+            {"sub": "test_staff", "exp": datetime.now(timezone.utc) + timedelta(minutes=5)},
+            settings.SECRET_KEY, algorithm=settings.ALGORITHM,
+        )
+        resp = client.get("/api/pipeline/status", headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 403

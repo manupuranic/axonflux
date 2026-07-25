@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_db, get_current_user, require_admin
+from api.dependencies import get_db, get_current_user, require_manager
 from api.schemas.auth import CurrentUser
 from api.tools.cash_closure import MANIFEST
 from api.tools.cash_closure.schemas import HotoCreate, HotoResponse, HotoVerify
@@ -132,7 +132,7 @@ def verify_closure(
     closure_id: str,
     body: HotoVerify,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_manager),
 ):
     record = service.verify_closure(db, closure_id, str(current_user.id), body.status, body.notes)
     if not record:

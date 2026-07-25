@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_db, require_admin
+from api.dependencies import get_db, require_manager, require_staff
 from api.models.app import AppPipelineRun
 from api.schemas.auth import CurrentUser
 
@@ -230,7 +230,7 @@ def trigger_full_refresh(
     debug: bool = Query(False, description="Run browser in non-headless mode for debugging"),
     include_masters: bool = Query(False, description="Also export supplier master and item combinations"),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_manager),
 ):
     """
     Export fresh data from Er4u, ingest it, then rebuild derived tables.
@@ -272,7 +272,7 @@ def trigger_pipeline(
     background_tasks: BackgroundTasks,
     run_ingestion: bool = Query(False),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_manager),
 ):
     """
     Trigger the weekly pipeline (rebuild only, or ingest + rebuild).
@@ -295,7 +295,7 @@ def trigger_pipeline(
 @router.get("/status/latest", response_model=dict | None)
 def get_latest_pipeline_run(
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(require_admin),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Get the most recent pipeline run."""
     run = (
@@ -320,7 +320,7 @@ def get_latest_pipeline_run(
 def get_pipeline_run(
     run_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(require_admin),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Get a specific pipeline run by ID (used for live polling)."""
     from fastapi import HTTPException
@@ -342,7 +342,7 @@ def get_pipeline_run(
 def get_pipeline_status(
     limit: int = 10,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(require_admin),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Get recent pipeline runs."""
     runs = (
@@ -368,7 +368,7 @@ def get_pipeline_status(
 def cancel_pipeline_run(
     run_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(require_admin),
+    _: CurrentUser = Depends(require_manager),
 ):
     """Kill a running pipeline subprocess and mark the run as cancelled."""
     from fastapi import HTTPException
@@ -407,7 +407,7 @@ def cancel_pipeline_run(
 
 @router.get("/last-data-date")
 def get_last_data_date(
-    _: CurrentUser = Depends(require_admin),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Return the latest data date in the system (for pre-flight info in the UI)."""
     last = _get_last_data_date()

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_conn, get_current_user, get_db, require_admin
+from api.dependencies import get_conn, get_current_user, get_db, require_admin, require_manager
 from api.schemas.auth import CurrentUser
 from api.tools.entity_resolution import MANIFEST
 from api.tools.entity_resolution import service
@@ -52,7 +52,7 @@ def get_suggestions(
 def confirm_alias(
     body: ConfirmRequest,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_manager),
 ):
     alias = service.confirm_alias(db, body, current_user)
     return ConfirmResponse(alias=alias, pipeline_rebuild_required=True)
@@ -66,7 +66,7 @@ def confirm_alias(
 def reject_suggestion(
     body: RejectRequest,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_manager),
 ):
     service.reject_suggestion(db, body.suggestion_id, current_user)
     return {"ok": True}
