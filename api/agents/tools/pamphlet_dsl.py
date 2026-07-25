@@ -386,11 +386,20 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
     def update_products(updates: list, sort_by: str | None = None) -> dict:
         if not state.db or not state.pamphlet_id:
             return {"error": "DB not available"}
-        from api.tools.pamphlets.models import PamphletItem
+        # Pamphlets back product rows with PamphletItem; Campaign Studio injects
+        # CampaignProduct via state.product_model. Using the wrong model here matches
+        # 0 rows and looks like a phantom "backend won't save" bug.
+        if state.product_model is not None:
+            ProductModel = state.product_model
+        else:
+            from api.tools.pamphlets.models import PamphletItem
+            ProductModel = PamphletItem
         changed = 0
+        missing: list[str] = []
         for u in updates:
-            item = state.db.query(PamphletItem).filter(PamphletItem.id == u["item_id"]).first()
+            item = state.db.query(ProductModel).filter(ProductModel.id == u["item_id"]).first()
             if not item:
+                missing.append(str(u.get("item_id")))
                 continue
             for field in ("display_name", "offer_price", "original_price", "highlight_text"):
                 if field in u:
@@ -401,7 +410,14 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
             }
             changed += 1
         state.dirty = True
-        return {"updated": changed}
+        result: dict = {"updated": changed}
+        if missing:
+            result["not_found"] = missing
+            result["hint"] = (
+                "These item_ids matched no product row. Use the EXACT item_id values "
+                "from the product table / get_layout — do not assume it's a save failure."
+            )
+        return result
 
     @tool(
         description=(

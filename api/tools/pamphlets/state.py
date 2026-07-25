@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -15,6 +15,11 @@ class PamphletState:
     db: "Session | None" = None
     pamphlet_id: str = ""
     pending_item_changes: list = field(default_factory=list)
+    # SQLAlchemy model backing product rows. Pamphlets use PamphletItem (default);
+    # Campaign Studio injects CampaignProduct. update_products() writes to whichever
+    # is set here — without this, the shared tool always queried PamphletItem and
+    # silently matched 0 rows for Campaign Studio item_ids.
+    product_model: Any = None
 
 
 def _find_node(tree: dict, node_id: str) -> tuple[dict | None, list | None, int]:

@@ -118,12 +118,14 @@ def make_campaign_chat_session(
     db=None,
     design_id: str = "",
 ) -> tuple[ChatSession, PamphletState]:
+    from api.tools.campaign_studio.models import CampaignProduct
     state = PamphletState(
         dsl=dsl,
         theme=theme,
         items=items,
         db=db,
         pamphlet_id=design_id,  # field name doesn't matter — tools just use state.dsl
+        product_model=CampaignProduct,  # price/name edits write CampaignProduct, not PamphletItem
     )
     tools = build_dsl_tools(state)
     session = ChatSession(
