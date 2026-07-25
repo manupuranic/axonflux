@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_db, get_current_user
+from api.dependencies import get_db, require_staff
 from api.schemas.auth import CurrentUser
 from api.tools.pamphlets import MANIFEST
 from api.tools.pamphlets.schemas import (
@@ -40,7 +40,7 @@ def list_pamphlets(
     limit: int = Query(default=30, le=100),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     total, items = service.list_pamphlets(db, limit, offset)
     summaries = [
@@ -64,7 +64,7 @@ def list_pamphlets(
 def create_pamphlet(
     body: PamphletCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     pamphlet = service.create_pamphlet(db, body, current_user.id)
     db.commit()
@@ -74,7 +74,7 @@ def create_pamphlet(
 
 
 @router.get("/models", response_model=list[ModelInfo])
-def list_models(_=Depends(get_current_user)):
+def list_models(_=Depends(require_staff)):
     labels = {
         "claude-opus-4-7": "Claude Opus 4.7", "claude-sonnet-4-6": "Claude Sonnet 4.6",
         "claude-haiku-4-5-20251001": "Claude Haiku 4.5",
@@ -99,7 +99,7 @@ def list_models(_=Depends(get_current_user)):
 def get_pamphlet(
     pamphlet_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     pamphlet = service.get_pamphlet(db, pamphlet_id)
     if not pamphlet:
@@ -112,7 +112,7 @@ def get_pamphlet(
 def delete_pamphlet(
     pamphlet_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     pamphlet = service.get_pamphlet(db, pamphlet_id)
     if not pamphlet:
@@ -126,7 +126,7 @@ def update_pamphlet(
     pamphlet_id: str,
     body: PamphletUpdate,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     pamphlet = service.update_pamphlet(db, pamphlet_id, body)
     if not pamphlet:
@@ -143,7 +143,7 @@ def add_item(
     body: PamphletItemCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     pamphlet = service.get_pamphlet(db, pamphlet_id)
     if not pamphlet:
@@ -175,7 +175,7 @@ def update_item(
     item_id: str,
     body: PamphletItemUpdate,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     item = service.update_item(db, item_id, body)
     if not item:
@@ -190,7 +190,7 @@ def remove_item(
     pamphlet_id: str,
     item_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     removed = service.remove_item(db, item_id)
     if not removed:
@@ -216,7 +216,7 @@ def apply_item_changes(
     pamphlet_id: str,
     body: ApplyItemChangesRequest,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     import copy as _copy
     from sqlalchemy.orm.attributes import flag_modified
@@ -268,7 +268,7 @@ def update_node_content(
     node_id: str,
     body: NodeContentUpdate,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     import copy as _copy
     from sqlalchemy.orm.attributes import flag_modified
@@ -291,7 +291,7 @@ def update_node_content(
 def purge_orphaned_nodes(
     pamphlet_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     import copy as _copy
     from sqlalchemy.orm.attributes import flag_modified
@@ -328,7 +328,7 @@ def purge_orphaned_nodes(
 def duplicate_pamphlet(
     pamphlet_id: str,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     copy = service.duplicate_pamphlet(db, pamphlet_id, current_user.id)
     if not copy:
@@ -350,7 +350,7 @@ class GSheetImportRequest(BaseModel):
 def import_from_gsheet(
     body: GSheetImportRequest,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     try:
         pamphlet = service.import_from_gsheet(
@@ -368,7 +368,7 @@ def import_from_gsheet(
 def generate_ai_highlights(
     pamphlet_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     pamphlet = service.get_pamphlet(db, pamphlet_id)
     if not pamphlet:
@@ -394,7 +394,7 @@ def chat(
     body: ChatRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_staff),
 ):
     pamphlet = svc.get_pamphlet(db, pamphlet_id)
     if not pamphlet:
@@ -487,7 +487,7 @@ def chat(
 def get_versions(
     pamphlet_id: str,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    _=Depends(require_staff),
 ):
     return [
         VersionResponse(
@@ -503,7 +503,7 @@ def get_versions(
 def restore_version(
     pamphlet_id: str, version_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_staff),
 ):
     version = svc.restore_version(db, pamphlet_id, version_id, current_user.id)
     if not version:
@@ -520,7 +520,7 @@ def restore_version(
 async def export_pdf(
     pamphlet_id: str,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    _=Depends(require_staff),
 ):
     from fastapi.responses import Response as FastAPIResponse
     pamphlet = svc.get_pamphlet(db, pamphlet_id)
@@ -549,7 +549,7 @@ async def export_pdf(
 async def export_image(
     pamphlet_id: str,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    _=Depends(require_staff),
 ):
     from fastapi.responses import Response as FastAPIResponse
     pamphlet = svc.get_pamphlet(db, pamphlet_id)

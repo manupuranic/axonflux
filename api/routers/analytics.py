@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-from api.dependencies import get_conn, get_current_user
+from api.dependencies import get_conn, require_staff
 from api.schemas.analytics import (
     AnalyticsSummary,
     DailyRevenue,
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 @router.get("/summary", response_model=AnalyticsSummary)
 def get_summary(
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """KPI cards for the dashboard home."""
     row = conn.execute(text("""
@@ -126,7 +126,7 @@ def get_daily_revenue(
     from_date: date = Query(default=None),
     to_date: date = Query(default=None),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     if not to_date:
         to_date = conn.execute(text(
@@ -153,7 +153,7 @@ def get_daily_payments(
     from_date: date = Query(default=None),
     to_date: date = Query(default=None),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     if not to_date:
         to_date = conn.execute(text(
@@ -183,7 +183,7 @@ def get_daily_purchases(
     from_date: date = Query(default=None),
     to_date: date = Query(default=None),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     if not to_date:
         to_date = conn.execute(text(
@@ -214,7 +214,7 @@ def get_health_signals(
     limit: int = Query(default=50, le=500),
     offset: int = Query(default=0, ge=0),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     flag_filter = {
         "fast":  "h.fast_moving_flag = TRUE",
@@ -368,7 +368,7 @@ _SUPPLIER_EXPORT_HEADERS = [
 @router.get("/health-export")
 def export_health_signals(
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Download all product health signals as CSV, sorted by supplier then consumption."""
     rows = conn.execute(text(_HEALTH_EXPORT_SQL)).mappings().all()
@@ -389,7 +389,7 @@ def export_health_signals(
 def export_supplier_report(
     supplier: str = Query(default=None, description="Filter to a single supplier (exact name)"),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Supplier-wise report: one row per product per supplier. Filter with ?supplier=NAME."""
     if supplier:
@@ -422,7 +422,7 @@ def get_replenishment(
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     supplier_filter = "AND r.supplier_name ILIKE :supplier" if supplier else ""
     urgent_filter = "AND r.days_of_cover < r.lead_time_days" if urgent_only else ""
@@ -473,7 +473,7 @@ def get_top_products(
     limit: int = Query(default=10, ge=1, le=50),
     sort_by: str = Query(default="revenue", pattern="^(revenue|qty)$"),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Top N products by revenue or quantity sold over the last N days."""
     order_col = "total_revenue" if sort_by == "revenue" else "total_qty"
@@ -505,7 +505,7 @@ def get_demand_trend(
     barcode: str,
     days: int = Query(default=60, ge=7, le=365),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     rows = conn.execute(
         text("""

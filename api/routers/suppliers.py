@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-from api.dependencies import get_conn, get_current_user
+from api.dependencies import get_conn, require_staff
 from api.schemas.auth import CurrentUser
 
 router = APIRouter(prefix="/api/suppliers", tags=["suppliers"])
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/suppliers", tags=["suppliers"])
 @router.get("", response_model=list[dict])
 def list_suppliers(
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     rows = conn.execute(
         text("""
@@ -36,7 +36,7 @@ def get_supplier_restock(
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     params = {"supplier_name": supplier_name, "limit": limit, "offset": offset}
 

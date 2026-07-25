@@ -5,7 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_conn, get_db, get_current_user, require_admin
+from api.dependencies import get_conn, get_db, require_admin, require_staff
 from api.storage.client import get_storage_client
 from api.models.app import AppProduct
 from api.schemas.auth import CurrentUser
@@ -25,7 +25,7 @@ def search_products(
     q: str = Query(min_length=1, max_length=100),
     limit: int = Query(default=20, le=100),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """
     Fast search across canonical names and barcodes.
@@ -63,7 +63,7 @@ def list_products(
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     filters = ["TRUE"]
     params: dict = {"limit": limit, "offset": offset}
@@ -119,7 +119,7 @@ def list_products(
 def bulk_categorize(
     body: BulkCategorizeRequest,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """
     Batch update category and/or product_type for multiple products.
@@ -153,7 +153,7 @@ def get_recommendations(
     barcode: str,
     limit: int = Query(default=5, le=20),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """
     Returns products frequently bought together with the given barcode.
@@ -196,7 +196,7 @@ def get_recommendations(
 def get_product(
     barcode: str,
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     row = conn.execute(
         text("""
@@ -242,7 +242,7 @@ async def upload_product_image(
     barcode: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Upload a product image to storage (R2 or local). Returns {image_url}."""
     ct = (file.content_type or "").split(";")[0].strip()
@@ -281,7 +281,7 @@ def update_product(
     barcode: str,
     body: ProductUpdate,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     product = db.query(AppProduct).filter(AppProduct.barcode == barcode).first()
 

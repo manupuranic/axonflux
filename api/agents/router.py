@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer
 
-from api.dependencies import get_db, get_current_user
+from api.dependencies import get_db, require_staff
 from api.tools.pamphlets import service as pamphlet_svc
 from api.agents.image_agent import start_scan_task, get_task
 
@@ -44,7 +44,7 @@ def trigger_image_scan(
     pamphlet_id: str,
     force: bool = Query(default=False),
     db=Depends(get_db),
-    _=Depends(get_current_user),
+    _=Depends(require_staff),
 ):
     """Trigger an image-scan task for all items in the pamphlet that lack an image_url.
 
@@ -80,7 +80,7 @@ def trigger_single_image(
     pamphlet_id: str,
     item_id: str,
     db=Depends(get_db),
-    _=Depends(get_current_user),
+    _=Depends(require_staff),
 ):
     """Trigger an image-scan task for a single pamphlet item."""
     from api.tools.pamphlets.models import PamphletItem
@@ -125,7 +125,7 @@ async def stream_task(task_id: str, _=Depends(_token_auth)):
 
 
 @router.get("/tasks/{task_id}")
-def get_task_status(task_id: str, _=Depends(get_current_user)):
+def get_task_status(task_id: str, _=Depends(require_staff)):
     """Polling fallback for task status (standard Bearer auth)."""
     task = get_task(task_id)
     if not task:

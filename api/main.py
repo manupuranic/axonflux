@@ -11,7 +11,7 @@ from api.agents.router import router as agents_router
 from api.tools import register_tools, _registered_manifests, get_manifests
 from api.tools.base import ToolManifest
 from api.ai.config import ALLOWED_MODELS
-from api.dependencies import get_current_user
+from api.dependencies import require_staff
 
 
 app = FastAPI(
@@ -80,7 +80,7 @@ def get_all_models():
 # AI connection test endpoint
 # ---------------------------------------------------------------------------
 @app.post("/api/ai/test", tags=["ai"])
-def test_ai_connection(body: dict, _=Depends(get_current_user)):
+def test_ai_connection(body: dict, _=Depends(require_staff)):
     """Sends a minimal message to the specified provider/model and reports latency."""
     from api.ai import ChatSession
     provider = body.get("provider", "anthropic")

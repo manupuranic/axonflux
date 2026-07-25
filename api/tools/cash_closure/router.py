@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_db, get_current_user, require_manager
+from api.dependencies import get_db, require_manager, require_staff
 from api.schemas.auth import CurrentUser
 from api.tools.cash_closure import MANIFEST
 from api.tools.cash_closure.schemas import HotoCreate, HotoResponse, HotoVerify
@@ -64,7 +64,7 @@ def _to_response(record) -> HotoResponse:
 def submit_closure(
     body: HotoCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     """Submit the HOTO for a given date. Upserts — re-submitting an existing draft is allowed."""
     record = service.upsert_closure(db, body, str(current_user.id))
@@ -77,7 +77,7 @@ def submit_closure(
 def save_draft(
     body: HotoCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     """Save a draft without marking as submitted. Safe to call repeatedly."""
     record = service.save_draft(db, body, str(current_user.id))
@@ -90,7 +90,7 @@ def save_draft(
 def get_by_date(
     closure_date: date,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Fetch the HOTO record for a specific date. Used to pre-fill today's form."""
     record = service.get_closure_by_date(db, closure_date)
@@ -104,7 +104,7 @@ def list_closures(
     limit: int = Query(default=30, le=100),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     total, items = service.list_closures(db, limit, offset)
     return {
@@ -119,7 +119,7 @@ def list_closures(
 def get_closure(
     closure_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     record = service.get_closure(db, closure_id)
     if not record:

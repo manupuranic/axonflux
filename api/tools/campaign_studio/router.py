@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_db, get_current_user
+from api.dependencies import get_db, require_staff
 from api.schemas.auth import CurrentUser
 from api.tools.campaign_studio import MANIFEST
 from api.tools.campaign_studio import service as svc
@@ -30,7 +30,7 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 @router.get("/meta")
-def get_meta(_=Depends(get_current_user)):
+def get_meta(_=Depends(require_staff)):
     return {
         "campaign_types": CAMPAIGN_TYPES,
         "objectives": CAMPAIGN_OBJECTIVES,
@@ -50,7 +50,7 @@ def list_campaigns(
     offset: int = Query(default=0, ge=0),
     status: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     total, items = svc.list_campaigns(db, limit, offset, status)
     summaries = [
@@ -76,7 +76,7 @@ def list_campaigns(
 def create_campaign(
     body: CampaignCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     campaign = svc.create_campaign(db, body, current_user.id)
     db.commit()
@@ -88,7 +88,7 @@ def create_campaign(
 def get_campaign(
     campaign_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     campaign = svc.get_campaign(db, campaign_id)
     if not campaign:
@@ -101,7 +101,7 @@ def update_campaign(
     campaign_id: str,
     body: CampaignUpdate,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     campaign = svc.update_campaign(db, campaign_id, body)
     if not campaign:
@@ -115,7 +115,7 @@ def update_campaign(
 def delete_campaign(
     campaign_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     campaign = svc.get_campaign(db, campaign_id)
     if not campaign:
@@ -128,7 +128,7 @@ def delete_campaign(
 def duplicate_campaign(
     campaign_id: str,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     copy = svc.duplicate_campaign(db, campaign_id, current_user.id)
     if not copy:
@@ -146,7 +146,7 @@ def duplicate_campaign(
 def list_products(
     campaign_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     _require_campaign(db, campaign_id)
     return [_product_to_response(p) for p in svc.list_products(db, campaign_id)]
@@ -157,7 +157,7 @@ def add_product(
     campaign_id: str,
     body: CampaignProductCreate,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     _require_campaign(db, campaign_id)
     product = svc.add_product(db, campaign_id, body)
@@ -171,7 +171,7 @@ def bulk_add_products(
     campaign_id: str,
     body: dict,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Add products from the catalog by barcode list."""
     _require_campaign(db, campaign_id)
@@ -188,7 +188,7 @@ def import_products_from_pamphlet(
     campaign_id: str,
     body: dict,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Copy all items from an existing pamphlet into this campaign as products."""
     from api.tools.pamphlets.service import get_pamphlet_items
@@ -221,7 +221,7 @@ def update_product(
     product_id: str,
     body: CampaignProductUpdate,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     product = svc.update_product(db, product_id, body)
     if not product:
@@ -236,7 +236,7 @@ def remove_product(
     campaign_id: str,
     product_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     removed = svc.remove_product(db, product_id)
     if not removed:
@@ -252,7 +252,7 @@ def remove_product(
 def list_designs(
     campaign_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     _require_campaign(db, campaign_id)
     return [_design_to_summary(d) for d in svc.list_designs(db, campaign_id)]
@@ -263,7 +263,7 @@ def create_design(
     campaign_id: str,
     body: CampaignDesignCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     _require_campaign(db, campaign_id)
     if body.target not in DESIGN_TARGETS:
@@ -281,7 +281,7 @@ def get_design(
     campaign_id: str,
     design_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     design = svc.get_design(db, design_id)
     if not design or str(design.campaign_id) != campaign_id:
@@ -295,7 +295,7 @@ def update_design(
     design_id: str,
     body: CampaignDesignUpdate,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     design = svc.update_design(db, design_id, body)
     if not design or str(design.campaign_id) != campaign_id:
@@ -310,7 +310,7 @@ def delete_design(
     campaign_id: str,
     design_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     design = svc.get_design(db, design_id)
     if not design or str(design.campaign_id) != campaign_id:
@@ -324,7 +324,7 @@ def duplicate_design(
     campaign_id: str,
     design_id: str,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     copy = svc.duplicate_design(db, design_id, current_user.id)
     if not copy:
@@ -346,7 +346,7 @@ def list_design_versions(
     campaign_id: str,
     design_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     return [
         DesignVersionResponse(
@@ -367,7 +367,7 @@ def restore_design_version(
     design_id: str,
     version_id: str,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     version = svc.restore_design_version(db, design_id, version_id, current_user.id)
     if not version:
@@ -389,7 +389,7 @@ def get_design_chat_history(
     campaign_id: str,
     design_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Return user+assistant messages for display in the chat UI."""
     from api.tools.campaign_studio.models import CampaignChatMessage
@@ -413,7 +413,7 @@ def clear_design_chat(
     campaign_id: str,
     design_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Clear all chat history for this design (start a new session)."""
     design = svc.get_design(db, design_id)
@@ -429,7 +429,7 @@ def chat_design(
     design_id: str,
     body: DesignChatRequest,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     """AI chat turn: modifies design DSL via tool calls and saves a version."""
     import copy
@@ -587,7 +587,7 @@ def preview_design(
     design_id: str,
     body: dict,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Render DSL → HTML. If body.dsl is absent, renders the saved DSL."""
     from fastapi.responses import HTMLResponse
@@ -630,7 +630,7 @@ async def export_design_pdf(
     campaign_id: str,
     design_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     from fastapi.responses import Response as FR
     design = svc.get_design(db, design_id)
@@ -659,7 +659,7 @@ async def export_design_image(
     design_id: str,
     scale: int = 2,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Export all pages as a single tall PNG. scale=2 (default) = 2×, scale=3 = print quality."""
     from fastapi.responses import Response as FR
@@ -691,7 +691,7 @@ def export_as_pamphlet(
     campaign_id: str,
     body: ExportToPamphletRequest,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     _require_campaign(db, campaign_id)
     pamphlet = svc.export_design_as_pamphlet(
@@ -719,7 +719,7 @@ async def upload_campaign_asset(
     campaign_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     """Upload an image and store it as a campaign asset.
 
@@ -767,7 +767,7 @@ async def upload_campaign_asset(
 def list_asset_library(
     kind: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     q = db.query(AssetLibrary).order_by(AssetLibrary.created_at.desc())
     if kind:
@@ -781,7 +781,7 @@ async def upload_asset(
     alt: str = Query(default=""),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     if kind not in ASSET_KINDS:
         raise HTTPException(400, f"Unknown kind. Valid: {ASSET_KINDS}")
@@ -814,7 +814,7 @@ async def upload_asset(
 async def delete_asset(
     asset_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     asset = db.query(AssetLibrary).filter(AssetLibrary.id == asset_id).first()
     if not asset:
@@ -833,7 +833,7 @@ async def delete_asset(
 def list_campaign_assets(
     campaign_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     _require_campaign(db, campaign_id)
     return [_campaign_asset_to_response(a) for a in svc.list_assets(db, campaign_id)]
@@ -844,7 +844,7 @@ def add_campaign_asset(
     campaign_id: str,
     body: CampaignAssetCreate,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     _require_campaign(db, campaign_id)
     asset = svc.add_asset(db, campaign_id, body)
@@ -858,7 +858,7 @@ def remove_campaign_asset(
     campaign_id: str,
     asset_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     removed = svc.remove_asset(db, asset_id)
     if not removed:

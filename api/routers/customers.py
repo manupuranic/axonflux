@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-from api.dependencies import get_conn, get_current_user
+from api.dependencies import get_conn, require_staff
 from api.lib.filters import FieldSpec, build_where, parse_conditions
 from api.schemas.auth import CurrentUser
 from api.schemas.customers import (
@@ -36,7 +36,7 @@ def list_customers(
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Paginated customer list, sorted by revenue by default. Walk-ins excluded unless requested."""
     filters = []
@@ -110,7 +110,7 @@ def list_customers(
 @router.get("/summary", response_model=CustomerSummary)
 def get_customer_summary(
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """Aggregate KPIs across all identified (non-walk-in) customers."""
     row = conn.execute(text("""
@@ -221,7 +221,7 @@ def list_lapsed_customers(
     limit: int = Query(default=50, le=500),
     offset: int = Query(default=0, ge=0),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     tier_sql = _tier_filter(tier)
     filter_sql, filter_params = _parse_lapsed_conditions(cond)
@@ -281,7 +281,7 @@ def export_lapsed_customers(
     cond: list[str] = Query(default_factory=list),
     export_format: str = Query(default="csv", pattern="^(csv|xlsx)$"),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     tier_sql = _tier_filter(tier)
     filter_sql, filter_params = _parse_lapsed_conditions(cond)
@@ -380,7 +380,7 @@ def get_customer_history(
     mobile: str,
     limit: int = Query(default=50, le=200),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     """All bills for a customer identified by their normalized 10-digit mobile."""
     rows = conn.execute(

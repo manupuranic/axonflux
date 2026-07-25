@@ -3,7 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_conn, get_current_user, get_db
+from api.dependencies import get_conn, get_db, require_staff
 from api.schemas.auth import CurrentUser
 from api.tools.bom import MANIFEST
 from api.tools.bom.schemas import (
@@ -46,7 +46,7 @@ def get_suggestions(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     rows = conn.execute(text("""
         SELECT id::TEXT AS id, raw_barcode, raw_name, finished_barcode, finished_name,
@@ -81,7 +81,7 @@ def get_suggestions(
 def confirm_bom(
     body: ConfirmBomRequest,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     if body.qty_per_unit <= 0:
         raise HTTPException(status_code=422, detail="qty_per_unit must be > 0")
@@ -140,7 +140,7 @@ def confirm_bom(
 def reject_suggestion(
     body: RejectBomRequest,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     updated = db.execute(text("""
         UPDATE app.product_bom_suggestions
@@ -163,7 +163,7 @@ def list_mappings(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     rows = conn.execute(text("""
         SELECT
@@ -217,7 +217,7 @@ def update_mapping(
     mapping_id: str,
     body: UpdateBomRequest,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     if body.qty_per_unit is not None and body.qty_per_unit <= 0:
         raise HTTPException(status_code=422, detail="qty_per_unit must be > 0")
@@ -263,7 +263,7 @@ def update_mapping(
 def delete_mapping(
     mapping_id: str,
     db: Session = Depends(get_db),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     deleted = db.execute(text("""
         DELETE FROM app.product_bom WHERE id = :id::UUID RETURNING id
@@ -281,7 +281,7 @@ def delete_mapping(
 def create_manual_bom(
     body: ManualBomRequest,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_staff),
 ):
     return confirm_bom(
         ConfirmBomRequest(
@@ -304,7 +304,7 @@ def product_search(
     q: str = Query(min_length=2, max_length=100),
     limit: int = Query(20, ge=1, le=50),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     rows = conn.execute(text("""
         SELECT barcode, MAX(item_name_raw) AS item_name

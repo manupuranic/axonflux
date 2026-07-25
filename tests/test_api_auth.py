@@ -134,3 +134,15 @@ class TestRoleEnforcementMatrix:
         )
         resp = client.get("/api/pipeline/status", headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 403
+
+    # -- garbage role: 403 on ordinary staff-gated business routes ------
+    def test_garbage_role_token_403_on_business_routes(self, client):
+        """A token with an unknown role must be rejected by staff-gated routes."""
+        from api.core.security import create_access_token
+
+        token = create_access_token(subject="test_staff", role="ghostrole",
+                                    extra={"user_id": "00000000-0000-0000-0000-000000000001"})
+        headers = {"Authorization": f"Bearer {token}"}
+        for url in ["/api/analytics/summary", "/api/customers", "/api/tools/bom/suggestions"]:
+            resp = client.get(url, headers=headers)
+            assert resp.status_code == 403, f"{url} returned {resp.status_code}"

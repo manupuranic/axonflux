@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_conn, get_current_user, get_db, require_admin, require_manager
+from api.dependencies import get_conn, get_db, require_admin, require_manager, require_staff
 from api.schemas.auth import CurrentUser
 from api.tools.entity_resolution import MANIFEST
 from api.tools.entity_resolution import service
@@ -39,7 +39,7 @@ def get_suggestions(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     return service.get_suggestions(conn, suggestion_status, min_score, limit, offset)
 
@@ -82,7 +82,7 @@ def list_aliases(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     return service.list_aliases(conn, canonical_barcode, limit, offset)
 
@@ -108,7 +108,7 @@ def delete_alias(
 def get_product_detail(
     barcode: str,
     conn: Connection = Depends(get_conn),
-    _: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_staff),
 ):
     detail = service.get_product_detail(conn, barcode)
     if detail is None:
