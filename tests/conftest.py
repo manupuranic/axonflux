@@ -65,6 +65,7 @@ app.dependency_overrides[get_conn] = _override_get_conn
 # ---------------------------------------------------------------------------
 STAFF_USERNAME = "test_staff"
 ADMIN_USERNAME = "test_admin"
+MANAGER_USERNAME = "test_manager"
 TEST_PASSWORD = "testpass123"
 
 # Barcodes seeded for BOM name resolution tests
@@ -105,9 +106,10 @@ def seed_test_db():
         conn.execute(text("""
             INSERT INTO app.users (username, full_name, hashed_password, role, is_active)
             VALUES
-                (:u1, 'Test Staff', :pw, 'staff', TRUE),
-                (:u2, 'Test Admin', :pw, 'admin', TRUE)
-        """), {"u1": STAFF_USERNAME, "u2": ADMIN_USERNAME, "pw": pw})
+                (:u1, 'Test Staff',   :pw, 'staff',   TRUE),
+                (:u2, 'Test Admin',   :pw, 'admin',   TRUE),
+                (:u3, 'Test Manager', :pw, 'manager', TRUE)
+        """), {"u1": STAFF_USERNAME, "u2": ADMIN_USERNAME, "u3": MANAGER_USERNAME, "pw": pw})
 
         # ── Raw rows for BOM name resolution ──────────────────────────────
         batch_id = str(uuid.uuid4())
@@ -209,6 +211,13 @@ def admin_token(client):
 
 
 @pytest.fixture
+def manager_token(client):
+    resp = client.post("/api/auth/login", json={"username": MANAGER_USERNAME, "password": TEST_PASSWORD})
+    assert resp.status_code == 200, resp.text
+    return resp.json()["access_token"]
+
+
+@pytest.fixture
 def staff_headers(staff_token):
     return {"Authorization": f"Bearer {staff_token}"}
 
@@ -216,3 +225,8 @@ def staff_headers(staff_token):
 @pytest.fixture
 def admin_headers(admin_token):
     return {"Authorization": f"Bearer {admin_token}"}
+
+
+@pytest.fixture
+def manager_headers(manager_token):
+    return {"Authorization": f"Bearer {manager_token}"}

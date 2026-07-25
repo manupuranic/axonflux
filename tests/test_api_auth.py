@@ -2,7 +2,7 @@
 Auth endpoint tests — login, token structure, role enforcement.
 Covers: staff/admin roles; invalid creds; protected route without token.
 """
-from tests.conftest import ADMIN_USERNAME, STAFF_USERNAME, TEST_PASSWORD
+from tests.conftest import ADMIN_USERNAME, MANAGER_USERNAME, STAFF_USERNAME, TEST_PASSWORD
 
 
 class TestLogin:
@@ -18,6 +18,11 @@ class TestLogin:
         assert resp.status_code == 200
         body = resp.json()
         assert body["role"] == "admin"
+
+    def test_manager_login_returns_token(self, client):
+        resp = client.post("/api/auth/login", json={"username": MANAGER_USERNAME, "password": TEST_PASSWORD})
+        assert resp.status_code == 200
+        assert resp.json()["role"] == "manager"
 
     def test_wrong_password_returns_401(self, client):
         resp = client.post("/api/auth/login", json={"username": STAFF_USERNAME, "password": "wrong"})
