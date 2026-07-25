@@ -13,6 +13,24 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    date: "2026-07-25",
+    title: "AxonFlux Academy — interactive learning portal at /academy",
+    detail: "Learning platform generated from the real codebase, replacing the standalone System Design page and Docs Library (both absorbed as Academy tabs). Nine sections: synapse map (topic graph across data/backend/ML/AI domain bands with prereq edges), frontier topics with level-2/level-3 deep dives + mentor notes + exercises, feature case studies (data pipeline, RBAC, Campaign Studio, entity resolution, demand forecasting, cash closure, storage abstraction, customer analytics), 6-phase frontier roadmap (RBAC → embeddings → co-pilot → evals → agents → MCP) with a rejected-tech list as interview ammunition, architecture graph, rebuild-from-memory challenges with progressive hints, and an interview deck auto-derived from topics + features. Learning progress (confidence marks, revealed answers, completed challenges) lives in localStorage only — Academy data files are versioned content, never state. A local update-progress skill now maps every knowledge surface (Academy modules, this changelog, CLAUDE.md roadmap, docs library) so none drift when features ship.",
+    type: "learning",
+  },
+  {
+    date: "2026-07-25",
+    title: "Campaign Studio product edits + BOM column backfill",
+    detail: "Two fixes. (1) Chat product-update tool silently failed in Campaign Studio: shared update_products always queried PamphletItem, but Campaign Studio rows live in CampaignProduct — edits matched 0 rows and surfaced as phantom save failures. PamphletState now carries the backing model (PamphletItem default, CampaignProduct injected by the Campaign Studio chat route), and unmatched item_ids return to the LLM as not_found with a hint so it self-corrects instead of retrying blindly. (2) Step 04 stock position: CREATE TABLE IF NOT EXISTS skips existing tables, so databases built before BOM consumption tracking lacked total_bom_consumed and the INSERT failed — ADD COLUMN IF NOT EXISTS keeps the step idempotent on old and fresh databases alike.",
+    type: "fix",
+  },
+  {
+    date: "2026-05-31",
+    title: "Campaign Studio — format-aware design authoring (Phases 1–6)",
+    detail: "Campaign Studio graduates the pamphlet DSL into a general design-authoring tool. Format-as-data architecture: canvas dimensions (A4, A5, WhatsApp story, Instagram post, Facebook cover) are data rows, not code branches — the renderer reads width/height/margins from the format record. Multi-panel editor: canvas preview, product list with bulk management, AI chat with product context. Same apply_dsl_patch universal mutation tool as pamphlets. Direct image upload onto the canvas (via C2 storage). One-way export to the Pamphlets tool keeps legacy printing intact. Phase 6 QA: 24 unit tests over DSL mutation, format math, and export paths.",
+    type: "feature",
+  },
+  {
     date: "2026-05-31",
     title: "Phase C2 — Storage abstraction + Cloudflare R2 integration",
     detail: "StorageClient ABC with two implementations: LocalStorageClient (dev — writes to data/uploads/, served via FastAPI StaticFiles at /static/uploads) and R2StorageClient (prod — Cloudflare R2 via boto3 S3-compatible API). Factory function get_storage_client() reads STORAGE_* env vars — switching storage provider requires zero code changes, only .env edits. Migration 012 adds image_url TEXT to app.products. New endpoint POST /api/products/{barcode}/image: validates content-type (jpeg/png/webp), 10 MB limit, uploads to storage, upserts image_url. Product detail page gains an image card with preview + upload button. Bulk fetcher script (scripts/fetch_product_images.py) queries Open Food Facts by EAN-13 barcode — discovered ~0% hit rate for Indian supermarket catalog (even Parle-G, Maggi, Colgate absent from OFF). Staff manual upload is primary image sourcing path. 12 storage tests green including API-level upload/reject/auth checks.",

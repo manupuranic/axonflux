@@ -180,7 +180,7 @@ SECRET_KEY=...   # required for API JWT auth
 - Folder-based ingestion for 6 report types with SHA-256 deduplication
 - Alembic migrations for `app.*` schema
 - FastAPI backend: auth (JWT), analytics, customers, products, suppliers, pipeline routers
-- Tool plugin system: cash_closure + pamphlets (backends complete)
+- Tool plugin system: cash_closure + pamphlets + campaign_studio
 
 **Analytics (derived layer)**
 - `derived.product_daily_metrics` — date × product time series (~2.3M rows)
@@ -200,7 +200,7 @@ SECRET_KEY=...   # required for API JWT auth
 - Replenishment page (filterable by supplier, urgent-only)
 - Customers page (search, filters, drawer with purchase history)
 - Pipeline trigger modal
-- System design page (`/docs`)
+- Academy learning portal (`/academy`) — synapse topic map, feature case studies, frontier roadmap, challenges, interview deck; absorbed the old system design page (`/docs`) and docs library as Deep Dive + Library tabs
 
 **Canonical Products**
 - `app.products` table with canonical_name, category, brand
@@ -229,6 +229,13 @@ Full builder at `/tools/pamphlet-generator`. Features:
 - Import from Google Sheets CSV (auto-converts regular URL to export URL)
 - Backend: `api/tools/pamphlets/` — full CRUD + AI endpoint, Alembic migration 005
 
+**A3.5 — Pamphlet DSL v2 + Campaign Studio** ✅
+Superseded the client-side PDF builder:
+- Server-side DSL renderer: 16 node types → HTML → PDF/PNG via Playwright; 3-column editor (Chat | Products | Preview)
+- AI chat: 6 composable tools + universal `apply_dsl_patch` mutation tool, staged approval flow, LLM image agent (Tavily + Open Food Facts, SSE progress)
+- Campaign Studio (`api/tools/campaign_studio/`): format-as-data canvas (A4/A5/WhatsApp/Instagram/Facebook stored as data rows, not code branches), bulk product management, canvas image upload, one-way export to Pamphlets, 24 QA unit tests
+- Shared chat tools carry the backing product model in state (`PamphletItem` default, `CampaignProduct` injected) — see fix `1c1037d`
+
 **A4 — Role-Based Access Control** *(before Phase D)*
 
 Current state: JWT auth works, two roles exist (`staff`, `admin`), `require_admin` dependency exists.
@@ -252,12 +259,10 @@ Missing: `manager` role, `require_manager` dependency, enforcement on all tool e
 
 ### Phase B — ML Upgrade *(after Phase A)*
 
-**B1 — ML Demand Forecasting**
-Replace SQL WMA with validated XGBoost/ARIMA model.
-- Export `derived.product_daily_features` → parquet → `ml/` notebooks
-- Experiment tracking: MLflow (port 5001, `ml/mlflow.db`)
-- Notebook sequence: 01_baseline → 02_arima → 03_xgboost → 04_feature_importance
-- Promotion: update step 03 SQL formula (simple) OR write to `derived.demand_predictions` (complex)
+**B1 — ML Demand Forecasting** *(in progress)*
+Replace SQL WMA with validated XGBoost model.
+- Done: `ml/` scaffolded (`train.py`, `predict.py`, requirements), notebooks 01_baseline → 02_feature_engineering → 03_xgboost_demand → 04_evaluation, MLflow WMA baseline logged (port 5001, `ml/mlflow.db`), migration 007 `app.ml_demand_predictions(p10/p50/p90)`, calendar dim + stockout censoring in step 02
+- Remaining: validated model beating WMA baseline + promotion into pipeline (predict step not yet wired into `weekly_pipeline.py`)
 
 **B2 — Basket Analysis / Recommendation Engine** ✅
 - SQL self-join on `bill_no` → `derived.product_associations` (30,018 pairs, min 5 co-occurrences)
@@ -277,27 +282,10 @@ Different barcodes for the same physical product split analytics. Resolution pip
 **B4 — BOM Manager** ✅
 In-house repackaging blind spot fixed. See `docs/architecture/bom-manager.md`.
 
-**B5 — Test Baseline** *(before Phase C)*
-
-Current: 3 test files (DB connectivity, raw ingestion, insert). No API endpoint tests.
-Must establish before Phase C adds LLM calls + storage + agents (hard to test manually).
-
-**Target coverage (critical path only, not exhaustive):**
-```
-tests/
-├── test_db.py              ✅ exists — DB connectivity
-├── test_ingestion.py       ✅ exists — raw ingestion
-├── test_insert.py          ✅ exists — raw insert
-├── test_api_auth.py        login, token decode, role enforcement (staff/manager/admin)
-├── test_api_customers.py   lapsed tiers (30/60/90d math), active filter, summary counts
-├── test_api_analytics.py   summary endpoint, health signal flags
-├── test_api_bom.py         confirm requires qty > 0, reject marks status, duplicate prevention
-├── test_pipeline_step04.py BOM consumption math — wrong yield factor = daily stock error
-└── test_storage.py         LocalStorageClient upload/delete/url for dev env
-```
-
-**Not in scope for B5:** UI tests, ML notebook tests, full pipeline integration tests.
-Goal: catch regressions in auth, BOM math, customer tier logic before they hit production.
+**B5 — Test Baseline** ✅
+6-file suite covering the critical path before Phase C:
+`test_api_auth.py` (login, token decode, role enforcement), `test_api_customers.py` (lapsed tier math 30/60/90d, filters, summary), `test_api_analytics.py`, `test_api_bom.py` (confirm/reject/duplicate prevention), `test_pipeline_step04.py` (BOM consumption math), `test_storage.py` (Local + R2 clients + image upload API).
+Persistent `axonflux_test` DB via `scripts/setup_test_db.py`, per-test UUID isolation, FastAPI dependency-override DB swap, `integration` pytest mark for real-credential tests.
 
 ---
 
@@ -309,24 +297,12 @@ For promoted products (especially herbals). Requires new `app.products` columns:
 Script: `scripts/generate_product_content.py` — takes barcode list → calls Claude API →
 returns structured JSON → upserts into `app.products`. Framing must be wellness (not medical claims).
 
-**C2 — Storage Abstraction + Product Images**
-First task in C2: build `api/storage/client.py` — S3-compatible abstraction over boto3.
-Switching provider (R2 → S3 → any S3-compatible) = change `.env` vars only, zero code changes.
-
-```
-STORAGE_ENDPOINT_URL   # R2: https://{acct}.r2.cloudflarestorage.com | S3: omit
-STORAGE_ACCESS_KEY     # provider access key
-STORAGE_SECRET_KEY     # provider secret key
-STORAGE_BUCKET         # bucket name
-STORAGE_REGION         # R2: "auto" | S3: "ap-south-1" etc.
-STORAGE_PUBLIC_URL     # CDN public base URL (e.g. https://assets.puranic.in)
-```
-
-Local dev: `LocalStorageClient` writes to `data/uploads/`, served via FastAPI static files.
-Same `StorageClient` interface used by: C2 image fetcher, D7 Image Agent, D8 blog content.
-
-Image sourcing priority: Open Food Facts API (free, by barcode) → web fallback → AI generation (D7).
-- **DB**: `image_url TEXT` on `app.products` — stores CDN URL, never binary
+**C2 — Storage Abstraction + Product Images** ✅
+- `api/storage/client.py`: `StorageClient` ABC — `LocalStorageClient` (dev, writes `data/uploads/`, served via FastAPI StaticFiles) + `R2StorageClient` (Cloudflare R2 via boto3 S3-compatible API)
+- Factory `get_storage_client()` reads `STORAGE_*` env vars (`ENDPOINT_URL`, `ACCESS_KEY`, `SECRET_KEY`, `BUCKET`, `REGION`, `PUBLIC_URL`) — provider switch = `.env` only, zero code changes
+- Migration 012: `image_url TEXT` on `app.products` (CDN URL, never binary); `POST /api/products/{barcode}/image` (jpeg/png/webp, 10 MB limit) + image card on product detail page
+- Open Food Facts bulk fetcher (`scripts/fetch_product_images.py`) shipped but ~0% hit rate for Indian catalog — staff manual upload is the primary sourcing path
+- Same `StorageClient` interface reused by D7 Image Agent + D8 blog content
 
 **C3 — Embedding Pipeline + pgvector**
 Product catalog → vectors stored in PostgreSQL via pgvector extension.
