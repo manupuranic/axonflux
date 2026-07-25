@@ -463,8 +463,8 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
     prereqs: ["jwt-auth"],
     unlocks: ["mcp"],
     level1: [
-      "RBAC maps users→roles and roles→permissions, then guards resources by role. AxonFlux encodes role in the JWT and enforces via FastAPI dependencies: require_admin exists; A4 adds manager to the users.role CHECK constraint, a require_manager dependency, and an audit pass over every tool endpoint.",
-      "The three-role matrix: staff = submit closure, pamphlets, BOM review, trigger pipeline. manager = staff + verify closures + approve agent/blog outputs. admin = everything + config + API keys.",
+      "RBAC maps users→roles and roles→permissions, then guards resources by role. AxonFlux encodes role in the JWT and enforces via FastAPI dependencies: a require_role() factory over ROLE_LEVELS generates require_staff/require_manager/require_admin, migration 013 pins the CHECK constraint, and every route in api/ was audited onto the matrix (A4, shipped).",
+      "The shipped three-role matrix: staff = submit closure, pamphlets, BOM review, read all reports. manager = staff + verify closures + trigger/cancel pipeline + entity-resolution moderation. admin = everything + user management (/api/users) + entity recompute/alias delete.",
     ],
     level2: [
       {
@@ -473,7 +473,7 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       },
       {
         heading: "Roles as a lattice, not an enum",
-        body: "admin ⊃ manager ⊃ staff. Encode the hierarchy once (ROLE_LEVEL = {staff:0, manager:1, admin:2}; require level ≥ N) instead of listing allowed roles per endpoint — adding a role later means one table edit, not forty endpoint edits. This tiny design choice is the difference between RBAC and if-statement sprawl.",
+        body: "admin ⊃ manager ⊃ staff. Encode the hierarchy once (ROLE_LEVELS = {staff:1, manager:2, admin:3}; require level ≥ minimum) instead of listing allowed roles per endpoint — adding a role later means one dict edit, not forty endpoint edits. The shipped factory reserves level 0 for anything not in the dict: a forged or malformed token with a garbage role fails even the staff gate instead of silently passing as staff (the pre-A4 code defaulted missing role claims to 'staff' — a real hole, closed).",
       },
       {
         heading: "401 vs 403 — precise failure semantics",
@@ -491,15 +491,16 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       },
     ],
     axonflux:
-      "api/dependencies.py holds require_admin (require_manager lands in A4); tool manifests carry required_role for sidebar gating; migration adds 'manager' to the role CHECK constraint.",
+      "api/dependencies.py holds require_role()/ROLE_LEVELS/assert_min_role; migration 013 added the users.role CHECK constraint (001 never had one — CLAUDE.md claimed a constraint that didn't exist). The A4 final review found the audit's blind spot: sweep-by-grep replaces existing guards but can't see routes that never had one — /api/documentation shipped with zero auth, and two SSE query-token side-door helpers still carried the old 'default to staff' fallback. Whole-surface review, not diff review, caught them.",
     companies:
       "AWS IAM (roles+policies at planetary scale), GitHub org roles, Stripe's team permissions. Kubernetes RBAC guards every cluster API call with exactly this dependency-style model.",
     whenNot:
       "Two-user internal scripts don't need role systems. And once rules reference resource attributes heavily (ownership, tenancy, time), stretching RBAC with role explosion (staff_who_can_edit_tuesday) is the anti-pattern — switch vocabulary to ABAC.",
     files: [
-      { path: "api/dependencies.py", note: "require_admin; A4 adds require_manager + level lattice" },
-      { path: "api/migrations/versions/001_create_app_schema.py", note: "users.role CHECK constraint" },
-      { path: "api/tools/__init__.py", note: "manifest required_role — UI gating, not security" },
+      { path: "api/dependencies.py", note: "require_role factory, ROLE_LEVELS, assert_min_role" },
+      { path: "api/migrations/versions/013_users_role_check.py", note: "users.role CHECK constraint" },
+      { path: "api/routers/users.py", note: "admin user management — mints managers without SSH" },
+      { path: "tests/test_dependencies_roles.py", note: "the 9-combo lattice matrix + garbage-role tests" },
     ],
     interview: [
       {

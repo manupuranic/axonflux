@@ -62,7 +62,7 @@ export const FEATURES: Feature[] = [
   {
     id: "auth-rbac",
     title: "Authentication & Roles",
-    status: "in-progress",
+    status: "shipped",
     problem:
       "Staff, a manager, and an admin share one dashboard on a LAN/tailnet. Who may verify cash counts, trigger rebuilds, or manage users must be enforced server-side.",
     value: "The trust boundary for every tool. Also the pattern (dependency guards) each new endpoint inherits for free.",
@@ -70,14 +70,15 @@ export const FEATURES: Feature[] = [
       "POST /auth/login — bcrypt verify → JWT (sub, user_id, role, exp) signed with SECRET_KEY",
       "web/lib/auth.ts — token in localStorage, Bearer header on every call",
       "get_current_user dependency — decode + verify per request, zero DB reads",
-      "require_admin (and A4's require_manager) — role guards declared per route",
+      "require_role() factory over ROLE_LEVELS {staff:1, manager:2, admin:3} → require_staff/require_manager/require_admin, declared per route; unknown roles = level 0, fail everything",
+      "/api/users — admin-only CRUD (create, role change, deactivate, password reset) + Users section on Settings; self-demotion and self-deactivation blocked",
     ],
     codeFlow: [
       { step: "Login", detail: "verify bcrypt hash, mint token", file: "api/routers/auth.py" },
       { step: "Every request", detail: "HTTPBearer → decode_access_token → CurrentUser", file: "api/dependencies.py" },
-      { step: "Guarded routes", detail: "Depends(require_admin) raises 403 on insufficient role" },
+      { step: "Guarded routes", detail: "Depends(require_manager) etc. raise 403 below the required level", file: "api/dependencies.py" },
     ],
-    dbFlow: ["app.users (role CHECK constraint) read only at login — the JWT carries identity afterwards"],
+    dbFlow: ["app.users (role CHECK constraint, migration 013) read only at login — the JWT carries identity afterwards"],
     apiFlow: ["401 = unknown caller (bad/expired token) → client redirects to login; 403 = known caller, insufficient role"],
     theory: ["jwt-auth", "rbac", "dependency-injection"],
     interview: [
@@ -87,11 +88,12 @@ export const FEATURES: Feature[] = [
       },
     ],
     production: [
-      "A4 gap: manager role + endpoint audit still pending — hidden UI is not enforcement",
+      "A4 audit lesson: grep-driven sweeps replace existing guards but are blind to routes that never had one — /api/documentation shipped unauthenticated and two SSE side-door helpers kept the old default-to-staff fallback until the whole-branch review",
       "localStorage tokens are XSS-readable — acceptable on LAN, httpOnly cookies for public exposure",
       "Rate limiting on /login is a Phase 1 item",
+      "Role changes apply at next login (JWT staleness) — documented trade, not a bug",
     ],
-    improvements: ["require_manager + role lattice (A4)", "Refresh tokens", "Machine API-key plane for MCP (Phase E)"],
+    improvements: ["Refresh tokens", "Machine API-key plane for MCP (Phase E)", "Shared UUID path-param validator (users + pipeline routers)"],
     files: [
       { path: "api/core/security.py", note: "hashing + JWT" },
       { path: "api/dependencies.py", note: "guards" },

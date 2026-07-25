@@ -22,9 +22,9 @@ export const CHALLENGES: Challenge[] = [
       "One factory function make_role_guard(min_level) can generate all guards",
       "403 = known caller, refused; 401 = unknown caller",
     ],
-    solutionFiles: [{ path: "api/dependencies.py", note: "compare with require_admin — then improve it with your lattice" }],
+    solutionFiles: [{ path: "api/dependencies.py", note: "compare with the shipped require_role factory + ROLE_LEVELS" }],
     solutionNotes: [
-      "The shipped require_admin uses equality (role != 'admin') — your lattice version is genuinely better and is the A4 plan.",
+      "The shipped code (A4) IS the lattice: require_role(minimum) over ROLE_LEVELS {staff:1, manager:2, admin:3}. Compare your version against it — one detail worth stealing: anything not in the dict maps to level 0, so a garbage role fails even the staff gate instead of passing as implicit staff.",
       "If your version listed allowed roles per guard, count the edits a new role costs — that's the lesson.",
     ],
   },
