@@ -52,15 +52,32 @@ def get_current_user(
     return CurrentUser(
         id=payload.get("user_id", ""),
         username=username,
-        role=payload.get("role", "staff"),
+        # No fallback role: a token without the claim gets level 0 and fails
+        # every guard. Legitimate tokens always carry it (see routers/auth.py).
+        role=payload.get("role", ""),
         full_name=payload.get("full_name"),
     )
 
 
-def require_admin(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
-    if current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required",
-        )
-    return current_user
+ROLE_LEVELS = {"staff": 1, "manager": 2, "admin": 3}
+
+
+def require_role(minimum: str):
+    """Guard factory: require_role('manager') passes manager and admin."""
+    if minimum not in ROLE_LEVELS:
+        raise ValueError(f"Unknown role: {minimum}")
+
+    def guard(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+        if ROLE_LEVELS.get(current_user.role, 0) < ROLE_LEVELS[minimum]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"{minimum} access required",
+            )
+        return current_user
+
+    return guard
+
+
+require_staff = require_role("staff")
+require_manager = require_role("manager")
+require_admin = require_role("admin")
