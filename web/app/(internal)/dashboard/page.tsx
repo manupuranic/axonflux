@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useFetch } from "@/hooks/useFetch";
 import { api } from "@/lib/api";
 import { DataStateWrapper } from "@/components/shared/DataStateWrapper";
@@ -12,10 +12,16 @@ import { TopProductsCard } from "@/components/dashboard/TopProductsCard";
 import { PipelineTriggerModal } from "@/components/pipeline/PipelineTriggerModal";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { hasRole } from "@/lib/auth";
 
 export default function DashboardPage() {
   const [topSort, setTopSort] = useState<"revenue" | "qty">("revenue");
   const [isPipelineOpen, setIsPipelineOpen] = useState(false);
+  const [canRefresh, setCanRefresh] = useState(false);
+
+  useEffect(() => {
+    setCanRefresh(hasRole("manager"));
+  }, []);
 
   const summary = useFetch(() => api.summary());
   const revenue = useFetch(() => api.dailyRevenue());
@@ -30,15 +36,17 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-1">Overview of your inventory, sales, and purchases</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="mt-1 shrink-0 gap-1.5"
-          onClick={() => setIsPipelineOpen(true)}
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          Refresh Data
-        </Button>
+        {canRefresh && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-1 shrink-0 gap-1.5"
+            onClick={() => setIsPipelineOpen(true)}
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Refresh Data
+          </Button>
+        )}
       </div>
 
       <PipelineTriggerModal

@@ -4,13 +4,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { HotoForm } from "@/components/cash-closure/HotoForm";
 import { HotoHistory } from "@/components/cash-closure/HotoHistory";
 import { api } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { hasRole } from "@/lib/auth";
 import type { HotoResponse } from "@/types/api";
 
 export default function CashClosurePage() {
   const today = new Date().toISOString().slice(0, 10);
 
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [canVerify, setCanVerify] = useState(false);
   const [todayRecord, setTodayRecord] = useState<HotoResponse | null | undefined>(
     undefined
   );
@@ -21,8 +21,7 @@ export default function CashClosurePage() {
   const hiddenAtRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const user = getUser();
-    setIsAdmin(user?.role === "admin");
+    setCanVerify(hasRole("manager"));
   }, []);
 
   const fetchToday = useCallback(() => {
@@ -129,7 +128,7 @@ export default function CashClosurePage() {
         ) : (
           <HotoForm
             initialData={todayRecord}
-            isAdmin={isAdmin}
+            isAdmin={canVerify}
             onSaved={handleSaved}
             onVerify={todayRecord ? handleVerify : undefined}
           />
@@ -152,7 +151,7 @@ export default function CashClosurePage() {
         ) : (
           <HotoHistory
             items={history}
-            isAdmin={isAdmin}
+            isAdmin={canVerify}
             onVerify={handleVerify}
           />
         )}

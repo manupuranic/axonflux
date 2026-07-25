@@ -5,13 +5,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { api } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { hasRole } from "@/lib/auth";
 import { SuggestionClusterCard } from "@/components/entity-resolution/SuggestionClusterCard";
 import { AliasTable } from "@/components/entity-resolution/AliasTable";
 import type { SuggestionCluster, AliasResponse } from "@/types/api";
 
 export function EntityResolutionPage() {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [canModerate, setCanModerate] = useState(false); // manager+: confirm/reject
+  const [canDelete, setCanDelete] = useState(false);     // admin: alias delete
   const [activeTab, setActiveTab] = useState("suggestions");
 
   // Suggestions state
@@ -29,8 +30,8 @@ export function EntityResolutionPage() {
   const [aliasesLoading, setAliasesLoading] = useState(false);
 
   useEffect(() => {
-    const user = getUser();
-    setIsAdmin(user?.role === "admin");
+    setCanModerate(hasRole("manager"));
+    setCanDelete(hasRole("admin"));
   }, []);
 
   const loadClusters = useCallback(async () => {
@@ -152,7 +153,7 @@ export function EntityResolutionPage() {
             <div className="flex flex-col items-center justify-center py-16 text-center text-gray-500 border border-dashed border-gray-200 rounded-md">
               <p className="text-lg font-medium">No pending suggestions</p>
               <p className="text-sm mt-1">Click &quot;Refresh Suggestions&quot; to run the clustering analysis.</p>
-              {isAdmin && (
+              {canModerate && (
                 <Button
                   className="mt-4"
                   variant="outline"
@@ -169,7 +170,7 @@ export function EntityResolutionPage() {
                 <p className="text-sm text-gray-600">
                   {clusters.length} cluster{clusters.length !== 1 ? "s" : ""} — review and confirm or reject each alias
                 </p>
-                {isAdmin && (
+                {canModerate && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -208,7 +209,7 @@ export function EntityResolutionPage() {
               total={aliasTotal}
               offset={aliasOffset}
               limit={aliasLimit}
-              isAdmin={isAdmin}
+              isAdmin={canDelete}
               onDelete={handleDeleteAlias}
               onPageChange={(newOffset) => loadAliases(newOffset)}
             />

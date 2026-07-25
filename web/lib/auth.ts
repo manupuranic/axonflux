@@ -29,3 +29,13 @@ export function getUser(): { full_name: string | null; role: string } | null {
     return null;
   }
 }
+
+export type Role = "staff" | "manager" | "admin";
+
+// Mirrors ROLE_LEVELS in api/dependencies.py — keep in sync.
+const ROLE_LEVELS: Record<string, number> = { staff: 1, manager: 2, admin: 3 };
+
+export function hasRole(min: Role): boolean {
+  const user = getUser();
+  return (ROLE_LEVELS[user?.role ?? ""] ?? 0) >= ROLE_LEVELS[min];
+}
