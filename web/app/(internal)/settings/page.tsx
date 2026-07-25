@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ALLOWED_MODELS_BY_PROVIDER, PROVIDERS } from "@/lib/ai-settings";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
-import { getToken } from "@/lib/auth";
+import { getToken, hasRole } from "@/lib/auth";
+import { UsersSection } from "@/components/settings/UsersSection";
 
 type TestResult = { ok: boolean; response?: string; error?: string; latency_ms: number } | null;
 
@@ -32,6 +33,13 @@ export default function AISettingsPage() {
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<TestResult>(null);
   const [saved, setSaved] = useState(false);
+  const [showUsers, setShowUsers] = useState(false);
+
+  // Gated in useEffect (not render) so SSR/first paint never renders admin-only
+  // UI before localStorage-backed role info is available on the client.
+  useEffect(() => {
+    setShowUsers(hasRole("admin"));
+  }, []);
 
   useEffect(() => {
     const p = localStorage.getItem("axonflux_ai_provider") ?? "openrouter";
@@ -153,6 +161,8 @@ export default function AISettingsPage() {
           <li><code>OPENROUTER_API_KEY</code> — for openrouter provider</li>
         </ul>
       </div>
+
+      {showUsers && <UsersSection />}
     </div>
   );
 }

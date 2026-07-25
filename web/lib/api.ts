@@ -57,6 +57,7 @@ import type {
   AssetLibraryItem,
   DesignChatRequest,
   DesignChatResponse,
+  AppUserOut,
 } from "@/types/api";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -689,4 +690,24 @@ export const api = {
       return res.json();
     },
   },
+};
+
+// Users (A4 — admin-only user management)
+export const usersApi = {
+  list: () => apiFetch<AppUserOut[]>("/api/users"),
+
+  create: (body: { username: string; password: string; full_name: string | null; role: string }) =>
+    apiFetch<AppUserOut>("/api/users", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  patch: (
+    id: string,
+    body: Partial<{ full_name: string; role: string; is_active: boolean; password: string }>
+  ) =>
+    apiFetch<AppUserOut>(`/api/users/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 };

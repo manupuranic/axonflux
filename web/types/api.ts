@@ -693,3 +693,14 @@ export interface DesignChatResponse {
   provider: string;
   model: string;
 }
+
+// Users (A4 — admin-only user management)
+export interface AppUserOut {
+  id: string;
+  username: string;
+  full_name: string | null;
+  role: string;
+  is_active: boolean;
+  created_at: string | null;
+  last_login_at: string | null;
+}
