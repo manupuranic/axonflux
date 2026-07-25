@@ -19,7 +19,9 @@ else derives from or narrates them.
 | **Academy architecture** | `web/lib/academy/architecture.ts` | New system component (Redis, worker, MCP server...) → add ArchNode + edges. |
 | **Academy challenges** | `web/lib/academy/challenges.ts` | Shipped code worth rebuilding from memory → add a Challenge (brief, requirements, progressive hints, solution files). |
 | **Interview deck** | auto-derived from topics + features + `web/lib/academy/interview.ts` (SYSTEM_QUESTIONS) | Add system-wide questions only for cross-cutting stories (scaling, incidents, big trade-offs). |
-| **Deep Dive explainer** | `web/components/docs/explainer/sections/*` (served at `/academy/deep-dive`) | **Patch in place, never regenerate** (user rule). Update `Changelog.tsx` with shipped work; touch other sections only if the narrative they tell changed. Do NOT re-add concept/roadmap/interview content here — Academy owns those. |
+| **Deep Dive explainer — Changelog** | `web/components/docs/explainer/sections/Changelog.tsx` | **Always**, for every ship. Newest entry first. **Patch in place, never regenerate** (user rule). |
+| **Deep Dive explainer — Roadmap** | `web/components/docs/explainer/sections/Roadmap.tsx` | **Always**, when a phase item's state changes. It has its OWN `status: "shipped" \| "in-flight" \| "planned"` per item, separate from `web/lib/academy/roadmap.ts` — ticking one does NOT tick the other. Flip the status AND rewrite `detail` to what actually shipped. |
+| **Deep Dive explainer — other sections** | `web/components/docs/explainer/sections/*` | Only if the narrative they tell changed. Do NOT re-add concept/interview content here — Academy owns those. |
 | **CLAUDE.md roadmap** | `CLAUDE.md` (project root, "Project Roadmap" section) | Move shipped items to ✅ with a one-line summary, same style as existing entries. |
 | **Docs library** | `docs/architecture/*.md`, `docs/decisions/*.md` | New architecture or ADR-worthy decision → markdown file (auto-appears at `/academy/library` via `api/routers/docs.py`). |
 | **Session doc** | `docs/session_<topic>.md` | When user says "document": full session write-up goes here (user rule — `.remember/` alone is not documentation). |
@@ -35,9 +37,15 @@ Learning progress (confidence marks, revealed questions, done challenges) lives 
    numbers measured) — not generic theory. Keep the existing voice: analogy-first,
    problem-before-solution, trade-offs named, "when NOT" honest.
 3. **Explainer changelog** entry (patch in place).
-4. **CLAUDE.md roadmap** tick.
+4. **Roadmap tick — THREE separate files, all of them:**
+   `web/lib/academy/roadmap.ts` (prefix "✅ "), `web/components/docs/explainer/sections/Roadmap.tsx`
+   (flip `status` + rewrite `detail`), and `CLAUDE.md`. They are independent data;
+   updating one and assuming the others followed is the recurring failure mode here.
 5. **ADR/architecture doc** if a real decision was made (`docs/decisions/NNN-*.md`).
 6. **Verify**: `cd web && npm run build` must pass (type-checks all Academy data).
+   Then **grep the shipped item's ID** (e.g. `grep -rn "A4" web/ CLAUDE.md docs/`)
+   and confirm no surface still calls it planned/pending/in-progress. The build
+   cannot catch a stale status string — only this grep can.
 7. **Commit** per caveman-commit conventions (conventional commits, why over what,
    Co-Authored-By trailer). Separate commit for content updates vs code.
 8. **Push** only when user says push; "push all" = both remotes: `git push origin main && git push public main`.

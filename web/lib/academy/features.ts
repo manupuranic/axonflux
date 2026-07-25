@@ -222,7 +222,7 @@ export const FEATURES: Feature[] = [
     architecture: [
       "Date-picked closure form: system totals (derived payment breakdown) vs physical denomination grid",
       "Live delta computation client-side; submit → app.cash_closure_records",
-      "Manager verify/reject flow (A4 wires require_manager to it)",
+      "Manager verify/reject flow — the verify route is gated require_manager (A4)",
     ],
     codeFlow: [
       { step: "Compare", detail: "system side from derived.daily_payment_breakdown; physical side from denomination inputs" },
@@ -237,7 +237,7 @@ export const FEATURES: Feature[] = [
         a: "It's derived data — storing a copy freezes a possibly-stale rebuild into a human record. The record stores what only humans know (physical count, attestation); system totals join live from derived. One source of truth per fact.",
       },
     ],
-    production: ["Verification needs require_manager (A4)", "Discrepancy pattern analysis is deliberately deterministic — statistics, not LLM"],
+    production: ["Verification is manager-gated server-side; the UI's Review button is hidden below manager as UX only", "Discrepancy pattern analysis is deliberately deterministic — statistics, not LLM"],
     improvements: ["30-day pattern flags (day-of-week bias, worsening trend) in SQL", "Notification on large deltas via outbox events"],
     files: [{ path: "api/tools/cash_closure/", note: "tool plugin" }, { path: "web/components/cash-closure/", note: "denomination grid UI" }],
   },
