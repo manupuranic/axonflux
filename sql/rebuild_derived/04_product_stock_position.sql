@@ -16,6 +16,10 @@ CREATE TABLE IF NOT EXISTS derived.product_stock_position (
     PRIMARY KEY (date, product_id)
 );
 
+-- backfill column for tables created before BOM consumption tracking was added
+ALTER TABLE derived.product_stock_position
+    ADD COLUMN IF NOT EXISTS total_bom_consumed NUMERIC;
+
 -- populate product_stock_position table
 TRUNCATE TABLE derived.product_stock_position;
 
