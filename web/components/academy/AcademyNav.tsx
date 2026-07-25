@@ -13,6 +13,8 @@ const SECTIONS: { href: string; label: string }[] = [
   { href: "/academy/rebuild", label: "Rebuild Mode" },
   { href: "/academy/interview", label: "Interview" },
   { href: "/academy/roadmap", label: "Roadmap" },
+  { href: "/academy/deep-dive", label: "Deep Dive" },
+  { href: "/academy/library", label: "Library" },
 ];
 
 export function AcademyNav() {

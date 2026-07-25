@@ -1,9 +1,6 @@
-import { ExplainerPage } from "@/components/docs/explainer/ExplainerPage";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "Project Explainer | AxonFlux",
-};
-
-export default function DocsPage() {
-  return <ExplainerPage />;
+// Merged into the Academy — old bookmarks land on the new home.
+export default function DocsRedirect() {
+  redirect("/academy/deep-dive");
 }
