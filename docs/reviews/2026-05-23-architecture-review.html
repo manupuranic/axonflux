@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AxonFlux — Architecture Review</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], mono: ['JetBrains Mono', 'Menlo', 'monospace'] } } } };
+</script>
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .shallow-block { background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border: 1px dashed #ef4444; }
+  .deep-block { background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border: 1px solid #16a34a; }
+  .leaky { background: repeating-linear-gradient(45deg, #fef3c7, #fef3c7 6px, #fde68a 6px, #fde68a 12px); border: 1px solid #f59e0b; }
+  .clean { background: #f0f9ff; border: 1px solid #0284c7; }
+  .arrow-down::after { content: '↓'; font-size: 24px; color: #64748b; display: block; text-align: center; margin: 4px 0; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 12px 16px; border-radius: 6px; font-size: 12px; overflow-x: auto; }
+  pre code { font-family: 'JetBrains Mono', monospace; }
+  .badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge-strong { background: #dc2626; color: white; }
+  .badge-explore { background: #f59e0b; color: white; }
+  .badge-speculative { background: #64748b; color: white; }
+  details summary { cursor: pointer; user-select: none; }
+  details summary::marker { color: #64748b; }
+  .mermaid { background: white; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<!-- HEADER -->
+<header class="bg-gradient-to-br from-slate-900 to-slate-700 text-white">
+  <div class="max-w-6xl mx-auto px-6 py-12">
+    <p class="text-sm font-mono text-slate-300 tracking-wider uppercase">Architecture Review · 2026-05-23</p>
+    <h1 class="text-4xl font-bold mt-2">AxonFlux — Deepening Opportunities</h1>
+    <p class="mt-3 text-lg text-slate-300 max-w-3xl">
+      Survey of shallow modules, leaky seams, and untestable interfaces.
+      Each candidate proposes a deepening — turning interfaces with high implementation-to-interface ratio into modules where one small interface hides a lot of behaviour.
+    </p>
+  </div>
+</header>
+
+<!-- TLDR -->
+<section class="max-w-6xl mx-auto px-6 py-10">
+  <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+    <h2 class="text-xl font-bold mb-4">Headline findings</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="border-l-4 border-emerald-500 pl-4">
+        <p class="text-sm font-semibold text-emerald-700">What's deep</p>
+        <p class="text-sm text-slate-700 mt-1">Cash Closure tool plugin · Pamphlets service layer · BOM-aware step 04 SQL · derived layer rebuild contract</p>
+      </div>
+      <div class="border-l-4 border-amber-500 pl-4">
+        <p class="text-sm font-semibold text-amber-700">What's shallow</p>
+        <p class="text-sm text-slate-700 mt-1">Analytics router (SQL = business logic) · Schema sync between Python/TS · Script infrastructure (6× reinvention)</p>
+      </div>
+      <div class="border-l-4 border-rose-500 pl-4">
+        <p class="text-sm font-semibold text-rose-700">What's leaky</p>
+        <p class="text-sm text-slate-700 mt-1">BOM router (raw SQL on app+raw schemas) · Pipeline step ordering (implicit, by filename) · Schema drift (untyped)</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CANDIDATES -->
+<main class="max-w-6xl mx-auto px-6 pb-16 space-y-10">
+
+  <!-- ========================================================== -->
+  <!-- CANDIDATE 1: Read-side query module -->
+  <!-- ========================================================== -->
+  <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-slate-100">
+      <div class="flex items-start justify-between gap-3 mb-2">
+        <h3 class="text-2xl font-bold">1 · Extract a Read-Query Module</h3>
+        <span class="badge badge-strong">Strong</span>
+      </div>
+      <p class="text-slate-600">SQL is leaking from <code class="bg-slate-100 px-1 rounded text-sm">derived.*</code> reads up through every read-only router. Each route IS the business logic — there's no seam to test against.</p>
+    </div>
+
+    <div class="p-6 grid md:grid-cols-2 gap-6 border-b border-slate-100">
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Files involved</p>
+        <ul class="text-sm space-y-1 font-mono">
+          <li>api/routers/analytics.py · <span class="text-rose-600">533 LOC, 15 text()</span></li>
+          <li>api/routers/customers.py · <span class="text-rose-600">382 LOC, 8 text()</span></li>
+          <li>api/routers/products.py · <span class="text-rose-600">264 LOC, 5 text()</span></li>
+          <li>api/routers/suppliers.py · <span class="text-rose-600">76 LOC, 3 text()</span></li>
+        </ul>
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Friction</p>
+        <ul class="text-sm space-y-1 text-slate-700">
+          <li>· 70–100 line SQL strings embedded in route handlers</li>
+          <li>· Can't unit-test the query independent of HTTP transport</li>
+          <li>· Same derived.* table queried with slight variations across endpoints</li>
+          <li>· FastAPI route handler IS the data access layer</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="p-6 bg-slate-50">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Before / After</p>
+      <div class="grid md:grid-cols-2 gap-6">
+        <!-- BEFORE -->
+        <div>
+          <p class="text-xs font-semibold text-rose-700 mb-2">BEFORE — Router is the data layer</p>
+          <div class="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+            <div class="shallow-block rounded p-3 text-xs">
+              <p class="font-semibold">analytics.py / get_summary()</p>
+              <pre class="mt-1 text-[10px]"><code>@router.get("/summary")
+def summary(conn=Depends(get_conn)):
+    row = conn.execute(text("""
+      WITH revenue_7d AS (...),
+           signals AS (...),
+           customer_kpis AS (...)
+      SELECT ... -- 70 lines
+    """)).one()
+    return AnalyticsSummary(**row)</code></pre>
+            </div>
+            <p class="text-center text-xs text-slate-500">×15 read endpoints, same pattern</p>
+          </div>
+        </div>
+        <!-- AFTER -->
+        <div>
+          <p class="text-xs font-semibold text-emerald-700 mb-2">AFTER — Query module behind a seam</p>
+          <div class="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+            <div class="clean rounded p-3 text-xs">
+              <p class="font-semibold">api/routers/analytics.py</p>
+              <pre class="mt-1 text-[10px]"><code>@router.get("/summary")
+def summary(q=Depends(get_analytics)):
+    return q.summary_for(today())</code></pre>
+            </div>
+            <div class="arrow-down"></div>
+            <div class="deep-block rounded p-3 text-xs">
+              <p class="font-semibold">api/queries/analytics.py</p>
+              <pre class="mt-1 text-[10px]"><code>class AnalyticsQueries:
+  def summary_for(self, date) -> Summary:
+    """Returns 7d revenue, signals, customer KPIs.
+    Composes revenue_7d() + signals() + kpis()."""
+  def revenue_7d(self) -> Decimal: ...
+  def signals(self) -> SignalCounts: ...
+  def customer_kpis(self) -> CustomerKpis: ...</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Why this is deep</p>
+      <ul class="text-sm space-y-1.5 text-slate-700">
+        <li><strong>Leverage:</strong> One small interface <code class="bg-slate-100 px-1 rounded">AnalyticsQueries.summary_for(date)</code> hides the 70-line CTE.</li>
+        <li><strong>Locality:</strong> All derived.* read SQL lives in <code class="bg-slate-100 px-1 rounded">api/queries/</code>. Schema changes touch one place.</li>
+        <li><strong>Test surface:</strong> Query module returns typed objects testable with seed data — no HTTP/JWT/FastAPI machinery required.</li>
+        <li><strong>Deletion test:</strong> Deleting <code>api/queries/</code> would scatter ~30 SQL strings back across 4 routers. Complexity <em>concentrates</em> when consolidated. Pass.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ========================================================== -->
+  <!-- CANDIDATE 2: SQL pipeline dependency declaration -->
+  <!-- ========================================================== -->
+  <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-slate-100">
+      <div class="flex items-start justify-between gap-3 mb-2">
+        <h3 class="text-2xl font-bold">2 · Declare Pipeline Step Dependencies</h3>
+        <span class="badge badge-strong">Strong</span>
+      </div>
+      <p class="text-slate-600">Step ordering enforced only by filename prefix. Step 04 reads <code class="bg-slate-100 px-1 rounded text-sm">app.product_bom</code> but never declares the dependency. If 04 runs before 01, you get silent data corruption — no error.</p>
+    </div>
+
+    <div class="p-6 grid md:grid-cols-2 gap-6 border-b border-slate-100">
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Files involved</p>
+        <ul class="text-sm space-y-1 font-mono">
+          <li>pipelines/weekly_pipeline.py · lines 29–41</li>
+          <li>sql/rebuild_derived/00..10_*.sql</li>
+          <li>sql/rebuild_derived/04_product_stock_position.sql · joins app.product_bom + derived.product_daily_metrics</li>
+        </ul>
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Failure mode</p>
+        <ul class="text-sm space-y-1 text-slate-700">
+          <li>· No error on missing dependency — just zero BOM consumption</li>
+          <li>· pseudo_stock = purchased − sold (missing the BOM drain)</li>
+          <li>· Downstream step 06 (replenishment) uses corrupted stock</li>
+          <li>· Failure invisible until staff notices replenishment is wrong</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="p-6 bg-slate-50">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Before / After</p>
+      <div class="grid md:grid-cols-2 gap-6">
+        <div>
+          <p class="text-xs font-semibold text-rose-700 mb-2">BEFORE — Implicit order, no contract</p>
+          <div class="mermaid">
+flowchart TB
+  s00["00 daily_sales"] --> s01["01 product_daily_metrics"]
+  s01 --> s02["02 features"]
+  s02 --> s03["03 health_signals"]
+  s01 -.-> s04["04 stock_position"]
+  bom[("app.product_bom")] -.->|undeclared| s04
+  s04 --> s06["06 replenishment"]
+  style bom fill:#fee,stroke:#b91c1c,stroke-dasharray:4 4
+  style s04 fill:#fef3c7
+          </div>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-emerald-700 mb-2">AFTER — Declared deps, validated</p>
+          <div class="mermaid">
+flowchart TB
+  s00["00 daily_sales<br/><i>requires: raw.sales</i>"] --> s01["01 product_daily_metrics<br/><i>requires: 00</i>"]
+  s01 --> s02["02 features<br/><i>requires: 01</i>"]
+  s02 --> s03["03 health_signals<br/><i>requires: 02</i>"]
+  s01 --> s04["04 stock_position<br/><i>requires: 01, app.product_bom</i>"]
+  bom[("app.product_bom")] -->|declared| s04
+  s04 --> s06["06 replenishment<br/><i>requires: 04</i>"]
+  style s04 fill:#dcfce7
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Shape of the solution</p>
+      <p class="text-sm text-slate-700 mb-3">Each <code>.sql</code> file gets a header comment <em>or</em> a sibling <code>.toml</code> declaring its inputs. A Python <code>PipelineStep</code> dataclass reads them, builds a DAG, validates topological order at pipeline start, fails fast if a step depends on a missing table.</p>
+      <pre><code>-- sql/rebuild_derived/04_product_stock_position.sql
+-- requires: derived.product_daily_metrics  (step 01)
+-- requires: app.product_bom                (alembic-managed)
+-- produces: derived.product_stock_position
+CREATE TABLE IF NOT EXISTS derived.product_stock_position (...);</code></pre>
+      <ul class="text-sm space-y-1.5 text-slate-700 mt-4">
+        <li><strong>Leverage:</strong> Pre-flight validator catches missing dependencies before any step runs.</li>
+        <li><strong>Locality:</strong> Each SQL file declares its own contract — no central manifest to drift.</li>
+        <li><strong>Test surface:</strong> Parser is pure; DAG validation is testable without DB.</li>
+        <li><strong>Deletion test:</strong> Without declared deps, ordering is filename convention. A junior dev renaming files breaks the pipeline silently. Strong pass.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ========================================================== -->
+  <!-- CANDIDATE 3: Schema codegen -->
+  <!-- ========================================================== -->
+  <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-slate-100">
+      <div class="flex items-start justify-between gap-3 mb-2">
+        <h3 class="text-2xl font-bold">3 · Generate TS Types from Pydantic</h3>
+        <span class="badge badge-strong">Strong</span>
+      </div>
+      <p class="text-slate-600">~60 Pydantic schemas duplicated in TypeScript by hand. Drift is invisible — there's at least one real bug already (SuggestionCluster's <code class="bg-slate-100 px-1 rounded text-sm">AliasResponse</code> vs <code class="bg-slate-100 px-1 rounded text-sm">SuggestionItem</code>).</p>
+    </div>
+
+    <div class="p-6 grid md:grid-cols-2 gap-6 border-b border-slate-100">
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Files involved</p>
+        <ul class="text-sm space-y-1 font-mono">
+          <li>api/schemas/*.py · ~15 files</li>
+          <li>api/tools/**/schemas.py · 4 files</li>
+          <li>web/types/api.ts · <span class="text-rose-600">434 LOC, manually mirrored</span></li>
+        </ul>
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Known drift</p>
+        <ul class="text-sm space-y-1 text-slate-700">
+          <li>· <code>SuggestionCluster.suggestions</code>: Python = <code>list[AliasResponse]</code>, TS = <code>SuggestionItem[]</code></li>
+          <li>· Manual sync after every schema change</li>
+          <li>· Compile passes even when TS is wrong</li>
+          <li>· Runtime shape mismatch = silent UI bug</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="p-6 bg-slate-50">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Before / After</p>
+      <div class="grid md:grid-cols-2 gap-6">
+        <div>
+          <p class="text-xs font-semibold text-rose-700 mb-2">BEFORE — Two parallel definitions</p>
+          <div class="space-y-2">
+            <div class="leaky rounded p-3 text-xs">
+              <p class="font-semibold mb-1">api/schemas/customers.py</p>
+              <pre class="text-[10px]"><code>class LapsedCustomer(BaseModel):
+    mobile_clean: str
+    churn_tier: Literal["active",...]</code></pre>
+            </div>
+            <div class="text-center text-xs text-slate-500">↓ manual translation ↓</div>
+            <div class="leaky rounded p-3 text-xs">
+              <p class="font-semibold mb-1">web/types/api.ts</p>
+              <pre class="text-[10px]"><code>export interface LapsedCustomer {
+  mobile_clean: string;
+  churn_tier: ChurnTier;
+}</code></pre>
+            </div>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-emerald-700 mb-2">AFTER — Single source of truth</p>
+          <div class="space-y-2">
+            <div class="deep-block rounded p-3 text-xs">
+              <p class="font-semibold mb-1">api/schemas/customers.py</p>
+              <pre class="text-[10px]"><code>class LapsedCustomer(BaseModel):
+    mobile_clean: str
+    churn_tier: Literal["active",...]</code></pre>
+            </div>
+            <div class="text-center text-xs text-emerald-700 font-semibold">↓ openapi.json → openapi-typescript ↓</div>
+            <div class="clean rounded p-3 text-xs">
+              <p class="font-semibold mb-1">web/types/api.generated.ts (committed)</p>
+              <pre class="text-[10px]"><code>// AUTO-GENERATED — do not edit
+export interface LapsedCustomer {
+  mobile_clean: string;
+  churn_tier: "active" | "at-risk" | ...
+}</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Implementation</p>
+      <p class="text-sm text-slate-700 mb-2">FastAPI already produces an OpenAPI schema at <code>/api/openapi.json</code>. Run <code>npx openapi-typescript</code> on it → committed <code>api.generated.ts</code>. Pre-commit hook re-runs on schema changes.</p>
+      <ul class="text-sm space-y-1.5 text-slate-700">
+        <li><strong>Leverage:</strong> ~430 lines of TS deleted, replaced by generated file.</li>
+        <li><strong>Locality:</strong> Schema lives in Pydantic only. TS follows automatically.</li>
+        <li><strong>Test surface:</strong> Runtime contract enforced at TS compile time. Drift becomes a build error.</li>
+        <li><strong>Deletion test:</strong> Without codegen, you maintain two parallel definitions. Pass.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ========================================================== -->
+  <!-- CANDIDATE 4: BOM service extraction -->
+  <!-- ========================================================== -->
+  <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-slate-100">
+      <div class="flex items-start justify-between gap-3 mb-2">
+        <h3 class="text-2xl font-bold">4 · BOM Tool — Extract Service Layer</h3>
+        <span class="badge badge-explore">Worth exploring</span>
+      </div>
+      <p class="text-slate-600">BOM router (322 LOC, 10 embedded SQL strings) violates the tool plugin contract that Cash Closure follows. Mixes raw schema reads with app schema writes through the wrong dependency (<code class="bg-slate-100 px-1 rounded text-sm">Session</code> instead of <code class="bg-slate-100 px-1 rounded text-sm">Connection</code>).</p>
+    </div>
+
+    <div class="p-6 grid md:grid-cols-2 gap-6 border-b border-slate-100">
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Pattern divergence across tools</p>
+        <table class="text-xs w-full">
+          <thead class="bg-slate-100">
+            <tr><th class="text-left p-2">Tool</th><th class="text-left p-2">Service?</th><th class="text-left p-2">SQL in router?</th></tr>
+          </thead>
+          <tbody>
+            <tr class="border-b"><td class="p-2 font-mono">cash_closure</td><td class="p-2 text-emerald-600">✓</td><td class="p-2 text-emerald-600">none</td></tr>
+            <tr class="border-b"><td class="p-2 font-mono">pamphlets</td><td class="p-2 text-emerald-600">✓</td><td class="p-2 text-emerald-600">none</td></tr>
+            <tr class="border-b"><td class="p-2 font-mono">entity_resolution</td><td class="p-2 text-emerald-600">✓</td><td class="p-2 text-amber-600">subprocess spawn</td></tr>
+            <tr class="bg-rose-50"><td class="p-2 font-mono">bom</td><td class="p-2 text-rose-600">✗</td><td class="p-2 text-rose-600">10× text()</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Friction</p>
+        <ul class="text-sm space-y-1 text-slate-700">
+          <li>· Cannot unit-test BOM business logic (qty validation, name resolution, conflict detection)</li>
+          <li>· Reads <code>raw.raw_sales_itemwise</code> through ORM Session (wrong tx semantics)</li>
+          <li>· Future agents (D7 Image Agent, D8 Content Writer) cannot reuse BOM logic — only HTTP layer</li>
+          <li>· The pattern Cash Closure proved works, but BOM didn't follow it</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="p-6 bg-slate-50">
+      <div class="grid md:grid-cols-2 gap-6">
+        <div>
+          <p class="text-xs font-semibold text-rose-700 mb-2">BEFORE — SQL in router</p>
+          <div class="leaky rounded p-3 text-xs">
+            <pre class="text-[10px]"><code>@router.post("/confirm")
+def confirm_bom(body, db: Session):
+    if body.qty_per_unit <= 0: raise HTTPException(...)
+    raw_name = db.execute(text("""
+      SELECT MAX(item_name_raw) FROM (
+        SELECT item_name_raw FROM raw.raw_sales_itemwise
+        UNION ALL
+        SELECT ... -- mixed schema query
+      ) t WHERE barcode=:bc
+    """), {"bc": body.raw_barcode}).scalar()
+    existing = db.execute(text("""
+      SELECT id FROM app.product_bom
+      WHERE raw_barcode=:r AND finished_barcode=:f
+    """), {...}).scalar()
+    if existing: raise HTTPException(409, ...)
+    row = db.execute(text("""
+      INSERT INTO app.product_bom ...
+    """), {...}).mappings().one()
+    if body.suggestion_id:
+        db.execute(text("UPDATE ..."), {...})
+    db.commit()
+    return BomMapping(...)</code></pre>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-emerald-700 mb-2">AFTER — Service module</p>
+          <div class="clean rounded p-3 text-xs mb-2">
+            <p class="font-semibold mb-1">bom/router.py</p>
+            <pre class="text-[10px]"><code>@router.post("/confirm")
+def confirm_bom(body, svc=Depends(get_bom_service)):
+    return svc.confirm(body, current_user)</code></pre>
+          </div>
+          <div class="deep-block rounded p-3 text-xs">
+            <p class="font-semibold mb-1">bom/service.py</p>
+            <pre class="text-[10px]"><code>class BomService:
+  def confirm(self, req, user) -> BomMapping:
+    self._validate_qty(req.qty_per_unit)
+    self._reject_if_duplicate(req)
+    raw_name = self.name_resolver.resolve(req.raw_barcode)
+    fin_name = self.name_resolver.resolve(req.finished_barcode)
+    mapping = self.repo.insert(req, user, raw_name, fin_name)
+    if req.suggestion_id:
+      self.repo.mark_suggestion_confirmed(req.suggestion_id)
+    return mapping</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6">
+      <ul class="text-sm space-y-1.5 text-slate-700">
+        <li><strong>Leverage:</strong> Router becomes 1-line delegations. Business rules (qty &gt; 0, no duplicates, suggestion lifecycle) live in one testable place.</li>
+        <li><strong>Locality:</strong> Future BOM rule changes (e.g., enforce qty &le; 100) touch service only, not the HTTP layer.</li>
+        <li><strong>Test surface:</strong> <code>BomService.confirm()</code> testable with stub repo + in-memory name resolver. Currently zero unit tests possible.</li>
+        <li><strong>Deletion test:</strong> Without service extraction, BOM stays a 322-line router. Pass.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ========================================================== -->
+  <!-- CANDIDATE 5: Script harness -->
+  <!-- ========================================================== -->
+  <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-slate-100">
+      <div class="flex items-start justify-between gap-3 mb-2">
+        <h3 class="text-2xl font-bold">5 · Script Harness (shared infra for scripts/)</h3>
+        <span class="badge badge-explore">Worth exploring</span>
+      </div>
+      <p class="text-slate-600">Six scripts in <code class="bg-slate-100 px-1 rounded text-sm">scripts/</code> each reinvent: sys.path hack, .env loading, engine setup, argparse, and logging (which is just <code>print()</code>). Pipeline imports <code>suggest_bom.py</code> as a runtime function — silent failures.</p>
+    </div>
+
+    <div class="p-6 grid md:grid-cols-2 gap-6 border-b border-slate-100">
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Scripts surveyed</p>
+        <ul class="text-sm space-y-1 font-mono">
+          <li>scripts/cluster_product_names.py · 287 LOC</li>
+          <li>scripts/suggest_bom.py · 177 LOC</li>
+          <li>scripts/ingest_all.py · 282 LOC</li>
+          <li>scripts/generate_demo_data.py · 463 LOC</li>
+          <li>scripts/seed_calendar.py · 219 LOC</li>
+          <li>scripts/seed_canonical_products.py · 211 LOC</li>
+        </ul>
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Common boilerplate</p>
+        <pre class="text-[10px]"><code># Repeated in every script:
+import sys
+sys.path.insert(0, ".")
+from dotenv import load_dotenv
+from config.db import engine
+import argparse, structlog ...
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", ...)
+    args = parser.parse_args()
+    # Then actual logic
+
+if __name__ == "__main__":
+    main()</code></pre>
+      </div>
+    </div>
+
+    <div class="p-6 bg-slate-50">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Solution shape</p>
+      <div class="grid md:grid-cols-2 gap-6">
+        <div>
+          <p class="text-xs font-semibold text-rose-700 mb-2">BEFORE — 6× reinvention</p>
+          <div class="space-y-1.5">
+            <div class="shallow-block rounded px-3 py-2 text-xs">script A: 30 lines of setup + 250 lines logic</div>
+            <div class="shallow-block rounded px-3 py-2 text-xs">script B: 30 lines of setup + 150 lines logic</div>
+            <div class="shallow-block rounded px-3 py-2 text-xs">script C: 30 lines of setup + 250 lines logic</div>
+            <div class="shallow-block rounded px-3 py-2 text-xs">script D: 30 lines of setup + 430 lines logic</div>
+            <div class="shallow-block rounded px-3 py-2 text-xs">script E: 30 lines of setup + 190 lines logic</div>
+            <div class="shallow-block rounded px-3 py-2 text-xs">script F: 30 lines of setup + 180 lines logic</div>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-emerald-700 mb-2">AFTER — Harness + thin scripts</p>
+          <div class="space-y-1.5">
+            <div class="deep-block rounded px-3 py-2 text-xs">
+              <p class="font-semibold">scripts/_harness.py</p>
+              <p class="text-[11px]">@axonflux_script(<br>&nbsp;&nbsp;name="suggest_bom",<br>&nbsp;&nbsp;needs=["raw.raw_sales", "app.product_bom"],<br>&nbsp;&nbsp;args=[Arg("--min-score", int, 70)],<br>)<br>def run(ctx, args): ...</p>
+            </div>
+            <div class="clean rounded px-3 py-2 text-xs">scripts/suggest_bom.py — only the logic</div>
+            <div class="clean rounded px-3 py-2 text-xs">scripts/cluster_product_names.py — only the logic</div>
+            <div class="clean rounded px-3 py-2 text-xs">scripts/ingest_all.py — only the logic</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6">
+      <ul class="text-sm space-y-1.5 text-slate-700">
+        <li><strong>Leverage:</strong> One decorator gives every script a DB engine, structured logging, dry-run, and dependency pre-check.</li>
+        <li><strong>Locality:</strong> Changes to logging or engine setup happen in one file, not six.</li>
+        <li><strong>Test surface:</strong> <code>@axonflux_script</code> can inject a fake engine for unit testing.</li>
+        <li><strong>Deletion test:</strong> Deleting <code>_harness.py</code> would re-scatter ~180 lines back across 6 files. Pass.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ========================================================== -->
+  <!-- CANDIDATE 6: Frontend api.ts grouping -->
+  <!-- ========================================================== -->
+  <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-slate-100">
+      <div class="flex items-start justify-between gap-3 mb-2">
+        <h3 class="text-2xl font-bold">6 · Frontend API client — split by domain</h3>
+        <span class="badge badge-speculative">Speculative</span>
+      </div>
+      <p class="text-slate-600"><code class="bg-slate-100 px-1 rounded text-sm">web/lib/api.ts</code> is 429 lines, one giant <code>api = { ... }</code> object. ~60 endpoints flat at the root level. Works, but doesn't help discoverability.</p>
+    </div>
+
+    <div class="p-6 border-b border-slate-100">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Friction</p>
+      <ul class="text-sm space-y-1 text-slate-700">
+        <li>· Adding an endpoint = scrolling 429 lines to find the right spot</li>
+        <li>· Refactoring a domain (e.g. customers) touches a 400-line file</li>
+        <li>· No code-splitting opportunity — every page imports everything</li>
+      </ul>
+    </div>
+
+    <div class="p-6 bg-slate-50">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Note</p>
+      <p class="text-sm text-slate-700">This is speculative because if Candidate 3 (codegen) lands, the manually-written <code>api.ts</code> may become moot — the generated client takes over. Defer this until codegen lands; revisit if the generated client is awkward.</p>
+    </div>
+  </section>
+
+</main>
+
+<!-- TOP RECOMMENDATION -->
+<section class="max-w-6xl mx-auto px-6 pb-16">
+  <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-xl p-8 shadow-lg">
+    <p class="text-xs font-mono uppercase tracking-wider text-blue-200">Top recommendation</p>
+    <h2 class="text-3xl font-bold mt-2">Start with Candidate 2 — Pipeline dependency declaration</h2>
+    <p class="mt-4 text-blue-100">
+      Three candidates are <strong>Strong</strong>. Pick this one first because it's the only one where the current state can <em>silently corrupt production data</em>. Step 04 reads <code class="bg-blue-900/40 px-1 rounded">app.product_bom</code> with zero declared dependency. If a future engineer reorders the SQL files, the BOM consumption silently disappears from stock position, and the replenishment sheet starts recommending reorders for products that don't need them. There is no test that catches this.
+    </p>
+    <p class="mt-3 text-blue-100">
+      It's also <strong>small and contained</strong>: a header comment grammar in the SQL files + a Python parser + a pre-flight DAG check in <code class="bg-blue-900/40 px-1 rounded">weekly_pipeline.py</code>. One day of work. Defends every future SQL step automatically.
+    </p>
+    <div class="mt-6 grid md:grid-cols-2 gap-4">
+      <div class="bg-white/10 rounded-lg p-4">
+        <p class="text-xs uppercase tracking-wider text-blue-200">After Candidate 2 lands</p>
+        <p class="text-sm mt-1">Then Candidate 3 (codegen) — catches schema drift before it ships.</p>
+      </div>
+      <div class="bg-white/10 rounded-lg p-4">
+        <p class="text-xs uppercase tracking-wider text-blue-200">Then</p>
+        <p class="text-sm mt-1">Candidate 1 (read-query module) — biggest LOC delta, but lowest risk because read-only.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="border-t border-slate-200 py-6">
+  <div class="max-w-6xl mx-auto px-6 text-center text-xs text-slate-500">
+    Architecture review · AxonFlux · Generated 2026-05-23 · 6 candidates · 3 strong · 2 worth exploring · 1 speculative
+  </div>
+</footer>
+
+<script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+
+</body>
+</html>
