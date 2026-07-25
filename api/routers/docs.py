@@ -4,7 +4,10 @@ Provides a list endpoint and a content endpoint for the frontend doc browser.
 """
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from api.dependencies import require_staff
+from api.schemas.auth import CurrentUser
 
 router = APIRouter(prefix="/api/documentation", tags=["docs"])
 
@@ -19,7 +22,7 @@ _CATEGORIES = {
 
 
 @router.get("")
-def list_docs():
+def list_docs(_: CurrentUser = Depends(require_staff)):
     """Return all available docs grouped by category."""
     result = []
     for folder, label in _CATEGORIES.items():
@@ -46,7 +49,7 @@ def list_docs():
 
 
 @router.get("/{category}/{slug}")
-def get_doc(category: str, slug: str):
+def get_doc(category: str, slug: str, _: CurrentUser = Depends(require_staff)):
     """Return markdown content for a specific doc."""
     if category not in _CATEGORIES:
         raise HTTPException(status_code=404, detail="Category not found")

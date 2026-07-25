@@ -62,17 +62,31 @@ def get_current_user(
 ROLE_LEVELS = {"staff": 1, "manager": 2, "admin": 3}
 
 
+def assert_min_role(role: str, minimum: str) -> None:
+    """Raise 403 unless `role` meets or exceeds `minimum` on the ROLE_LEVELS lattice.
+
+    Shared by the require_role guard factory below AND the query-token auth
+    helpers in api/agents/router.py (_token_auth) and
+    api/tools/pamphlets/router.py (_user_from_query_token). Those two exist
+    because EventSource/browser navigation can't send Authorization headers,
+    so they decode the JWT from a ?token= query param instead of going
+    through get_current_user — but they must enforce the exact same
+    role-level check, not their own weaker copy.
+    """
+    if ROLE_LEVELS.get(role, 0) < ROLE_LEVELS[minimum]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"{minimum} access required",
+        )
+
+
 def require_role(minimum: str):
     """Guard factory: require_role('manager') passes manager and admin."""
     if minimum not in ROLE_LEVELS:
         raise ValueError(f"Unknown role: {minimum}")
 
     def guard(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
-        if ROLE_LEVELS.get(current_user.role, 0) < ROLE_LEVELS[minimum]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"{minimum} access required",
-            )
+        assert_min_role(current_user.role, minimum)
         return current_user
 
     return guard

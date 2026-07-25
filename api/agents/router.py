@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer
 
-from api.dependencies import get_db, require_staff
+from api.dependencies import assert_min_role, get_db, require_staff
 from api.tools.pamphlets import service as pamphlet_svc
 from api.agents.image_agent import start_scan_task, get_task
 
@@ -31,10 +31,15 @@ def _token_auth(
     payload = decode_access_token(raw)
     if not payload.get("sub"):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
+    # No fallback role: a token without the claim gets level 0 and fails the
+    # staff check below (see api.dependencies.get_current_user for the same
+    # rule on the header-auth path).
+    role = payload.get("role", "")
+    assert_min_role(role, "staff")
     return CurrentUser(
         id=payload.get("user_id", ""),
         username=payload["sub"],
-        role=payload.get("role", "staff"),
+        role=role,
         full_name=payload.get("full_name"),
     )
 

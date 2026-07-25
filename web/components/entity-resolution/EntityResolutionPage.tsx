@@ -153,7 +153,7 @@ export function EntityResolutionPage() {
             <div className="flex flex-col items-center justify-center py-16 text-center text-gray-500 border border-dashed border-gray-200 rounded-md">
               <p className="text-lg font-medium">No pending suggestions</p>
               <p className="text-sm mt-1">Click &quot;Refresh Suggestions&quot; to run the clustering analysis.</p>
-              {canModerate && (
+              {canDelete && (
                 <Button
                   className="mt-4"
                   variant="outline"
@@ -170,7 +170,7 @@ export function EntityResolutionPage() {
                 <p className="text-sm text-gray-600">
                   {clusters.length} cluster{clusters.length !== 1 ? "s" : ""} — review and confirm or reject each alias
                 </p>
-                {canModerate && (
+                {canDelete && (
                   <Button
                     size="sm"
                     variant="outline"

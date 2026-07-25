@@ -78,6 +78,22 @@ class TestRoleEnforcementMatrix:
         resp = client.post("/api/pipeline/trigger?run_ingestion=false", headers=manager_headers)
         assert resp.status_code == 202
 
+    def test_pipeline_trigger_admin_passes(self, client, admin_headers, monkeypatch):
+        # Same neutering as the manager-trigger test above — admin sits above
+        # manager on the lattice, so require_manager must still pass it.
+        import api.routers.pipeline as pl
+        monkeypatch.setattr(pl, "_run_pipeline", lambda *a, **k: None)
+        resp = client.post("/api/pipeline/trigger?run_ingestion=false", headers=admin_headers)
+        assert resp.status_code == 202
+
+    def test_pipeline_full_refresh_staff_403(self, client, staff_headers):
+        assert client.post("/api/pipeline/full-refresh", headers=staff_headers).status_code == 403
+
+    def test_pipeline_cancel_staff_403(self, client, staff_headers):
+        from uuid import uuid4
+        resp = client.post(f"/api/pipeline/{uuid4()}/cancel", headers=staff_headers)
+        assert resp.status_code == 403
+
     # -- pipeline reads: staff+ ----------------------------------------
     def test_pipeline_status_staff_passes(self, client, staff_headers):
         assert client.get("/api/pipeline/status", headers=staff_headers).status_code == 200
@@ -117,6 +133,12 @@ class TestRoleEnforcementMatrix:
     def test_entity_recompute_manager_403(self, client, manager_headers):
         assert client.post("/api/tools/entity-resolution/recompute", headers=manager_headers).status_code == 403
 
+    def test_entity_delete_alias_manager_403(self, client, manager_headers):
+        resp = client.delete(
+            "/api/tools/entity-resolution/aliases/some-barcode", headers=manager_headers
+        )
+        assert resp.status_code == 403
+
     # -- BOM confirm: staff+ -------------------------------------------
     def test_bom_confirm_staff_passes_gate(self, client, staff_headers):
         resp = client.post("/api/tools/bom/confirm", headers=staff_headers, json={})
@@ -134,6 +156,21 @@ class TestRoleEnforcementMatrix:
         )
         resp = client.get("/api/pipeline/status", headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 403
+
+    # -- internal docs browser: staff+ (previously unauthenticated) ----
+    def test_docs_list_no_token_401(self, client):
+        assert client.get("/api/documentation").status_code == 401
+
+    def test_docs_list_staff_passes_gate(self, client, staff_headers):
+        resp = client.get("/api/documentation", headers=staff_headers)
+        assert resp.status_code not in (401, 403)
+
+    def test_docs_get_no_token_401(self, client):
+        assert client.get("/api/documentation/setup/anything").status_code == 401
+
+    def test_docs_get_staff_passes_gate(self, client, staff_headers):
+        resp = client.get("/api/documentation/setup/anything", headers=staff_headers)
+        assert resp.status_code not in (401, 403)
 
     # -- garbage role: 403 on ordinary staff-gated business routes ------
     def test_garbage_role_token_403_on_business_routes(self, client):

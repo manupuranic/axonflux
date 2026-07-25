@@ -68,7 +68,7 @@ _registered_manifests.extend(registered)
 # Global AI models endpoint — returns all models from the allowlist
 # ---------------------------------------------------------------------------
 @app.get("/api/ai/models", tags=["ai"])
-def get_all_models():
+def get_all_models(_=Depends(require_staff)):
     """Returns all allowed AI models grouped by provider."""
     return [
         {"provider": p, "model": m}
@@ -104,7 +104,7 @@ def test_ai_connection(body: dict, _=Depends(require_staff)):
 # Tool manifest endpoint — frontend reads this to know which tools exist
 # ---------------------------------------------------------------------------
 @app.get("/api/tools", tags=["tools"], response_model=list[dict])
-def list_tools():
+def list_tools(_=Depends(require_staff)):
     """Returns registered tool manifests for dynamic sidebar/routing."""
     return [
         {

@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from api.dependencies import get_db, require_staff
+from api.dependencies import assert_min_role, get_db, require_staff
 from api.schemas.auth import CurrentUser
 from api.tools.pamphlets import MANIFEST
 from api.tools.pamphlets.schemas import (
@@ -586,8 +586,13 @@ def _user_from_query_token(
     payload = decode_access_token(raw)
     if not payload.get("sub"):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
+    # No fallback role: a token without the claim gets level 0 and fails the
+    # staff check below (see api.dependencies.get_current_user for the same
+    # rule on the header-auth path).
+    role = payload.get("role", "")
+    assert_min_role(role, "staff")
     return CU(id=payload.get("user_id", ""), username=payload["sub"],
-               role=payload.get("role", "staff"), full_name=payload.get("full_name"))
+               role=role, full_name=payload.get("full_name"))
 
 
 @router.get("/{pamphlet_id}/preview-html")
