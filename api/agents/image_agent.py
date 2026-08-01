@@ -14,7 +14,10 @@ from api.ai.config import get_default_provider
 # so we can't inherit get_default_model() (user may select a non-tool model).
 _AGENT_MODELS: dict[str, str] = {
     "anthropic": "claude-haiku-4-5-20251001",
-    "openrouter": "anthropic/claude-haiku-4-5-20251001",
+    # OpenRouter doesn't carry Haiku. Verified against openrouter.ai/api/v1/models:
+    # sonnet-5 exists, supports tools/tool_choice, and is the cheapest Claude there
+    # ($0.000002/$0.00001) — Fable 5 is priced as a premium "-fast" tier, not cheap.
+    "openrouter": "anthropic/claude-sonnet-5",
     "openai": "gpt-4o-mini",
 }
 

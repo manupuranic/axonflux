@@ -36,8 +36,15 @@ You create and edit marketing designs (pamphlets, posters, WhatsApp creatives, s
 ## Rules
 - NEVER narrate before tool calls. Call tools immediately.
 - Batch all changes in ONE turn. Don't do one tool at a time.
-- After all tools complete, write ONE short confirmation sentence.
+- After all tools complete, check EVERY tool result for an "error" key before writing your summary.
+  - All succeeded → ONE short confirmation sentence.
+  - Any failed → say plainly what failed and why (use the error message), and only claim success for the parts that actually returned ok. NEVER say a change was applied if its tool call returned an error.
 - Available themes: {", ".join(PRESET_IDS)}
+- "Reapply the theme on the whole page" / "apply this everywhere" / "undo my color tweaks" →
+  call set_theme(..., clear_node_overrides=true). Individual nodes styled earlier via
+  apply_dsl_patch/style_region have colors baked in as inline styles that a theme change
+  alone can NEVER override — clear_node_overrides strips those first. Skip it for narrower
+  "change the header color" style requests — it would undo unrelated per-node styling.
 
 ## Primary tool: apply_dsl_patch
 Use `apply_dsl_patch(ops)` for almost everything. ops MUST be a JSON array (Python list).
@@ -119,6 +126,8 @@ def make_campaign_chat_session(
     design_id: str = "",
 ) -> tuple[ChatSession, PamphletState]:
     from api.tools.campaign_studio.models import CampaignProduct
+    resolved_provider = provider or get_default_provider()
+    resolved_model = model or get_default_model()
     state = PamphletState(
         dsl=dsl,
         theme=theme,
@@ -126,11 +135,13 @@ def make_campaign_chat_session(
         db=db,
         pamphlet_id=design_id,  # field name doesn't matter — tools just use state.dsl
         product_model=CampaignProduct,  # price/name edits write CampaignProduct, not PamphletItem
+        provider=resolved_provider,
+        model=resolved_model,
     )
     tools = build_dsl_tools(state)
     session = ChatSession(
-        provider=provider or get_default_provider(),
-        model=model or get_default_model(),
+        provider=resolved_provider,
+        model=resolved_model,
         system_prompt=build_campaign_system_prompt(
             design_title=design_title,
             design_type=design_type,

@@ -205,14 +205,78 @@ def test_style_region_product_cards_sets_card_base_rem():
     assert abs(card_base_rem - 14 / 16) < 0.01
 
 
-def test_style_region_product_cards_rejects_non_font_args():
-    """product_cards without font_size_px must return an error (not silently do nothing)."""
+def test_style_region_product_cards_rejects_empty_args():
+    """product_cards with no supported field at all must error (not silently do nothing)."""
+    state = _make_state()
+    tools = build_dsl_tools(state)
+    style_region = next(t for t in tools if t.name == "style_region")
+
+    result = style_region.func(region="product_cards", text_align="center")
+    assert "error" in result
+
+
+def test_style_region_product_cards_sets_card_color_from_hex():
+    """color_hex → theme.overrides.typography.card_badge_color and card_price_color."""
     state = _make_state()
     tools = build_dsl_tools(state)
     style_region = next(t for t in tools if t.name == "style_region")
 
     result = style_region.func(region="product_cards", color_hex="#ff0000")
-    assert "error" in result
+
+    assert result.get("ok") is True
+    typo = state.theme.get("overrides", {}).get("typography", {})
+    assert typo.get("card_badge_color") == "#ff0000"
+    assert typo.get("card_price_color") == "#ff0000"
+
+
+def test_style_region_product_cards_sets_card_color_from_token():
+    """color_token → CSS var() reference, not a raw token name."""
+    state = _make_state()
+    tools = build_dsl_tools(state)
+    style_region = next(t for t in tools if t.name == "style_region")
+
+    result = style_region.func(region="product_cards", color_token="success")
+
+    assert result.get("ok") is True
+    typo = state.theme.get("overrides", {}).get("typography", {})
+    assert typo.get("card_badge_color") == "var(--success)"
+    assert typo.get("card_price_color") == "var(--success)"
+
+
+def test_set_theme_clear_node_overrides_strips_color_only():
+    """clear_node_overrides=True removes color_hex/bg_color_hex from every node's
+    style_overrides but leaves unrelated fields (font_size_px) intact — those weren't
+    pinned against the theme and shouldn't be touched."""
+    state = _make_state()
+    # Simulate an earlier apply_dsl_patch/style_region call that pinned this node's color.
+    state.dsl["children"][0]["children"][0]["style_overrides"] = {
+        "color_hex": "#050a2e", "font_size_px": 22,
+    }
+    tools = build_dsl_tools(state)
+    set_theme = next(t for t in tools if t.name == "set_theme")
+
+    result = set_theme.func(preset="monsoon", clear_node_overrides=True)
+
+    assert result.get("ok") is True
+    assert result.get("cleared_node_overrides") == 1
+    so = state.dsl["children"][0]["children"][0]["style_overrides"]
+    assert "color_hex" not in so
+    assert so.get("font_size_px") == 22
+
+
+def test_set_theme_without_clear_node_overrides_leaves_pinned_colors():
+    """Default behavior (clear_node_overrides omitted) must not touch node-level colors —
+    only opt-in "reapply everywhere" requests should strip them."""
+    state = _make_state()
+    state.dsl["children"][0]["children"][0]["style_overrides"] = {"color_hex": "#050a2e"}
+    tools = build_dsl_tools(state)
+    set_theme = next(t for t in tools if t.name == "set_theme")
+
+    result = set_theme.func(preset="monsoon")
+
+    assert result.get("cleared_node_overrides") == 0
+    so = state.dsl["children"][0]["children"][0]["style_overrides"]
+    assert so.get("color_hex") == "#050a2e"
 
 
 def test_style_region_all_text_updates_nodes():

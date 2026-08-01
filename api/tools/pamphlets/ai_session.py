@@ -19,11 +19,16 @@ def make_pamphlet_session(
     db=None,
     pamphlet_id: str = "",
 ) -> tuple[ChatSession, PamphletState]:
-    state = PamphletState(dsl=dsl, theme=theme, items=items, db=db, pamphlet_id=pamphlet_id)
+    resolved_provider = provider or get_default_provider()
+    resolved_model = model or get_default_model()
+    state = PamphletState(
+        dsl=dsl, theme=theme, items=items, db=db, pamphlet_id=pamphlet_id,
+        provider=resolved_provider, model=resolved_model,
+    )
     tools = build_dsl_tools(state) + build_item_tools(state)
     session = ChatSession(
-        provider=provider or get_default_provider(),
-        model=model or get_default_model(),
+        provider=resolved_provider,
+        model=resolved_model,
         system_prompt=build_system_prompt(pamphlet_title, len(items), dsl=dsl),
         tools=tools,
         history=history,

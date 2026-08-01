@@ -80,7 +80,7 @@ def list_models(_=Depends(require_staff)):
         "claude-haiku-4-5-20251001": "Claude Haiku 4.5",
         "gpt-4o": "GPT-4o", "gpt-4o-mini": "GPT-4o Mini", "gpt-4-turbo": "GPT-4 Turbo",
         "anthropic/claude-sonnet-4-6": "Claude Sonnet (OpenRouter)",
-        "anthropic/claude-haiku-4-5-20251001": "Claude Haiku (OpenRouter)",
+        "anthropic/claude-sonnet-5": "Claude Sonnet 5 (OpenRouter)",
         "anthropic/claude-opus-4-7": "Claude Opus (OpenRouter)",
         "openai/gpt-4o": "GPT-4o (OpenRouter)",
         "openai/gpt-4o-mini": "GPT-4o Mini (OpenRouter)",

@@ -14,7 +14,7 @@ ALLOWED_MODELS: dict[str, list[str]] = {
     ],
     "openrouter": [
         "anthropic/claude-sonnet-4-6",
-        "anthropic/claude-haiku-4-5-20251001",
+        "anthropic/claude-sonnet-5",
         "anthropic/claude-opus-4-7",
         "openai/gpt-4o",
         "openai/gpt-4o-mini",

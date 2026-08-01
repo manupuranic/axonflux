@@ -102,6 +102,28 @@ def _find_region_nodes(dsl: dict, region: str) -> list[dict]:
     return []
 
 
+def _clear_node_color_overrides(node: dict) -> int:
+    """Strip color_hex/bg_color_hex from every node's style_overrides, recursively.
+
+    Node-level style_overrides are rendered as literal inline styles, which always
+    beat theme CSS variables in the cascade. Once a node's color has been pinned by
+    an earlier apply_dsl_patch/style_region call, no later set_theme call can ever
+    change it again — "reapply the theme on the whole page" silently no-ops on any
+    node touched before. Returns the number of nodes actually cleared.
+    """
+    cleared = 0
+    so = node.get("style_overrides")
+    if so and ("color_hex" in so or "bg_color_hex" in so):
+        so.pop("color_hex", None)
+        so.pop("bg_color_hex", None)
+        if not so:
+            node.pop("style_overrides", None)
+        cleared += 1
+    for c in node.get("children", []) or []:
+        cleared += _clear_node_color_overrides(c)
+    return cleared
+
+
 def build_dsl_tools(state: PamphletState) -> list[Tool]:
 
     @tool(
@@ -425,7 +447,13 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
             "preset (named theme), "
             "description (text like 'dark blue moody' — generates theme via AI), "
             "overrides (token overrides: {colors:{primary:'#hex'}, typography:{...}}), "
-            "font_scale ({all|headings|prices|body: delta, e.g. 0.1 = 10% bigger})."
+            "font_scale ({all|headings|prices|body: delta, e.g. 0.1 = 10% bigger}).\n"
+            "clear_node_overrides: set true whenever the user wants the theme to govern the "
+            "WHOLE page (e.g. 'reapply the theme on the entire page', 'apply this everywhere', "
+            "'undo my color tweaks'). Individual color_hex/bg_color_hex set earlier via "
+            "apply_dsl_patch or style_region are baked in as literal inline styles and silently "
+            "block the new theme's colors on those specific nodes otherwise — this strips them "
+            "first so every node actually follows the new theme."
         ),
         parameters={
             "type": "object",
@@ -434,6 +462,7 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
                 "description": {"type": "string"},
                 "overrides": {"type": "object"},
                 "font_scale": {"type": "object"},
+                "clear_node_overrides": {"type": "boolean"},
             },
             "required": [],
         },
@@ -443,19 +472,25 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
         description: str | None = None,
         overrides: dict | None = None,
         font_scale: dict | None = None,
+        clear_node_overrides: bool = False,
     ) -> dict:
+        cleared_count = 0
+        if clear_node_overrides:
+            cleared_count = _clear_node_color_overrides(state.dsl)
+            if cleared_count:
+                state.dirty = True
+
         if description:
             import json
             from api.ai import ChatSession
-            from api.ai.config import get_default_provider
+            from api.ai.config import get_default_provider, get_default_model
 
-            _CHEAP = {
-                "anthropic": "claude-haiku-4-5-20251001",
-                "openrouter": "anthropic/claude-haiku-4-5-20251001",
-                "openai": "gpt-4o-mini",
-            }
-            provider = get_default_provider()
-            model = _CHEAP.get(provider, "anthropic/claude-haiku-4-5-20251001")
+            # Reuse the outer chat session's provider+model exactly — this call needs no
+            # tool use, so there's no reason to substitute a different ("cheap") model, and
+            # guessing a per-provider slug has twice been wrong (invalid or mispriced on
+            # OpenRouter). Whatever the user has configured is already known to work.
+            provider = state.provider or get_default_provider()
+            model = state.model or get_default_model()
             prompt = (
                 f'Generate a retail pamphlet color theme for: "{description}"\n'
                 'Return ONLY valid JSON (no markdown):\n'
@@ -475,9 +510,12 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
                 state.theme = {"preset": "minimal_light", "overrides": generated}
                 state.dsl["theme_id"] = "minimal_light"
                 state.dirty = True
-                return {"ok": True, "generated": generated}
+                return {"ok": True, "generated": generated, "cleared_node_overrides": cleared_count}
             except Exception as exc:
-                return {"error": f"Theme generation failed: {exc}. Try using preset= instead."}
+                return {
+                    "error": f"Theme generation failed: {exc}. Try using preset= instead.",
+                    "cleared_node_overrides": cleared_count,
+                }
 
         if preset:
             if preset not in PRESET_IDS:
@@ -499,7 +537,7 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
             state.theme.setdefault("font_scale", {}).update(font_scale)
             state.dirty = True
 
-        return {"ok": True, "theme": state.theme.get("preset")}
+        return {"ok": True, "theme": state.theme.get("preset"), "cleared_node_overrides": cleared_count}
 
     @tool(
         description=(
@@ -521,10 +559,12 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
             "Apply a style to a semantic REGION in one call. NO get_layout needed.\n"
             "region: 'footer' (contact_strip + bottom text), 'header' (first text/heading), "
             "'all_text' (every text node), 'all_headings' (text variant=heading|subheading), "
-            "'product_cards' (product name/badge/price fonts — uses CSS variable, font_size_px only).\n"
+            "'product_cards' (product name/badge/price — shared CSS variables, not per-node style_overrides. "
+            "Supports font_size_px (name/badge/price text size) and color_hex/color_token "
+            "(badge background + price text color together — cards use one accent, not two).\n"
             "Pass any style field(s) to apply. Existing style_overrides are merged, not replaced.\n"
             "Use for: 'make footer bigger', 'header in red', 'all prices bold', 'larger contact text', "
-            "'bigger product names'."
+            "'bigger product names', 'green badges and prices'."
         ),
         parameters={
             "type": "object",
@@ -574,14 +614,26 @@ def build_dsl_tools(state: PamphletState) -> list[Tool]:
         if not overrides:
             return {"error": "No style properties given. Pass font_size_px, color_hex, etc."}
 
-        # product_cards region: map font_size_px → CSS variable via theme override
+        # product_cards region: cards are template-rendered (not individual DSL nodes), so
+        # there are no per-node style_overrides to touch. Instead we write shared CSS
+        # variables into theme.overrides.typography — same mechanism as card_base_rem below.
         if region == "product_cards":
-            if font_size_px is None:
-                return {"error": "product_cards region only supports font_size_px"}
-            card_base_rem = round(font_size_px / 16, 3)
-            state.theme.setdefault("overrides", {}).setdefault("typography", {})["card_base_rem"] = card_base_rem
+            if font_size_px is None and color_hex is None and color_token is None:
+                return {"error": "product_cards region only supports font_size_px, color_hex, and color_token"}
+            typo = state.theme.setdefault("overrides", {}).setdefault("typography", {})
+            result: dict = {"ok": True, "region": "product_cards"}
+            if font_size_px is not None:
+                card_base_rem = round(font_size_px / 16, 3)
+                typo["card_base_rem"] = card_base_rem
+                result["card_base_rem"] = card_base_rem
+                result["font_size_px"] = font_size_px
+            if color_hex is not None or color_token is not None:
+                card_color = color_hex if color_hex is not None else f"var(--{color_token.replace('_', '-')})"
+                typo["card_badge_color"] = card_color
+                typo["card_price_color"] = card_color
+                result["card_color"] = card_color
             state.dirty = True
-            return {"ok": True, "region": "product_cards", "card_base_rem": card_base_rem, "font_size_px": font_size_px}
+            return result
 
         targets = _find_region_nodes(state.dsl, region)
         if not targets:

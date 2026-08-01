@@ -137,8 +137,8 @@ body{{width:{w};{bg_style}font-family:var(--font-body,Geist,sans-serif);color:va
 .product-card .product-info{{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}}
 .product-card .product-name{{font-size:0.83em;font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}}
 .product-card .product-prices{{display:flex;gap:4px;align-items:baseline;margin-top:auto;flex-wrap:wrap;padding-top:4px;}}
-.product-badge{{background:var(--accent);color:#fff;font-size:0.71em;padding:2px 4px;border-radius:99px;align-self:flex-start;flex-shrink:0;margin-bottom:2px;}}
-.price-offer{{color:var(--accent);font-weight:700;font-size:1em;}}
+.product-badge{{background:var(--card-badge,var(--accent));color:#fff;font-size:0.71em;padding:2px 4px;border-radius:99px;align-self:flex-start;flex-shrink:0;margin-bottom:2px;}}
+.price-offer{{color:var(--card-price,var(--accent));font-weight:700;font-size:1em;}}
 .price-mrp{{color:var(--text-muted);font-size:0.91em;text-decoration:line-through;}}
 .offer-banner-strip{{background:var(--accent);color:#fff;padding:12px 24px;text-align:center;border-radius:var(--radius-md,8px);}}
 .offer-banner-ribbon{{background:var(--accent);color:#fff;padding:8px 32px;clip-path:polygon(0 0,100% 0,calc(100% - 16px) 50%,100% 100%,0 100%,16px 50%);text-align:center;}}
@@ -171,6 +171,10 @@ def _theme_to_css_vars(theme: dict) -> str:
     for k, v in tokens.get("typography", {}).items():
         if k == "card_base_rem":
             lines.append(f"--card-base:{v}rem;")
+        elif k == "card_badge_color":
+            lines.append(f"--card-badge:{v};")
+        elif k == "card_price_color":
+            lines.append(f"--card-price:{v};")
         else:
             lines.append(f"--font-{k.replace('_','-')}:{v};")
     for k, v in tokens.get("radii", {}).items():

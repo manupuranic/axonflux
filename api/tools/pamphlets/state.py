@@ -20,6 +20,11 @@ class PamphletState:
     # is set here — without this, the shared tool always queried PamphletItem and
     # silently matched 0 rows for Campaign Studio item_ids.
     product_model: Any = None
+    # Provider/model the outer chat session is running on. set_theme's description-based
+    # theme generation spins up its own sub-session and must reuse these — falling back to
+    # get_default_provider() ignores whichever provider the user actually has a key for.
+    provider: str | None = None
+    model: str | None = None
 
 
 def _find_node(tree: dict, node_id: str) -> tuple[dict | None, list | None, int]:

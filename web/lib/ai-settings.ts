@@ -6,7 +6,7 @@ export const ALLOWED_MODELS_BY_PROVIDER: Record<Provider, string[]> = {
   openai: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
   openrouter: [
     "anthropic/claude-sonnet-4-6",
-    "anthropic/claude-haiku-4-5-20251001",
+    "anthropic/claude-sonnet-5",
     "anthropic/claude-opus-4-7",
     "openai/gpt-4o",
     "openai/gpt-4o-mini",
