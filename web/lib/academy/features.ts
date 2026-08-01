@@ -133,11 +133,26 @@ export const FEATURES: Feature[] = [
         q: "What was your hardest production bug here?",
         a: "LLM type hallucination corrupting the DSL — string where number belonged, renderer down. Fix was architectural, not a prompt tweak: validation + repair layer at the boundary, with a written policy of what's silently fixable vs rejected, encoded as tests.",
       },
+      {
+        q: "A sub-agent tool (set_theme's AI color generator) kept picking the wrong model. Why, and what's the general lesson?",
+        a: "The tool spun up its own ChatSession and hardcoded a per-provider 'cheap model' guess instead of reusing the outer session's already-verified provider+model. Two bugs stacked: (1) it ignored state entirely and defaulted to the env var, silently calling Anthropic direct when the user was on OpenRouter — auth error. (2) once fixed to use the real provider, the hardcoded OpenRouter slug (a dated Haiku ID) turned out not to exist there at all — verified by fetching openrouter.ai/api/v1/models directly rather than trusting a remembered model name. General lesson: any sub-session spawned by a tool should inherit the caller's already-working config by default; a 'cheaper model' optimization is not worth a second independent guess about provider/model validity, and model catalogs should be verified live, not assumed from training data or old code comments.",
+      },
+      {
+        q: "The assistant kept saying 'Theme applied!' right after a tool call that returned an error. What was actually wrong?",
+        a: "Two separate bugs disguised as one. First, the system prompt said 'after tools complete, write one confirmation sentence' with no branch for failure — the model followed that literally regardless of the tool's return value, so it needed an explicit 'check every tool result for an error key first' rule. Second, and more interesting: even after that was fixed, a `style_region` request to recolor product badges genuinely could not work, because product cards are template-rendered from data (not individual DSL nodes) — there was no per-node style_overrides to attach a color to, only a font-size CSS variable. Prompt honesty and missing capability look identical from the chat transcript; only reading the tool's actual code distinguishes 'the AI is lying' from 'the AI is asked to do something the system can't do yet.'",
+      },
+      {
+        q: "Why did 'reapply the theme on the whole page' silently fail on some elements but not others?",
+        a: "CSS cascade, not an AI bug. set_theme only rewrites theme-level CSS custom properties (--accent, --primary). But any node the user had asked to color individually earlier in the conversation got a literal color_hex baked into its inline style via apply_dsl_patch — and inline styles always beat var()-referencing CSS classes. So 'reapply the theme everywhere' was structurally incapable of touching pre-pinned nodes, no matter how confidently the model narrated success. Confirmed by pulling the live DSL from Postgres and finding the exact hex values pinned on specific node IDs. Fix was a new explicit set_theme(clear_node_overrides=true) tool param that strips only color-related overrides before applying the new theme — narrower 'change the header color' requests must NOT set this flag, or they'd nuke unrelated per-node styling.",
+      },
     ],
     production: [
       "Multi-round loops need tracing (Phase 4) — debugging transcripts by eye doesn't scale",
       "Highlight/copy quality is untested — first eval target",
       "Cost per session visible in UI — attribution persistence pending",
+      "Sub-agent tool calls must inherit the caller's provider/model, never re-guess one — verified against the live OpenRouter catalog after two wrong hardcoded slugs shipped",
+      "Template-rendered regions (product cards) have no per-node style_overrides — new capabilities there need a dedicated CSS-variable + theme-override path, not the generic node-styling tool",
+      "'Write a confirmation sentence after tools complete' needs an explicit error-check branch — models follow narration instructions literally even when the tool result says error",
     ],
     improvements: ["Eval suite for patches + copy", "Prompt registry for system prompts", "Parallel tool execution in the loop"],
     files: [
