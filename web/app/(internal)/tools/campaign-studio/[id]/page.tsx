@@ -5,15 +5,15 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, Plus, Layers, Package, Sparkles,
   FileDown, Copy, Trash2, ExternalLink, LayoutGrid, PenLine,
-  Search, Pencil, BookOpen, X,
+  Search, Pencil, BookOpen, X, Settings2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type {
   Campaign, CampaignProduct, CampaignDesignSummary,
-  CampaignDesignCreate, CampaignStudioMeta,
+  CampaignDesignCreate, CampaignDesignUpdate, CampaignStudioMeta,
   CampaignProductCreate, CampaignProductUpdate,
-  PamphletSummary, ProductSearchResult,
+  CampaignUpdate, PamphletSummary, ProductSearchResult,
 } from "@/types/api";
 
 const TARGET_LABELS: Record<string, string> = {
@@ -125,12 +125,194 @@ function AddDesignDialog({
 }
 
 // ---------------------------------------------------------------------------
+// Edit Campaign Dialog
+// ---------------------------------------------------------------------------
+
+function EditCampaignDialog({
+  campaign,
+  meta,
+  onClose,
+  onSaved,
+}: {
+  campaign: Campaign;
+  meta: CampaignStudioMeta;
+  onClose: () => void;
+  onSaved: (c: Campaign) => void;
+}) {
+  const [form, setForm] = useState<CampaignUpdate>({
+    title: campaign.title,
+    campaign_type: campaign.campaign_type,
+    objective: campaign.objective,
+    status: campaign.status,
+    valid_from: campaign.valid_from,
+    valid_until: campaign.valid_until,
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  function set(k: keyof CampaignUpdate, v: unknown) {
+    setForm((prev) => ({ ...prev, [k]: v }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.title?.trim()) { setError("Title required"); return; }
+    setLoading(true); setError("");
+    try {
+      const updated = await api.campaignStudio.updateCampaign(campaign.id, form);
+      onSaved(updated);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-background rounded-lg border shadow-xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Edit Campaign</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Title</label>
+            <input
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={form.title ?? ""}
+              onChange={(e) => set("title", e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Type</label>
+              <select
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={form.campaign_type ?? ""}
+                onChange={(e) => set("campaign_type", e.target.value || null)}
+              >
+                <option value="">—</option>
+                {meta.campaign_types.map((t) => (
+                  <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Objective</label>
+              <select
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={form.objective ?? ""}
+                onChange={(e) => set("objective", e.target.value || null)}
+              >
+                <option value="">—</option>
+                {meta.objectives.map((t) => (
+                  <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Status</label>
+              <select
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={form.status ?? "draft"}
+                onChange={(e) => set("status", e.target.value)}
+              >
+                <option value="draft">Draft</option>
+                <option value="active">Active</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Valid until</label>
+              <input
+                type="date"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={form.valid_until ? form.valid_until.slice(0, 10) : ""}
+                onChange={(e) => set("valid_until", e.target.value || null)}
+              />
+            </div>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <div className="flex gap-2 pt-1">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">Cancel</Button>
+            <Button type="submit" disabled={loading} className="flex-1">
+              {loading ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Rename Design Dialog
+// ---------------------------------------------------------------------------
+
+function RenameDesignDialog({
+  design,
+  onClose,
+  onSaved,
+}: {
+  design: CampaignDesignSummary;
+  onClose: () => void;
+  onSaved: (d: CampaignDesignSummary) => void;
+}) {
+  const [title, setTitle] = useState(design.title);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) { setError("Title required"); return; }
+    setLoading(true); setError("");
+    try {
+      const updated = await api.campaignStudio.updateDesign(design.campaign_id, design.id, { title });
+      onSaved(updated);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-background rounded-lg border shadow-xl w-full max-w-sm p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-sm">Rename Design</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input
+            className={INPUT_CLS}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            autoFocus
+          />
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <div className="flex gap-2 pt-1">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">Cancel</Button>
+            <Button type="submit" disabled={loading} className="flex-1">{loading ? "Saving…" : "Save"}</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Design Card
 // ---------------------------------------------------------------------------
 
 function DesignCard({
   design,
   campaignId,
+  onRename,
   onDuplicate,
   onDelete,
   onExportPdf,
@@ -138,6 +320,7 @@ function DesignCard({
 }: {
   design: CampaignDesignSummary;
   campaignId: string;
+  onRename: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onExportPdf: () => void;
@@ -168,6 +351,10 @@ function DesignCard({
               className="absolute right-0 top-7 z-20 bg-popover border rounded-md shadow-md w-44 py-1"
               onMouseLeave={() => setMenuOpen(false)}
             >
+              <button onClick={() => { setMenuOpen(false); onRename(); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted">
+                <Pencil className="h-3.5 w-3.5" /> Rename
+              </button>
               <button onClick={() => { setMenuOpen(false); onExportPdf(); }}
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted">
                 <FileDown className="h-3.5 w-3.5" /> Export PDF
@@ -570,6 +757,8 @@ export default function CampaignEditorPage() {
   const [showCustomDialog, setShowCustomDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<CampaignProduct | null>(null);
+  const [showEditCampaign, setShowEditCampaign] = useState(false);
+  const [renamingDesign, setRenamingDesign] = useState<CampaignDesignSummary | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -625,6 +814,14 @@ export default function CampaignEditorPage() {
 
   function handleProductSaved(p: CampaignProduct) {
     setProducts((prev) => prev.map((x) => x.id === p.id ? p : x));
+  }
+
+  function handleCampaignSaved(c: Campaign) {
+    setCampaign(c);
+  }
+
+  function handleDesignRenamed(d: CampaignDesignSummary) {
+    setDesigns((prev) => prev.map((x) => x.id === d.id ? d : x));
   }
 
   async function handleRemoveProduct(productId: string) {
@@ -686,6 +883,9 @@ export default function CampaignEditorPage() {
             )}
           </div>
         </div>
+        <Button variant="outline" size="sm" className="gap-1.5 mt-0.5" onClick={() => setShowEditCampaign(true)}>
+          <Settings2 className="h-3.5 w-3.5" /> Edit
+        </Button>
       </div>
 
       {/* Tabs */}
@@ -737,6 +937,7 @@ export default function CampaignEditorPage() {
                   key={d.id}
                   design={d}
                   campaignId={campaignId}
+                  onRename={() => setRenamingDesign(d)}
                   onDuplicate={() => handleDuplicateDesign(d.id)}
                   onDelete={() => handleDeleteDesign(d.id)}
                   onExportPdf={() => api.campaignStudio.exportDesignPdf(campaignId, d.id, d.title)}
@@ -870,6 +1071,23 @@ export default function CampaignEditorPage() {
           product={editingProduct}
           onClose={() => setEditingProduct(null)}
           onSaved={handleProductSaved}
+        />
+      )}
+
+      {showEditCampaign && meta && (
+        <EditCampaignDialog
+          campaign={campaign}
+          meta={meta}
+          onClose={() => setShowEditCampaign(false)}
+          onSaved={handleCampaignSaved}
+        />
+      )}
+
+      {renamingDesign && (
+        <RenameDesignDialog
+          design={renamingDesign}
+          onClose={() => setRenamingDesign(null)}
+          onSaved={handleDesignRenamed}
         />
       )}
     </div>

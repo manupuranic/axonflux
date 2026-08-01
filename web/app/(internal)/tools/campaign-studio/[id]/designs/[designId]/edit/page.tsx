@@ -13,6 +13,8 @@ import { api } from "@/lib/api";
 import { getAiDefaults } from "@/lib/ai-settings";
 import type { CampaignDesign, CampaignProduct } from "@/types/api";
 import type { ReactNode } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 // ---------------------------------------------------------------------------
 // DSL types (loose — we use Record<string,any> to avoid tight coupling)
@@ -664,11 +666,40 @@ export default function DesignEditorPage() {
   const [chatMessages, setChatMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [rightPanelWidth, setRightPanelWidth] = useState(320);
+  const isResizingRef = useRef(false);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const previewWrapRef = useRef<HTMLDivElement>(null);
   const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Drag-resize the right panel (Properties + Chat)
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      if (!isResizingRef.current) return;
+      const next = window.innerWidth - e.clientX;
+      setRightPanelWidth(Math.min(720, Math.max(260, next)));
+    }
+    function onMouseUp() {
+      isResizingRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
+
+  function startResize(e: React.MouseEvent) {
+    e.preventDefault();
+    isResizingRef.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }
   const [previewScale, setPreviewScale] = useState(0.65);
   const [iframeHeight, setIframeHeight] = useState(794);
 
@@ -1044,8 +1075,14 @@ export default function DesignEditorPage() {
           )}
         </div>
 
+        {/* Drag handle to resize right panel */}
+        <div
+          onMouseDown={startResize}
+          className="w-1 shrink-0 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 transition-colors"
+        />
+
         {/* Right — Properties (collapsible) + Chat */}
-        <div className="w-80 shrink-0 border-l flex flex-col">
+        <div className="shrink-0 border-l flex flex-col" style={{ width: rightPanelWidth }}>
 
           {/* Properties header — click to collapse */}
           <div
@@ -1111,13 +1148,39 @@ export default function DesignEditorPage() {
                 {chatMessages.map((m, i) => (
                   <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                     <div
-                      className={`max-w-[85%] rounded-lg px-3 py-1.5 text-xs whitespace-pre-wrap ${
+                      className={`max-w-[85%] rounded-lg px-3 py-1.5 text-xs ${
                         m.role === "user"
-                          ? "bg-primary text-primary-foreground"
+                          ? "bg-primary text-primary-foreground whitespace-pre-wrap"
                           : "bg-muted text-foreground"
                       }`}
                     >
-                      {m.content}
+                      {m.role === "user" ? (
+                        m.content
+                      ) : (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({ children }) => <p className="mb-1.5 last:mb-0">{children}</p>,
+                            strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                            ul: ({ children }) => <ul className="list-disc list-inside space-y-0.5 my-1">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal list-inside space-y-0.5 my-1">{children}</ol>,
+                            li: ({ children }) => <li>{children}</li>,
+                            code: ({ children }) => <code className="bg-background/60 rounded px-1 py-0.5 text-[11px] font-mono">{children}</code>,
+                            a: ({ children, href }) => <a href={href} target="_blank" rel="noreferrer" className="underline text-primary">{children}</a>,
+                            table: ({ children }) => (
+                              <div className="overflow-x-auto my-1.5 rounded border border-border/60">
+                                <table className="w-full text-[11px] border-collapse">{children}</table>
+                              </div>
+                            ),
+                            thead: ({ children }) => <thead className="bg-background/50">{children}</thead>,
+                            tr: ({ children }) => <tr className="border-b border-border/60 last:border-0">{children}</tr>,
+                            th: ({ children }) => <th className="text-left font-semibold px-2 py-1 whitespace-nowrap">{children}</th>,
+                            td: ({ children }) => <td className="px-2 py-1 whitespace-nowrap">{children}</td>,
+                          }}
+                        >
+                          {m.content}
+                        </ReactMarkdown>
+                      )}
                     </div>
                   </div>
                 ))}
