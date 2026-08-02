@@ -3,7 +3,7 @@
 // data modules (topics.ts, features.ts, ...). Adding content never
 // requires touching components — same philosophy as the API tool registry.
 
-export type Domain = "data" | "backend" | "ai" | "ml";
+export type Domain = "cs" | "data" | "backend" | "systems" | "ai" | "ml";
 export type Confidence = "none" | "partial" | "solid";
 export type Difficulty = "beginner" | "intermediate" | "advanced";
 export type TopicStatus = "ready" | "planned";
@@ -167,6 +167,20 @@ export const DOMAIN_META: Record<
   Domain,
   { label: string; color: string; bg: string; border: string; text: string }
 > = {
+  cs: {
+    label: "Computer Science",
+    color: "#4f46e5",
+    bg: "bg-indigo-50",
+    border: "border-indigo-200",
+    text: "text-indigo-700",
+  },
+  systems: {
+    label: "System Design",
+    color: "#c2410c",
+    bg: "bg-orange-50",
+    border: "border-orange-200",
+    text: "text-orange-700",
+  },
   data: {
     label: "Data Engineering",
     color: "#0891b2",

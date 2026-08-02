@@ -39,6 +39,8 @@ const singles = (src, field) =>
 const src = {
   topicsData: read("topics-data-backend.ts"),
   topicsMlAi: read("topics-ml-ai.ts"),
+  topicsCs: read("topics-cs.ts"),
+  topicsSystems: read("topics-systems.ts"),
   features: read("features.ts"),
   architecture: read("architecture.ts"),
   challenges: read("challenges.ts"),
@@ -49,8 +51,10 @@ const src = {
   dna: read("dna.ts"),
 };
 
+const allTopicSrc = [src.topicsData, src.topicsMlAi, src.topicsCs, src.topicsSystems];
+
 const known = {
-  topic: new Set([...ids(src.topicsData), ...ids(src.topicsMlAi)]),
+  topic: new Set(allTopicSrc.flatMap(ids)),
   feature: new Set(ids(src.features)),
   arch: new Set(ids(src.architecture)),
   challenge: new Set(ids(src.challenges)),
@@ -67,6 +71,34 @@ const check = (label, values, set, kind) => {
     if (!set.has(v)) problems.push(`${label}: unknown ${kind} id "${v}"`);
   }
 };
+
+// Topic graph — prereq/unlock edges must resolve, or the learning path silently
+// drops nodes and topologicalLayers() produces a wrong ordering.
+for (const s of allTopicSrc) {
+  check("topics.prereqs", refs(s, "prereqs"), known.topic, "topic");
+  check("topics.unlocks", refs(s, "unlocks"), known.topic, "topic");
+}
+
+// Synapse map collisions — two topics at the same coordinate render on top of
+// each other, which looks like a missing node rather than a bug.
+const seenPos = new Map();
+for (const s of allTopicSrc) {
+  let currentId = null;
+  for (const m of s.matchAll(/id: "([\w-]+)",|pos: \{ x: (\d+), y: (\d+) \}/g)) {
+    if (m[1]) {
+      currentId = m[1];
+      continue;
+    }
+    const key = `${m[2]},${m[3]}`;
+    if (seenPos.has(key)) {
+      problems.push(
+        `synapse map: "${currentId}" collides with "${seenPos.get(key)}" at (${key})`,
+      );
+    } else {
+      seenPos.set(key, currentId);
+    }
+  }
+}
 
 // Capability graph
 check("capabilities.requiredTopicIds", refs(src.capabilities, "requiredTopicIds"), known.topic, "topic");

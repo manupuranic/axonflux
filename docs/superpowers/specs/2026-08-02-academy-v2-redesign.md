@@ -1,6 +1,6 @@
 # AxonFlux Academy V2 — Redesign Proposal
 
-**Status:** Proposal only — not implemented. No code changes accompany this document.
+**Status:** **Implemented** (2026-08-02) on branch `feat/academy-v2`. Originally written as a proposal; the sections below are preserved as the design of record, with an implementation log at the end (§25) recording what shipped, what changed during the build, and what was deliberately deferred.
 **Author context:** Academy currently ships as `web/app/(internal)/academy/*`, driven by data modules in `web/lib/academy/*.ts`. This proposal reorganizes that content around capability and civilization, not technology. It does not discard anything currently written.
 
 ---
@@ -576,6 +576,47 @@ The reason this proposal's data model choices matter for that future automation,
 Two more session-scoped skills were added alongside it, both reasoning-only (no code-writing tools needed, no dependency on V2 existing):
 - **`.claude/skills/mission-control/SKILL.md`** — the lightweight "what should I work on this session" brief: current mission, prerequisites, required knowledge, files, risks. Runs today against CLAUDE.md's roadmap + `.remember/` history; will read the Civilization Map directly once §8 ships.
 - **`.claude/skills/reclaim/SKILL.md`** — the heavier "I've been away, rebuild my full mental model before I touch code" walk (Vision → Architecture → Knowledge → Capabilities → Features → Code, ending in a concrete today's-plan). This merges what were drafted as two separate skills (`academy-review` + `reclaim`) into one — both triggered on the identical "returned after a break" moment, and shipping them as two competing skills with near-identical descriptions would have made skill selection ambiguous (the whole point of a skill's `description` field is a distinguishable trigger — two skills claiming the same trigger defeats that). `reclaim` is the fuller version; `mission-control` stays the separate, lighter one for an ordinary session with no context loss.
+
+---
+
+## 25. Implementation log (2026-08-02)
+
+### What shipped
+
+**Data layer** — `web/lib/academy/`:
+- `types.ts` extended (nothing removed): `CivilizationId`, `CivilizationNode`, `RingProgress`, `KnowledgeDebt`, `DecisionRecord`, `JournalEntry`, `DNAPrinciple`, `Capability`, plus `CIVILIZATION_META` / `RING_META` / `DEBT_META` / `CAPABILITY_STATUS_META`. Two optional fields added to existing interfaces: `ContentSection.mode`, `ArchNode.myConfidence`.
+- `dna.ts` — 6 principles, each with a `cost` field.
+- `civilization.ts` — 5 trees declared, **all 5 populated** (see change below): Retail Intelligence 9, AI 8, Engineering 7, CS 5, System Design 6 nodes, plus the reachability/age/recommend engine.
+- `capabilities.ts` — 22 capabilities including 9 already-built ones.
+- `decisions.ts` — the 6 real ADRs indexed (linked via `adrFile`, never re-authored).
+- `journal.ts` — 3 entries seeded from real session history.
+- `progress.ts` — rings + knowledge debt, same storage key, forward migration on read.
+- `topics-cs.ts` (10 topics, 1029 lines) and `topics-systems.ts` (7 topics, 714 lines) — net-new authored content, taking the Constellation from 29 to **46 topics**.
+
+**Pages** — `web/app/(internal)/academy/`: `page.tsx` (Command Center, rewritten), `civilization/`, `capabilities/` + `[id]/`, `atlas/`, `dna/`, `decisions/`, `journal/`. `architecture/` and `features/` became redirects to `atlas`; `features/[id]` case studies stay.
+
+**Components**: `v2.tsx` (rings, badges, milestone counter), `CivilizationTree.tsx`. `AcademyNav` regrouped into pillars. `SynapseMap` widened to 6 domain columns.
+
+**Verification**: `scripts/validate-academy.mjs`, wired into `npm run build`. Checks dead ids across every reference field, topic prereq/unlock resolution, synapse-map coordinate collisions, and the contentGap invariant. Final state: 46 topics, 22 capabilities, 35 civilization nodes, 12 arch nodes, 8 features, 6 decisions, 6 principles, 6 challenges, 3 journal entries — all cross-references resolving, `tsc --noEmit` and `next build` clean.
+
+**Honesty note on the CS content:** `topics-cs.ts` was written by a subagent that hit a session limit immediately after writing the file. The file was recovered, verified complete (10 topics, valid prereq edges, no coordinate collisions, closes cleanly), and kept. Its `dynamic-programming` entry correctly states that DP is **not** used anywhere in this repository and carries `files: []` — the nearest real things (SQL window-function running sums, and RapidFuzz's internal edit distance) are named and explicitly disclaimed as not-quite-DP. That is the behaviour the content rules asked for, so it was left alone rather than "improved" into a fabricated connection.
+
+### Changed during the build
+
+1. **`KnowledgeRing` as an int was dropped entirely** in favour of five booleans on `RingProgress` plus `lastTouchedAt`. §7 already anticipated this; implementation confirmed the int had no remaining use once debt detection needed to distinguish a broken ladder from honest progress.
+2. **`Domain` gained `cs` and `systems`** — not in the original spec. Required because the new topics needed a home and a colour band. This forced a one-off remap of all 29 existing topics' `pos.x` from 4 columns to 6 (scripted, mechanical).
+3. **CS and System Design trees were populated, not deferred.** §3C/§8 step 10 planned to defer them as net-new writing. They were written instead, on instruction. 17 new topics at full depth.
+4. **Voice Agent was added**, reversing §4's recommendation to omit it. It is now a real capability (`voice-agent`, blocked on `information-agent`) and roadmap Phase 7, framed as a *transport over an existing agent loop* rather than a second brain — which is what makes it honest rather than a stub.
+5. **9 built capabilities were seeded** — the spec's §4 table listed mostly unbuilt agents. Rendering only those would have shown a system where nothing had been achieved, which is false and demotivating.
+6. **The academy `layout.tsx` already provided nav + container**, so the first draft of every new page double-rendered both. Caught before build; stripped.
+
+### Deliberately still open
+
+- `stock-truth` is `status: "built"` with **no `featureId`** — the BOM Manager shipped without a case study in `features.ts`. A real content gap, left visible.
+- `retail-planning` and `retail-decision-intelligence` carry `contentGap: true` — no authored topic covers ranking/optimisation yet.
+- `eng-production` (cloud/deploy/on-call) is a declared gap in the Engineering tree.
+- `app.academy_progress` still does not exist; progress remains localStorage-only, as `progress.ts` has documented since V1.
+- `update-progress` is **not retired**. `academy-keeper` now has real V2 files to maintain, so retirement is possible — but should follow a session where `academy-keeper` is actually exercised end-to-end first.
 
 ---
 

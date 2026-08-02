@@ -288,7 +288,7 @@ export const CAPABILITIES: Capability[] = [
     expectedOutcome:
       "A tool-calling loop over the existing read endpoints — grounded answers, no new SQL, no hallucinated figures.",
     prereqCapabilities: ["data-foundation", "customer-intelligence", "demand-signal"],
-    unlocksCapabilities: ["analytics-agent", "retail-copilot"],
+    unlocksCapabilities: ["analytics-agent", "retail-copilot", "voice-agent"],
     requiredTopicIds: ["tool-calling", "structured-outputs", "provider-abstraction"],
     archNodeIds: ["ai-layer", "fastapi"],
     rebuildChallengeIds: ["rebuild-tool-loop"],
@@ -417,6 +417,37 @@ export const CAPABILITIES: Capability[] = [
     journalEntryIds: [],
     principleRefs: ["capabilities-not-features"],
     interview: [],
+  },
+  {
+    id: "voice-agent",
+    title: "Voice Agent",
+    civilizations: ["ai", "retail-intel"],
+    status: "planned",
+    mission: "Ask the shop a question out loud, in the language you actually speak.",
+    businessValue:
+      "Shop-floor staff have their hands full — counting stock, handling cash, serving a queue. Typing is the barrier, not the thinking. Local-language input also removes the English-literacy tax that a typed interface quietly charges.",
+    expectedOutcome:
+      "Speech in, transcript to the Information Agent's existing tool loop, spoken or on-screen answer back. Voice is an INTERFACE over an existing capability, not a second brain.",
+    blockedBy:
+      "Information Agent must exist first — without it, voice input has nothing to ask. Adding speech before the reasoning layer would mean building a microphone that talks to nothing.",
+    prereqCapabilities: ["information-agent"],
+    unlocksCapabilities: [],
+    requiredTopicIds: ["structured-outputs", "tool-calling", "provider-abstraction"],
+    archNodeIds: ["ai-layer", "nextjs"],
+    rebuildChallengeIds: [],
+    decisionRecordIds: [],
+    journalEntryIds: [],
+    principleRefs: ["capabilities-not-features", "no-pii-crosses-boundary"],
+    interview: [
+      {
+        q: "Why is voice a thin layer rather than its own agent?",
+        a: "Because the hard part is already solved. Speech-to-text is a commodity; grounding an answer in real store data is not. Treating voice as a second agent would duplicate the tool loop and let the two drift apart. It is a transport, and the architecture should say so.",
+      },
+      {
+        q: "What is the risk unique to voice here?",
+        a: "Transcription errors on product names — Indian grocery names get mangled badly by English-tuned models. That pushes the design toward confirming the resolved product back to the user before acting, rather than trusting the transcript.",
+      },
+    ],
   },
   {
     id: "storefront-agent",

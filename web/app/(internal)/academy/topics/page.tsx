@@ -10,7 +10,7 @@ import { useProgress } from "@/lib/academy/progress";
 import { ConfidenceDot, DifficultyBadge, Eyebrow, StatusBadge } from "@/components/academy/ui";
 import { Search } from "lucide-react";
 
-const DOMAINS: (Domain | "all")[] = ["all", "data", "backend", "ml", "ai"];
+const DOMAINS: (Domain | "all")[] = ["all", "cs", "data", "backend", "systems", "ml", "ai"];
 
 export default function TopicsPage() {
   const { confidenceOf } = useProgress();

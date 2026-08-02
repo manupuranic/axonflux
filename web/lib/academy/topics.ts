@@ -1,8 +1,16 @@
 import type { Confidence, Topic } from "./types";
 import { DATA_BACKEND_TOPICS } from "./topics-data-backend";
 import { ML_AI_TOPICS } from "./topics-ml-ai";
+import { CS_TOPICS } from "./topics-cs";
+import { SYSTEMS_TOPICS } from "./topics-systems";
 
-export const TOPICS: Topic[] = [...DATA_BACKEND_TOPICS, ...ML_AI_TOPICS];
+// Ordered fundamentals → application, matching the synapse map's column bands.
+export const TOPICS: Topic[] = [
+  ...CS_TOPICS,
+  ...DATA_BACKEND_TOPICS,
+  ...SYSTEMS_TOPICS,
+  ...ML_AI_TOPICS,
+];
 
 export const TOPIC_BY_ID: Record<string, Topic> = Object.fromEntries(
   TOPICS.map((t) => [t.id, t]),
