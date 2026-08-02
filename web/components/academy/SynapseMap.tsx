@@ -10,8 +10,8 @@ import type { Confidence, Topic } from "@/lib/academy/types";
 import { CONFIDENCE_META, DOMAIN_META } from "@/lib/academy/types";
 import { EDGES, TOPICS } from "@/lib/academy/topics";
 
-const W = 1000;
-const H = 660;
+const W = 1280;
+const H = 720;
 const sx = (x: number) => 40 + (x / 100) * (W - 80);
 const sy = (y: number) => 36 + (y / 100) * (H - 90);
 
@@ -59,16 +59,16 @@ export function SynapseMap({
           role="img"
           aria-label="Knowledge graph of AxonFlux topics"
         >
-          {/* Domain column labels */}
-          {(["data", "backend", "ml", "ai"] as const).map((d, i) => (
+          {/* Domain column labels — six bands, ordered fundamentals → application */}
+          {(["cs", "data", "backend", "systems", "ml", "ai"] as const).map((d, i) => (
             <text
               key={d}
-              x={sx([14, 37, 61, 85][i])}
+              x={sx([9.5, 25.5, 41.5, 57.5, 73.5, 89.5][i])}
               y={18}
               textAnchor="middle"
               className="font-mono"
-              fontSize={11}
-              letterSpacing={2}
+              fontSize={10}
+              letterSpacing={1.5}
               fill={DOMAIN_META[d].color}
               opacity={0.75}
             >

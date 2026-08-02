@@ -73,7 +73,7 @@ export const ML_AI_TOPICS: Topic[] = [
       "Query the top 10 pairs by confidence and by lift; write two sentences on why the lists differ.",
       "Design the date-windowed variant: associations for festival months only.",
     ],
-    pos: { x: 58, y: 12 },
+    pos: { x: 71, y: 12 },
   },
   {
     id: "entity-resolution",
@@ -153,7 +153,7 @@ export const ML_AI_TOPICS: Topic[] = [
       "Unmerge one alias, rebuild, verify the histories cleanly separate — prove reversibility.",
       "Prototype the embedding second-scorer on 50 gray pairs; measure agreement with your labels.",
     ],
-    pos: { x: 66, y: 28 },
+    pos: { x: 77, y: 28 },
   },
   {
     id: "mlflow-tracking",
@@ -225,7 +225,7 @@ export const ML_AI_TOPICS: Topic[] = [
       "Add a 'git_sha' tag to training runs; verify feature SQL is pinned by it.",
       "Write the two-paragraph promotion memo: which run, vs which baseline, on which window, by how much.",
     ],
-    pos: { x: 56, y: 46 },
+    pos: { x: 70, y: 46 },
   },
   {
     id: "demand-forecasting",
@@ -310,7 +310,7 @@ export const ML_AI_TOPICS: Topic[] = [
       "Retrain with Tweedie objective; compare zero-day behavior.",
       "Add weekly MAE-vs-actuals logging to the pipeline; chart four weeks of model health.",
     ],
-    pos: { x: 62, y: 64 },
+    pos: { x: 74, y: 64 },
   },
 
   // ── AI ENGINEERING ──────────────────────────────────────────────────
@@ -384,7 +384,7 @@ export const ML_AI_TOPICS: Topic[] = [
       "Diff Anthropic vs OpenAI adapter translation of the same tool-result turn; list every quirk quarantined.",
       "Design (paper) the optional-capability mechanism for structured outputs across providers.",
     ],
-    pos: { x: 80, y: 6 },
+    pos: { x: 87, y: 6 },
   },
   {
     id: "cost-tracking",
@@ -455,7 +455,7 @@ export const ML_AI_TOPICS: Topic[] = [
       "Compute quality-per-rupee for Haiku vs Sonnet on 20 highlight generations (manual quality scores).",
       "Find the most expensive single turn ever; explain its token count from the transcript.",
     ],
-    pos: { x: 92, y: 16 },
+    pos: { x: 94, y: 16 },
   },
   {
     id: "tool-calling",
@@ -535,7 +535,7 @@ export const ML_AI_TOPICS: Topic[] = [
       "Add repeated-identical-failure detection (same tool+args+error twice → inject guidance message).",
       "Take one failing campaign-chat transcript, classify each failure into the five-bucket taxonomy.",
     ],
-    pos: { x: 78, y: 22 },
+    pos: { x: 85, y: 22 },
   },
   {
     id: "structured-outputs",
@@ -606,7 +606,7 @@ export const ML_AI_TOPICS: Topic[] = [
       "Add coercion logging; run a week of campaign chat; count silent fixes (model-quality metric!).",
       "Redesign one DSL fragment's schema purely for generation reliability; A/B 20 generations against the old shape.",
     ],
-    pos: { x: 88, y: 34 },
+    pos: { x: 91, y: 34 },
   },
 
   // ── AI — FRONTIER (planned) ─────────────────────────────────────────
@@ -648,7 +648,7 @@ export const ML_AI_TOPICS: Topic[] = [
       mistakes: ["Embedding barcodes/IDs and wondering why search broke", "Comparing vectors from different models"],
     },
     exercises: ["Before building: hand-pick 10 product pairs you believe are semantically close; they become the embedding smoke test."],
-    pos: { x: 76, y: 44 },
+    pos: { x: 84, y: 44 },
   },
   {
     id: "vector-search",
@@ -692,7 +692,7 @@ export const ML_AI_TOPICS: Topic[] = [
       mistakes: ["Two datastores for one question", "Comparing raw scores across lexical and vector instead of rank fusion"],
     },
     exercises: ["Collect 20 real staff search queries; label each lexical-intent vs semantic-intent — your future eval set."],
-    pos: { x: 84, y: 54 },
+    pos: { x: 89, y: 54 },
   },
   {
     id: "rag",
@@ -736,7 +736,7 @@ export const ML_AI_TOPICS: Topic[] = [
       mistakes: ["RAG-ing structured data", "Skipping retrieval evals and prompt-tweaking synthesis forever", "No 'I don't know' path"],
     },
     exercises: ["Write 15 real questions staff would ask; label each SQL-shaped vs knowledge-shaped vs hybrid — the co-pilot's routing spec and eval seed."],
-    pos: { x: 78, y: 66 },
+    pos: { x: 85, y: 66 },
   },
   {
     id: "agents-orchestration",
@@ -776,7 +776,7 @@ export const ML_AI_TOPICS: Topic[] = [
       mistakes: ["Letting the model decide workflow order", "No audit trail", "Agents calling agents without typed contracts"],
     },
     exercises: ["Design app.agent_runs + agent_outputs schemas: statuses, checkpoints, cost columns, approval linkage — before any agent code."],
-    pos: { x: 90, y: 66 },
+    pos: { x: 92, y: 66 },
   },
   {
     id: "conversation-memory",
@@ -815,7 +815,7 @@ export const ML_AI_TOPICS: Topic[] = [
       mistakes: ["Summarizing exact figures into approximations", "Building memory infrastructure before a user needs it"],
     },
     exercises: ["Take a 30-turn campaign-chat transcript; hand-write the ideal 10-line summary + pinned-facts list — your summarizer's target output."],
-    pos: { x: 82, y: 78 },
+    pos: { x: 88, y: 78 },
   },
   {
     id: "llm-evals",
@@ -855,7 +855,7 @@ export const ML_AI_TOPICS: Topic[] = [
       mistakes: ["LLM-judging the assertable", "Golden sets of easy cases only", "Evals that run 'sometimes' — ungated is unenforced"],
     },
     exercises: ["Start the golden set NOW: save 20 real highlight-generation inputs+outputs, mark each pass/fail with a one-line reason — the harness's seed."],
-    pos: { x: 94, y: 78 },
+    pos: { x: 95, y: 78 },
   },
   {
     id: "ai-observability",
@@ -895,7 +895,7 @@ export const ML_AI_TOPICS: Topic[] = [
       mistakes: ["Logging only final answers", "Storing full payloads with PII unscrubbed", "Building dashboards before instrumenting the loop"],
     },
     exercises: ["Define the span schema on paper for one real campaign-chat turn: names, attributes, parent links — implementation becomes transcription."],
-    pos: { x: 86, y: 90 },
+    pos: { x: 90, y: 90 },
   },
   {
     id: "prompt-versioning",
@@ -934,7 +934,7 @@ export const ML_AI_TOPICS: Topic[] = [
       mistakes: ["Versioning prompts without linking eval results (changelog without meaning)", "Buying a platform before outgrowing a folder"],
     },
     exercises: ["Inventory every prompt literal in the codebase (grep system_prompt); table: feature, location, last-changed, evaled? — the registry's migration list."],
-    pos: { x: 94, y: 92 },
+    pos: { x: 95, y: 92 },
   },
   {
     id: "mcp",
@@ -974,6 +974,6 @@ export const ML_AI_TOPICS: Topic[] = [
       mistakes: ["Exposing write tools to an autonomous external agent", "Reusing human JWTs for machine callers"],
     },
     exercises: ["Write tool descriptions for all six planned MCP tools as if the reader is a foreign agent with zero AxonFlux context — then test them on a fresh Claude session."],
-    pos: { x: 76, y: 92 },
+    pos: { x: 84, y: 92 },
   },
 ];

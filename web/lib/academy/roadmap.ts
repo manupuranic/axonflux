@@ -131,6 +131,35 @@ export const ROADMAP: RoadmapPhase[] = [
     complexity: 3,
     resume: "MCP server with a real external consumer — a rarity: most portfolio MCP servers have zero users.",
   },
+  {
+    id: "phase-7",
+    phase: 7,
+    title: "Voice & Multilingual Interface",
+    goal: "Remove the keyboard from the shop floor — ask out loud, in the language staff actually speak.",
+    mvp: false,
+    dependencies:
+      "Phase 3 (tool loop) is the hard prerequisite. Voice is a transport over an existing brain; built earlier it would be a microphone wired to nothing.",
+    features: [
+      { name: "Speech-to-text → existing Information Agent tool loop", difficulty: "intermediate" },
+      { name: "Product-name disambiguation (Indian grocery names transcribe badly)", difficulty: "advanced" },
+      { name: "Kannada/Hindi input with English-normalised tool calls", difficulty: "advanced" },
+      { name: "Hands-free stock check + cash-count entry on the floor", difficulty: "intermediate" },
+    ],
+    concepts: [
+      "Speech-to-text as transport, not intelligence",
+      "Confirm-before-act under transcription uncertainty",
+      "Multilingual input with a single normalised tool surface",
+      "Interface layers vs capability layers",
+    ],
+    companies:
+      "Amazon warehouse voice picking; Indian retail POS vendors shipping vernacular voice input — the literacy tax is a real, measured barrier, not a novelty.",
+    learningValue: 3,
+    interviewValue: 4,
+    productionValue: 4,
+    complexity: 3,
+    resume:
+      "Vernacular voice interface over an existing agent loop — argued as a transport layer rather than a second agent, with confirm-before-act under transcription uncertainty.",
+  },
 ];
 
 export const REJECTED_TECH: { name: string; reason: string }[] = [

@@ -98,7 +98,7 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       "Write the blue/green variant of one rebuild step (build into _next table, atomic swap) and measure downtime difference.",
       "Pick one dashboard KPI and trace it to a source file name on paper.",
     ],
-    pos: { x: 14, y: 8 },
+    pos: { x: 25, y: 8 },
   },
   {
     id: "idempotent-rebuilds",
@@ -177,7 +177,7 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       "Add a Postgres advisory lock to the pipeline so two concurrent runs are impossible; prove it with two terminals.",
       "Design the idempotency-key table for the future job queue: columns, unique constraint, retention.",
     ],
-    pos: { x: 10, y: 30 },
+    pos: { x: 22, y: 30 },
   },
   {
     id: "sql-window-functions",
@@ -265,7 +265,7 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       "EXPLAIN ANALYZE step 02; find the sort node, note work_mem spill, double work_mem locally, re-measure.",
       "Rebuild pseudo-stock for one barcode in a spreadsheet from raw purchases/sales; explain any drift vs step 04.",
     ],
-    pos: { x: 18, y: 50 },
+    pos: { x: 28, y: 50 },
   },
   {
     id: "postgres-optimization",
@@ -353,7 +353,7 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       "Add ANALYZE to the pipeline's final step; measure whether any dashboard query plan changes.",
       "Prototype partitioning product_daily_metrics by month in a scratch schema; show partition pruning in a plan.",
     ],
-    pos: { x: 14, y: 72 },
+    pos: { x: 25, y: 72 },
   },
 
   // ── BACKEND ─────────────────────────────────────────────────────────
@@ -445,7 +445,7 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       "Flip one payload byte and replay it against the API; watch signature verification reject it.",
       "Design (on paper) the refresh-token flow for AxonFlux: tables, endpoints, TTLs, and the fired-employee scenario.",
     ],
-    pos: { x: 36, y: 8 },
+    pos: { x: 41, y: 8 },
   },
   {
     id: "rbac",
@@ -535,7 +535,7 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       "Audit every tool router: table of endpoint → current guard → correct guard. Find at least one gap.",
       "Write the ownership check for 'staff edits own draft closure' and explain in a comment why it isn't pure RBAC.",
     ],
-    pos: { x: 42, y: 24 },
+    pos: { x: 45, y: 24 },
   },
   {
     id: "dependency-injection",
@@ -622,7 +622,7 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       "Write a paginate dependency (limit/offset with caps) and use it in two routers.",
       "In a test, override get_db with a session that always rolls back; verify no test data persists.",
     ],
-    pos: { x: 32, y: 22 },
+    pos: { x: 38, y: 22 },
   },
   {
     id: "plugin-architecture",
@@ -703,7 +703,7 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       "Write the pytest that asserts the exact set of registered manifests.",
       "Break a manifest on purpose; make startup fail with a clear error naming the offending tool.",
     ],
-    pos: { x: 30, y: 40 },
+    pos: { x: 36, y: 40 },
   },
 
   // ── BACKEND — PHASE 1 FRONTIER (planned) ───────────────────────────
@@ -752,7 +752,7 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       mistakes: ["Caching before profiling", "TTL-only 'invalidation' on data with real mutation events"],
     },
     exercises: ["Before building: list every AxonFlux read endpoint and classify — cacheable-until-rebuild vs per-user vs real-time."],
-    pos: { x: 40, y: 54 },
+    pos: { x: 44, y: 54 },
   },
   {
     id: "background-workers",
@@ -797,7 +797,7 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       mistakes: ["Fire-and-forget threads in the API process", "Non-idempotent handlers meeting at-least-once redelivery"],
     },
     exercises: ["Design the app.jobs table first: states, transitions, who writes each, and the exact unique constraint enforcing single-flight."],
-    pos: { x: 34, y: 68 },
+    pos: { x: 39, y: 68 },
   },
   {
     id: "event-driven-outbox",
@@ -847,7 +847,7 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       mistakes: ["Publishing inside request handlers without transactional guarantees", "Adopting Kafka to look serious"],
     },
     exercises: ["Draw the crash-timeline diagram: where dual-write loses events, where outbox cannot."],
-    pos: { x: 42, y: 82 },
+    pos: { x: 45, y: 82 },
   },
   {
     id: "rate-limiting",
@@ -886,6 +886,6 @@ export const DATA_BACKEND_TOPICS: Topic[] = [
       mistakes: ["Rate limiting by IP behind a proxy without X-Forwarded-For handling — you limit the proxy"],
     },
     exercises: ["Decide the actual numbers: login attempts/min per IP, LLM calls/hour per user — justify each from cost or threat."],
-    pos: { x: 46, y: 92 },
+    pos: { x: 48, y: 92 },
   },
 ];

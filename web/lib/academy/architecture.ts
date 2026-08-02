@@ -16,6 +16,7 @@ export const ARCH_NODES: ArchNode[] = [
     interview: ["How do you build reliable analytics on an unreliable, API-less source?"],
     files: [{ path: "scripts/er4u_export.py", note: "Playwright export automation" }],
     relatedTopics: ["three-layer-architecture"],
+    myConfidence: "none",
   },
   {
     id: "ingestion",
@@ -30,6 +31,7 @@ export const ARCH_NODES: ArchNode[] = [
     interview: ["Why does your ingestion do no data cleaning?"],
     files: [{ path: "raw_ingestion/common/ingest_core.py", note: "core (stable, do-not-modify)" }],
     relatedTopics: ["idempotent-rebuilds", "three-layer-architecture"],
+    myConfidence: "partial",
   },
   {
     id: "raw",
@@ -44,6 +46,7 @@ export const ARCH_NODES: ArchNode[] = [
     interview: ["What's your recovery story when analytics code has a bug?"],
     files: [{ path: "sql/raw_tables.sql", note: "schema" }, { path: "scripts/setup_raw_triggers.py", note: "dedup triggers" }],
     relatedTopics: ["three-layer-architecture", "idempotent-rebuilds"],
+    myConfidence: "solid",
   },
   {
     id: "pipeline",
@@ -58,6 +61,7 @@ export const ARCH_NODES: ArchNode[] = [
     interview: ["Walk me through what happens when the pipeline crashes at step 4."],
     files: [{ path: "pipelines/weekly_pipeline.py", note: "orchestrator" }, { path: "sql/rebuild_derived/", note: "steps 00–10" }],
     relatedTopics: ["idempotent-rebuilds", "sql-window-functions"],
+    myConfidence: "solid",
   },
   {
     id: "derived",
@@ -72,6 +76,7 @@ export const ARCH_NODES: ArchNode[] = [
     interview: ["Why TABLE instead of VIEW or MATERIALIZED VIEW for heavy dimensions?"],
     files: [{ path: "sql/derived_tables.sql", note: "schema" }, { path: "sql/rebuild_derived/05_necessary_views.sql", note: "view→table conversion" }],
     relatedTopics: ["postgres-optimization", "sql-window-functions"],
+    myConfidence: "solid",
   },
   {
     id: "app-schema",
@@ -86,6 +91,7 @@ export const ARCH_NODES: ArchNode[] = [
     interview: ["How do human edits survive a full analytics rebuild?"],
     files: [{ path: "api/migrations/versions/", note: "12 migrations" }],
     relatedTopics: ["three-layer-architecture"],
+    myConfidence: "solid",
   },
   {
     id: "fastapi",
@@ -100,6 +106,7 @@ export const ARCH_NODES: ArchNode[] = [
     interview: ["Why two database dependency types?", "How does a new staff tool get mounted without editing main.py?"],
     files: [{ path: "api/main.py", note: "app assembly" }, { path: "api/dependencies.py", note: "the DI seam" }, { path: "api/tools/__init__.py", note: "plugin registry" }],
     relatedTopics: ["dependency-injection", "plugin-architecture", "jwt-auth", "rbac"],
+    myConfidence: "solid",
   },
   {
     id: "ai-layer",
@@ -114,6 +121,7 @@ export const ARCH_NODES: ArchNode[] = [
     interview: ["Walk me through your agent loop.", "How would you add a fourth provider?"],
     files: [{ path: "api/ai/provider.py", note: "the port" }, { path: "api/ai/chat.py", note: "the loop" }, { path: "api/ai/cost.py", note: "the meter" }],
     relatedTopics: ["provider-abstraction", "tool-calling", "structured-outputs", "cost-tracking"],
+    myConfidence: "partial",
   },
   {
     id: "llm-providers",
@@ -128,6 +136,7 @@ export const ARCH_NODES: ArchNode[] = [
     interview: ["What breaks when your LLM vendor has an outage, and what's your fallback story?"],
     files: [{ path: "api/ai/providers/", note: "adapters" }],
     relatedTopics: ["provider-abstraction"],
+    myConfidence: "partial",
   },
   {
     id: "ml-stack",
@@ -142,6 +151,7 @@ export const ARCH_NODES: ArchNode[] = [
     interview: ["Batch vs online scoring — how did you decide?"],
     files: [{ path: "ml/", note: "notebooks + train/predict" }],
     relatedTopics: ["demand-forecasting", "mlflow-tracking"],
+    myConfidence: "none",
   },
   {
     id: "storage",
@@ -156,6 +166,7 @@ export const ARCH_NODES: ArchNode[] = [
     interview: ["Why never store images in the database?"],
     files: [{ path: "api/storage/client.py", note: "port + both adapters" }],
     relatedTopics: ["provider-abstraction"],
+    myConfidence: "solid",
   },
   {
     id: "nextjs",
@@ -170,6 +181,7 @@ export const ARCH_NODES: ArchNode[] = [
     interview: ["How does the frontend know which tools exist?"],
     files: [{ path: "web/app/(internal)/", note: "routes" }, { path: "web/components/shared/Sidebar.tsx", note: "manifest-aware nav" }],
     relatedTopics: ["plugin-architecture", "jwt-auth"],
+    myConfidence: "partial",
   },
 ];
 
