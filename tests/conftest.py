@@ -98,7 +98,8 @@ def seed_test_db():
                 derived.daily_sales_summary,
                 derived.daily_purchase_summary,
                 derived.product_daily_metrics,
-                derived.product_stock_position
+                derived.product_stock_position,
+                derived.supplier_restock_recommendations
         """))
 
         # ── Users ──────────────────────────────────────────────────────────
@@ -182,6 +183,25 @@ def seed_test_db():
             VALUES
                 (CURRENT_DATE - 1, 5, 100, 15000, 12000, 3000),
                 (CURRENT_DATE - 2, 4,  90, 13000, 13000,    0)
+        """))
+
+        # ── Supplier restock recommendations ───────────────────────────────
+        # Deliberately dated CURRENT_DATE while the newest sale is CURRENT_DATE-1.
+        # That gap is the real production shape: the table is a snapshot stamped
+        # at rebuild time, while sales exports always lag a day or more.
+        # The stale CURRENT_DATE-30 rows prove the KPI anchors on the newest
+        # snapshot rather than counting every date.
+        conn.execute(text("""
+            INSERT INTO derived.supplier_restock_recommendations
+                (date, product_id, product_name, supplier_name, current_stock,
+                 predicted_daily_demand, days_of_cover, min_stock, max_stock,
+                 required_quantity, lead_time_days)
+            VALUES
+                (CURRENT_DATE,      'REORDER_A',  'Needs Reorder A', 'Test Supplier',   2, 5.0,   0.4, 10, 50, 48, 3),
+                (CURRENT_DATE,      'REORDER_B',  'Needs Reorder B', 'Test Supplier',   0, 3.0,   0.0, 10, 40, 40, 5),
+                (CURRENT_DATE,      'STOCKED_C',  'Well Stocked C',  'Test Supplier', 100, 1.0, 100.0, 10, 50,  0, 3),
+                (CURRENT_DATE - 30, 'STALE_D',    'Stale Row D',     'Test Supplier',   1, 2.0,   0.5, 10, 30, 29, 4),
+                (CURRENT_DATE - 30, 'STALE_E',    'Stale Row E',     'Test Supplier',   1, 2.0,   0.5, 10, 30, 29, 4)
         """))
 
     yield

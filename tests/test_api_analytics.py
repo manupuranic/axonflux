@@ -51,6 +51,29 @@ class TestAnalyticsSummary:
         assert resp.status_code == 401
 
 
+class TestReorderCount:
+    """
+    supplier_restock_recommendations is a snapshot table: one date, stamped when
+    the pipeline rebuilds. The KPI used to filter it by MAX(sale_date) from
+    daily_sales_summary, so the two dates only aligned if the pipeline ran on a
+    day whose sales export was already current — nearly never. The card read 0
+    while thousands of products needed reordering.
+    """
+
+    def test_counts_reorders_when_snapshot_is_newer_than_last_sale(self, client, staff_headers):
+        body = client.get("/api/analytics/summary", headers=staff_headers).json()
+        # Fixtures: 2 rows with required_quantity > 0 dated CURRENT_DATE,
+        # while the newest sale is CURRENT_DATE - 1.
+        assert body["products_needing_reorder"] == 2
+
+    def test_ignores_stale_snapshot_dates(self, client, staff_headers):
+        # Same expected value as above, but this one kills a different mutant:
+        # dropping the date filter entirely would count the 2 extra qty>0 rows
+        # parked at CURRENT_DATE - 30 and return 4.
+        body = client.get("/api/analytics/summary", headers=staff_headers).json()
+        assert body["products_needing_reorder"] == 2
+
+
 class TestHealthSignals:
     def test_health_signals_endpoint_returns_200(self, client, staff_headers):
         resp = client.get("/api/analytics/health-signals", headers=staff_headers)

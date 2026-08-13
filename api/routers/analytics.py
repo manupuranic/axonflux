@@ -58,9 +58,14 @@ def get_summary(
             WHERE date = (SELECT d FROM latest)
         ),
         reorder AS (
+            -- Anchored on this table's own MAX(date), not the sales date:
+            -- restock is a snapshot stamped at rebuild time, while sales exports
+            -- lag behind. Filtering it by MAX(sale_date) matched zero rows on any
+            -- day the export wasn't current, so the KPI silently read 0.
+            -- Matches derived.replenishment_sheet reads (analytics.py, suppliers.py).
             SELECT COUNT(*) AS needs_reorder
             FROM derived.supplier_restock_recommendations
-            WHERE date = (SELECT d FROM latest)
+            WHERE date = (SELECT MAX(date) FROM derived.supplier_restock_recommendations)
               AND required_quantity > 0
         ),
         customer_kpis AS (
