@@ -14,14 +14,25 @@ SEMANTIC_NAME_SCHEMA = {
  }}
 
 def tokens(name: str) -> list[str]: return re.findall(r"[A-Z]{3,}", name.upper())
+def _one_edit_vocab_neighbors(token: str, vocab: Counter[str]) -> list[str]:
+    """Exact vocabulary lookup for the old one-edit predicate, without scanning vocab."""
+    found=set(); alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    for i in range(len(token)):
+        found.add(token[:i]+token[i+1:])
+        for char in alphabet:
+            if char != token[i]: found.add(token[:i]+char+token[i+1:])
+    for i in range(len(token)+1):
+        for char in alphabet: found.add(token[:i]+char+token[i:])
+    return [word for word in found if word in vocab and abs(len(word)-len(token))<=1 and _distance(word,token)==1]
 def detect(names: list[tuple[str,str]]) -> list[dict]:
     vocab=Counter(t for _,n in names for t in tokens(n)); out=[]
     protected={"JAWARI","AVALAKKI","SAJJE","SAJJI","PEANUT","GROUNDNUT","CREM"}
+    neighbors={token:_one_edit_vocab_neighbors(token,vocab) for token in vocab}
     for item_id,name in names:
         for token in tokens(name):
             if token in protected: continue
             # Precision-first: one clear, much more frequent one-edit peer of similar length.
-            close=[word for word,count in vocab.items() if count>=max(12,vocab[token]*8) and abs(len(word)-len(token))<=1 and _distance(word,token)==1]
+            close=[word for word in neighbors[token] if vocab[word]>=max(12,vocab[token]*8)]
             if vocab[token]<=3 and len(close)==1: out.append({"item_id":item_id,"name":name,"token":token,"reason":"RARE_NEAR_NEIGHBOR","evidence":close[0]})
             elif token in {"SHOULDE","CHOCOLT","LIQUD"}: out.append({"item_id":item_id,"name":name,"token":token,"reason":"TRUNCATED_LOOKING","evidence":"known suspicious token"})
     return out

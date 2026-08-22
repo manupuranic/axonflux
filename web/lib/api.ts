@@ -62,6 +62,7 @@ import type {
   ItemCombinationCleanupRow,
   ItemCombinationCleanupRowList,
   ItemCombinationCleanupRowParams,
+  ItemCombinationNameReview,
 } from "@/types/api";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -809,6 +810,15 @@ export const itemCombinationCleanup = {
     apiFetch<ItemCombinationCleanupRowList>(
       `/api/tools/item-combination-cleanup/runs/${runId}/rows${buildQuery(params)}`
     ),
+
+  listNameReview: (runId: string) =>
+    apiFetch<ItemCombinationNameReview>(`/api/tools/item-combination-cleanup/runs/${runId}/name-review`),
+
+  decideNameSuggestion: (runId: string, suggestionId: string, body: { decision: "ACCEPTED" | "REJECTED" | "EDITED"; edited_value?: string }) =>
+    apiFetch<{ suggestion_id: string; item_id: string; suggestion_status: string; effective_name: string }>(`/api/tools/item-combination-cleanup/runs/${runId}/name-suggestions/${suggestionId}/decision`, { method: "POST", body: JSON.stringify(body) }),
+
+  bulkAcceptNameSuggestions: (runId: string, suggestionIds: string[]) =>
+    apiFetch<{ updated: number }>(`/api/tools/item-combination-cleanup/runs/${runId}/name-suggestions/bulk-decision`, { method: "POST", body: JSON.stringify({ decision: "ACCEPTED", suggestion_ids: suggestionIds }) }),
 
   getRow: (runId: string, itemId: string) =>
     apiFetch<ItemCombinationCleanupRow>(

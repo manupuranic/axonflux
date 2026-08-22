@@ -20,6 +20,9 @@ from api.tools.item_combination_cleanup.schemas import (
     CleanupBulkApprovalResponse,
     CleanupBulkDecisionRequest,
     CleanupFieldDecisionRequest,
+    CleanupNameReviewResponse,
+    CleanupNameSuggestionBulkDecisionRequest,
+    CleanupNameSuggestionDecisionRequest,
     CleanupStaffExportRequest,
 )
 from api.tools.item_combination_cleanup import service
@@ -313,6 +316,52 @@ def export_proposals(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         filename=download_name,
     )
+
+
+@router.get("/runs/{run_id}/name-review", response_model=CleanupNameReviewResponse)
+def list_name_review(
+    run_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_staff),
+):
+    if service.get_run(db, run_id) is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return CleanupNameReviewResponse(**service.list_actionable_name_review(db, run_id))
+
+
+@router.post("/runs/{run_id}/name-suggestions/bulk-decision")
+def bulk_name_suggestion_decision(
+    run_id: uuid.UUID,
+    payload: CleanupNameSuggestionBulkDecisionRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_staff),
+):
+    try:
+        updated = service.bulk_accept_name_suggestions(db, run_id, payload.suggestion_ids, user)
+        db.commit()
+        return {"updated": updated}
+    except service.CleanupServiceError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+
+
+@router.post("/runs/{run_id}/name-suggestions/{suggestion_id}/decision")
+def decide_name_suggestion(
+    run_id: uuid.UUID,
+    suggestion_id: uuid.UUID,
+    payload: CleanupNameSuggestionDecisionRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_staff),
+):
+    try:
+        result = service.review_name_suggestion(
+            db, run_id, suggestion_id, payload.decision, user, payload.edited_value
+        )
+        db.commit()
+        return result
+    except service.CleanupServiceError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
 
 
 @router.post("/runs/{run_id}/staff-review-export")

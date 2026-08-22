@@ -786,6 +786,45 @@ export interface ItemCombinationCleanupRowList {
   };
 }
 
+export interface ItemCombinationNameSuggestion {
+  id: string;
+  source: "NAMING_STANDARD" | "SEMANTIC_V2";
+  version: string;
+  category: string;
+  base_value: string;
+  suggested_value: string;
+  transformations: Array<string | { original_text: string; replacement_text: string; change_type: string }>;
+  reason: string | null;
+  confidence: "HIGH" | "MEDIUM" | "LOW" | null;
+  detector_reason: string | null;
+  corroborating_evidence: string | null;
+  purchase_item_names: string[];
+  catalog_siblings: string[];
+  safe_bulk_group: string | null;
+  status: string;
+}
+
+export interface ItemCombinationNameReviewItem {
+  item_id: string;
+  effective_name: string;
+  overlap_classification: "EXACT_SAME_RESULT" | "DETERMINISTIC_SUPERSEDES_SEMANTIC" | "SEMANTIC_ADDS_ANOTHER_CHANGE" | "CONFLICTING_RESULTS" | "ALREADY_RESOLVED_BY_HUMAN" | null;
+  current_name_decision: { decision: string; edited_value: string | null; reviewed_at: string | null } | null;
+  suggestions: ItemCombinationNameSuggestion[];
+}
+
+export interface ItemCombinationNameReview {
+  items: ItemCombinationNameReviewItem[];
+  stats: {
+    actionable_suggestion_rows: number;
+    unique_items: number;
+    deterministic_only_items: number;
+    semantic_only_items: number;
+    overlap_items: number;
+    already_decided_excluded: number;
+    stale_excluded: number;
+  };
+}
+
 export interface ItemCombinationCleanupRowParams {
   type?: string;
   status?: string;

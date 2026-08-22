@@ -1,3 +1,4 @@
+import uuid
 from datetime import date, datetime
 from typing import Any, Literal
 
@@ -95,6 +96,21 @@ class CleanupBulkDecisionRequest(BaseModel):
 class CleanupFieldDecisionRequest(BaseModel):
     decision: Literal["ACCEPTED", "REJECTED", "EDITED"]
     edited_value: str | None = None
+
+
+class CleanupNameSuggestionDecisionRequest(BaseModel):
+    decision: Literal["ACCEPTED", "REJECTED", "EDITED"]
+    edited_value: str | None = None
+
+
+class CleanupNameSuggestionBulkDecisionRequest(BaseModel):
+    decision: Literal["ACCEPTED"]
+    suggestion_ids: list[uuid.UUID] = Field(min_length=1)
+
+
+class CleanupNameReviewResponse(BaseModel):
+    items: list[dict[str, Any]]
+    stats: dict[str, int]
 
 
 class CleanupStaffExportRequest(BaseModel):

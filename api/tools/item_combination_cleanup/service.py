@@ -363,8 +363,15 @@ def effective_name_for_phase5(db: Session, row: ItemCombinationCleanupRow) -> st
     """Mirror export precedence without making Phase 5 suggestions export-authoritative."""
     decision = db.query(ItemCombinationCleanupFieldDecision).filter_by(run_id=row.run_id, item_id_key=row.item_id_key, field_name="name").first()
     if decision:
-        return resolved_reviewed_value(row.original_item_name, row.proposed_item_name, decision.decision, decision.edited_value)
-    return row.proposed_item_name if is_export_eligible(row) and _text_changed(row.original_item_name, row.proposed_item_name) else row.original_item_name
+        return resolved_reviewed_value(
+            row.original_item_name,
+            getattr(decision, "deterministic_proposed_value", None) or row.proposed_item_name,
+            decision.decision,
+            decision.edited_value,
+        )
+    # A row-level approval (for example a Brand or Size decision) is not name
+    # authority. Phase 5 may only inherit an explicit accepted name decision.
+    return row.original_item_name
 
 
 def generate_phase5_name_suggestions(db: Session, run: ItemCombinationCleanupRun) -> dict[str, int]:
@@ -384,6 +391,267 @@ def generate_phase5_name_suggestions(db: Session, run: ItemCombinationCleanupRun
         created += 1
     db.flush()
     return {"created": created, "existing": unchanged}
+
+
+_STALE_NAME_SUGGESTION_STATUS = "SUPERSEDED_STALE_BASELINE"
+_BULK_SAFE_NAME_TRANSFORMATIONS = {
+    "CHOCOLT → CHOCOLATE",
+    "SHOULDE → SHOULDERS",
+    "LIQUD → LIQUID",
+    "CHESE → CHEESE",
+    "WIPERC → WIPER",
+}
+
+
+def _name_decision_supersedes_suggestion(decision, suggestion) -> bool:
+    if not decision or decision.decision not in {"ACCEPTED", "REJECTED"}:
+        return False
+    if decision.reviewed_at is None or suggestion.created_at is None:
+        return True
+    return decision.reviewed_at >= suggestion.created_at
+
+
+def _name_overlap_classification(suggestions, decision=None) -> str | None:
+    if decision and any(_name_decision_supersedes_suggestion(decision, s) for s in suggestions):
+        return "ALREADY_RESOLVED_BY_HUMAN"
+    deterministic = next((s for s in suggestions if s.suggestion_source == "NAMING_STANDARD"), None)
+    semantic = next((s for s in suggestions if s.suggestion_source == "SEMANTIC_V2"), None)
+    if not deterministic or not semantic:
+        return None
+    if deterministic.suggested_value == semantic.suggested_value:
+        if deterministic.base_value == semantic.base_value:
+            return "EXACT_SAME_RESULT"
+        return "DETERMINISTIC_SUPERSEDES_SEMANTIC"
+
+    det_originals = {
+        value.split(" → ", 1)[0]
+        for value in (deterministic.transformations or [])
+        if isinstance(value, str) and " → " in value
+    }
+    semantic_originals = {
+        value.get("original_text")
+        for value in (semantic.transformations or [])
+        if isinstance(value, dict) and value.get("original_text")
+    }
+    if det_originals and semantic_originals and det_originals.isdisjoint(semantic_originals):
+        return "SEMANTIC_ADDS_ANOTHER_CHANGE"
+    return "CONFLICTING_RESULTS"
+
+
+def _name_suggestion_out(suggestion, *, safe_bulk_group: str | None = None) -> dict:
+    evidence = suggestion.evidence or {}
+    payload = evidence.get("payload") or {}
+    candidate = payload.get("candidate") or {}
+    context = payload.get("context") or {}
+    return {
+        "id": str(suggestion.id),
+        "source": suggestion.suggestion_source,
+        "version": suggestion.suggestion_version,
+        "category": suggestion.category,
+        "base_value": suggestion.base_value,
+        "suggested_value": suggestion.suggested_value,
+        "transformations": suggestion.transformations or [],
+        "reason": evidence.get("reason"),
+        "confidence": evidence.get("confidence"),
+        "detector_reason": candidate.get("detector_reason"),
+        "corroborating_evidence": candidate.get("corroborating_evidence"),
+        "purchase_item_names": context.get("purchase_item_names") or [],
+        "catalog_siblings": context.get("catalog_siblings") or [],
+        "safe_bulk_group": safe_bulk_group,
+        "status": suggestion.status,
+    }
+
+
+def list_actionable_name_review(db: Session, run_id: uuid.UUID) -> dict:
+    """Read-only Phase 5 review projection; suggestion rows remain advisory."""
+    rows = {
+        row.item_id_key: row
+        for row in db.query(ItemCombinationCleanupRow).filter_by(run_id=run_id)
+    }
+    decisions = {
+        decision.item_id_key: decision
+        for decision in db.query(ItemCombinationCleanupFieldDecision).filter_by(
+            run_id=run_id, field_name="name"
+        )
+    }
+    suggestions = db.query(ItemCombinationCleanupNameSuggestion).filter_by(run_id=run_id).all()
+    actionable = []
+    stale_items = set()
+    decided_items = set()
+    for suggestion in suggestions:
+        row = rows.get(suggestion.item_id_key)
+        if row is None:
+            stale_items.add(suggestion.item_id_key)
+            continue
+        if suggestion.status == _STALE_NAME_SUGGESTION_STATUS:
+            stale_items.add(suggestion.item_id_key)
+            continue
+        if suggestion.status != "PENDING":
+            decided_items.add(suggestion.item_id_key)
+            continue
+        decision = decisions.get(suggestion.item_id_key)
+        if _name_decision_supersedes_suggestion(decision, suggestion):
+            decided_items.add(suggestion.item_id_key)
+            continue
+        effective = effective_name_for_phase5(db, row) or ""
+        if (
+            not suggestion.base_value
+            or not suggestion.suggested_value
+            or suggestion.base_value == suggestion.suggested_value
+            or suggestion.suggested_value == effective
+            or suggestion.base_value != effective
+        ):
+            stale_items.add(suggestion.item_id_key)
+            continue
+        actionable.append(suggestion)
+
+    by_item = defaultdict(list)
+    for suggestion in actionable:
+        by_item[suggestion.item_id_key].append(suggestion)
+
+    items = []
+    deterministic_only = semantic_only = overlap = 0
+    for item_id, item_suggestions in by_item.items():
+        sources = {suggestion.suggestion_source for suggestion in item_suggestions}
+        if sources == {"NAMING_STANDARD"}:
+            deterministic_only += 1
+        elif sources == {"SEMANTIC_V2"}:
+            semantic_only += 1
+        else:
+            overlap += 1
+        safe_group = None
+        if sources == {"NAMING_STANDARD"} and len(item_suggestions) == 1:
+            transformations = item_suggestions[0].transformations or []
+            if len(transformations) == 1 and transformations[0] in _BULK_SAFE_NAME_TRANSFORMATIONS:
+                safe_group = transformations[0]
+        row = rows[item_id]
+        decision = decisions.get(item_id)
+        items.append(
+            {
+                "item_id": item_id,
+                "effective_name": effective_name_for_phase5(db, row),
+                "overlap_classification": _name_overlap_classification(item_suggestions, decision),
+                "current_name_decision": None if decision is None else {
+                    "decision": decision.decision,
+                    "edited_value": decision.edited_value,
+                    "reviewed_at": decision.reviewed_at,
+                },
+                "suggestions": [
+                    _name_suggestion_out(suggestion, safe_bulk_group=safe_group)
+                    for suggestion in sorted(
+                        item_suggestions,
+                        key=lambda value: 0 if value.suggestion_source == "NAMING_STANDARD" else 1,
+                    )
+                ],
+            }
+        )
+    items.sort(key=lambda item: (0 if item["suggestions"][0]["source"] == "NAMING_STANDARD" else 1, item["item_id"]))
+    return {
+        "items": items,
+        "stats": {
+            "actionable_suggestion_rows": len(actionable),
+            "unique_items": len(items),
+            "deterministic_only_items": deterministic_only,
+            "semantic_only_items": semantic_only,
+            "overlap_items": overlap,
+            "already_decided_excluded": len(decided_items),
+            "stale_excluded": len(stale_items),
+        },
+    }
+
+
+def _get_reviewable_name_suggestion(db: Session, run_id: uuid.UUID, suggestion_id: uuid.UUID):
+    suggestion = db.get(ItemCombinationCleanupNameSuggestion, suggestion_id)
+    if suggestion is None or suggestion.run_id != run_id:
+        raise CleanupServiceError("Name suggestion not found.", 404)
+    if suggestion.status != "PENDING" or suggestion.status == _STALE_NAME_SUGGESTION_STATUS:
+        raise CleanupServiceError("Name suggestion is no longer pending.", 409)
+    row = get_row(db, run_id, suggestion.item_id_key)
+    if row is None:
+        raise CleanupServiceError("Cleanup row not found.", 404)
+    decision = db.query(ItemCombinationCleanupFieldDecision).filter_by(
+        run_id=run_id, item_id_key=row.item_id_key, field_name="name"
+    ).first()
+    if _name_decision_supersedes_suggestion(decision, suggestion):
+        raise CleanupServiceError("A later human Name decision already resolved this suggestion.", 409)
+    if (effective_name_for_phase5(db, row) or "") != suggestion.base_value:
+        raise CleanupServiceError("Name suggestion baseline is stale.", 409)
+    return suggestion, row, decision
+
+
+def review_name_suggestion(
+    db: Session,
+    run_id: uuid.UUID,
+    suggestion_id: uuid.UUID,
+    decision_value: str,
+    user: CurrentUser,
+    edited_value: str | None = None,
+) -> dict:
+    suggestion, row, decision = _get_reviewable_name_suggestion(db, run_id, suggestion_id)
+    if decision_value == "REJECTED":
+        suggestion.status = "REJECTED"
+    elif decision_value in {"ACCEPTED", "EDITED"}:
+        authoritative = (edited_value or "").strip() if decision_value == "EDITED" else suggestion.suggested_value
+        if not authoritative:
+            raise CleanupServiceError("An edited Name is required.", 422)
+        if decision is None:
+            decision = ItemCombinationCleanupFieldDecision(
+                run_id=run_id,
+                item_id_key=row.item_id_key,
+                field_name="name",
+                original_value=row.original_item_name,
+            )
+            db.add(decision)
+        decision.deterministic_proposed_value = suggestion.suggested_value
+        decision.edited_value = authoritative if decision_value == "EDITED" else None
+        decision.decision = "ACCEPTED"
+        decision.reviewed_by = uuid.UUID(user.id)
+        decision.review_source = f"NAME_SUGGESTION:{suggestion.suggestion_source}"
+        decision.reviewed_at = datetime.now(timezone.utc)
+        suggestion.status = "ACCEPTED"
+    else:
+        raise CleanupServiceError("Invalid Name suggestion decision.", 422)
+    suggestion.reviewed_by = uuid.UUID(user.id)
+    suggestion.reviewed_at = datetime.now(timezone.utc)
+    db.flush()
+    return {
+        "suggestion_id": str(suggestion.id),
+        "item_id": suggestion.item_id_key,
+        "suggestion_status": suggestion.status,
+        "effective_name": effective_name_for_phase5(db, row),
+    }
+
+
+def bulk_accept_name_suggestions(
+    db: Session, run_id: uuid.UUID, suggestion_ids: list[uuid.UUID], user: CurrentUser
+) -> int:
+    if not suggestion_ids:
+        raise CleanupServiceError("Select at least one Name suggestion.", 422)
+    prepared = []
+    for suggestion_id in suggestion_ids:
+        suggestion, row, decision = _get_reviewable_name_suggestion(db, run_id, suggestion_id)
+        transformations = suggestion.transformations or []
+        current = effective_name_for_phase5(db, row)
+        replay = suggest_name_standard(current)
+        semantic_overlap = db.query(ItemCombinationCleanupNameSuggestion).filter(
+            ItemCombinationCleanupNameSuggestion.run_id == run_id,
+            ItemCombinationCleanupNameSuggestion.item_id_key == suggestion.item_id_key,
+            ItemCombinationCleanupNameSuggestion.suggestion_source == "SEMANTIC_V2",
+            ItemCombinationCleanupNameSuggestion.status == "PENDING",
+        ).count()
+        if (
+            suggestion.suggestion_source != "NAMING_STANDARD"
+            or len(transformations) != 1
+            or transformations[0] not in _BULK_SAFE_NAME_TRANSFORMATIONS
+            or replay.suggested_name != suggestion.suggested_value
+            or replay.transformations != transformations
+            or semantic_overlap
+        ):
+            raise CleanupServiceError("Bulk Name review is limited to isolated exact approved mappings.", 422)
+        prepared.append(suggestion.id)
+    for suggestion_id in prepared:
+        review_name_suggestion(db, run_id, suggestion_id, "ACCEPTED", user)
+    return len(prepared)
 
 
 def set_field_decision(db: Session, row: ItemCombinationCleanupRow, field_name: str, decision: str, user: CurrentUser, edited_value: str | None = None) -> ItemCombinationCleanupFieldDecision:
@@ -854,7 +1122,8 @@ def export_approved_run(db: Session, run: ItemCombinationCleanupRun) -> ItemComb
         for field, source_column, original, proposed in (("name", "Item Name", row.original_item_name, row.proposed_item_name), ("brand", "Brand", row.original_brand, row.proposed_brand), ("size", "Size", row.original_size, row.proposed_size)):
             record = decisions.get((row.item_id_key, field))
             if record:
-                value = resolved_reviewed_value(original, proposed, record.decision, record.edited_value)
+                reviewed_proposal = record.deterministic_proposed_value
+                value = resolved_reviewed_value(original, reviewed_proposal, record.decision, record.edited_value)
                 if _text_changed(original, value): changes[source_column] = value
             elif is_export_eligible(row) and _text_changed(original, proposed):
                 changes[source_column] = proposed
