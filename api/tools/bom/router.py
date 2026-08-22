@@ -235,7 +235,7 @@ def update_mapping(
 
     row = db.execute(text(f"""
         UPDATE app.product_bom SET {', '.join(sets)}
-        WHERE id = :id::UUID
+        WHERE id = CAST(:id AS UUID)
         RETURNING id::TEXT, raw_barcode, finished_barcode, qty_per_unit, notes, confirmed_at
     """), params).mappings().one_or_none()
     db.commit()
@@ -266,7 +266,7 @@ def delete_mapping(
     _: CurrentUser = Depends(require_staff),
 ):
     deleted = db.execute(text("""
-        DELETE FROM app.product_bom WHERE id = :id::UUID RETURNING id
+        DELETE FROM app.product_bom WHERE id = CAST(:id AS UUID) RETURNING id
     """), {"id": mapping_id}).scalar()
     db.commit()
     if not deleted:

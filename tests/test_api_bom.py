@@ -121,3 +121,53 @@ class TestBomListMappings:
         assert resp.status_code == 200
         barcodes = {m["raw_barcode"] for m in resp.json()}
         assert raw_bc in barcodes
+
+
+class TestBomUpdateMapping:
+    def test_update_qty(self, client, staff_headers):
+        raw_bc, fin_bc = _unique_pair()
+        created = client.post("/api/tools/bom/confirm", headers=staff_headers, json={
+            "raw_barcode": raw_bc,
+            "finished_barcode": fin_bc,
+            "qty_per_unit": 0.25,
+        })
+        assert created.status_code == 200
+        mapping_id = created.json()["id"]
+
+        resp = client.patch(
+            f"/api/tools/bom/mappings/{mapping_id}",
+            headers=staff_headers,
+            json={"qty_per_unit": 0.5},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["qty_per_unit"] == 0.5
+
+    def test_update_missing_returns_404(self, client, staff_headers):
+        resp = client.patch(
+            f"/api/tools/bom/mappings/{uuid.uuid4()}",
+            headers=staff_headers,
+            json={"qty_per_unit": 1.0},
+        )
+        assert resp.status_code == 404
+
+
+class TestBomDeleteMapping:
+    def test_delete_mapping(self, client, staff_headers):
+        raw_bc, fin_bc = _unique_pair()
+        created = client.post("/api/tools/bom/confirm", headers=staff_headers, json={
+            "raw_barcode": raw_bc,
+            "finished_barcode": fin_bc,
+            "qty_per_unit": 0.05,
+        })
+        assert created.status_code == 200
+        mapping_id = created.json()["id"]
+
+        resp = client.delete(f"/api/tools/bom/mappings/{mapping_id}", headers=staff_headers)
+        assert resp.status_code == 204
+
+        listed = client.get("/api/tools/bom/mappings", headers=staff_headers)
+        assert mapping_id not in {m["id"] for m in listed.json()}
+
+    def test_delete_missing_returns_404(self, client, staff_headers):
+        resp = client.delete(f"/api/tools/bom/mappings/{uuid.uuid4()}", headers=staff_headers)
+        assert resp.status_code == 404
