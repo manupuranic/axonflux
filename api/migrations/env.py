@@ -17,6 +17,7 @@ if config.config_file_name is not None:
 from api.models.app import AppBase  # noqa: F401, E402
 import api.tools.cash_closure.models  # noqa: F401, E402
 import api.tools.pamphlets.models     # noqa: F401, E402
+import api.tools.item_combination_cleanup.models  # noqa: F401, E402
 
 target_metadata = AppBase.metadata
 

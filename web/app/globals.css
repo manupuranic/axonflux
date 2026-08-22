@@ -228,6 +228,27 @@
   font-weight: 600;
   color: #111827;
 }
+
+/* Item Combination Cleanup: make bulk-selection controls read as actions. */
+div.mb-2.flex.gap-2.text-xs {
+  justify-content: flex-end;
+  align-items: center;
+}
+
+div.mb-2.flex.gap-2.text-xs > button {
+  min-height: 30px;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.375rem;
+  background: #fff;
+  padding: 0.25rem 0.625rem;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+div.mb-2.flex.gap-2.text-xs > button:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;

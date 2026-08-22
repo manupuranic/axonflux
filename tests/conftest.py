@@ -83,7 +83,122 @@ def seed_test_db():
     with test_engine.begin() as conn:
         # Truncate in FK-safe order (product_bom refs users)
         conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS app.item_combination_cleanup_runs (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                created_by UUID REFERENCES app.users(id),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                status TEXT NOT NULL DEFAULT 'uploaded',
+                source_file_name TEXT NOT NULL,
+                original_path TEXT NOT NULL,
+                output_path TEXT,
+                approved_output_path TEXT,
+                sheet_name TEXT,
+                header_row INTEGER,
+                row_count INTEGER,
+                column_count INTEGER,
+                headers JSONB,
+                summary_json JSONB,
+                validation_status TEXT,
+                error_message TEXT
+            )
+        """))
+        conn.execute(text("""
+            ALTER TABLE app.item_combination_cleanup_runs
+                ADD COLUMN IF NOT EXISTS summary_json JSONB
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS app.item_combination_cleanup_rows (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                run_id UUID NOT NULL REFERENCES app.item_combination_cleanup_runs(id) ON DELETE CASCADE,
+                row_index INTEGER NOT NULL,
+                item_id_key TEXT NOT NULL,
+                source_identity JSONB NOT NULL,
+                original_item_name TEXT,
+                original_brand TEXT,
+                original_size TEXT,
+                original_hsn TEXT,
+                proposed_item_name TEXT,
+                proposed_size TEXT,
+                proposed_brand TEXT,
+                product_type TEXT NOT NULL,
+                classification_confidence TEXT,
+                supplier_name TEXT,
+                supplier_purchase_date DATE,
+                supplier_purchase_id TEXT,
+                supplier_invoice_no TEXT,
+                supplier_source_file TEXT,
+                supplier_match_method TEXT,
+                classification_evidence JSONB,
+                name_evidence JSONB,
+                review_status TEXT NOT NULL
+                ,approval_status TEXT NOT NULL DEFAULT 'PENDING'
+                ,reviewed_by UUID REFERENCES app.users(id)
+                ,reviewed_at TIMESTAMPTZ
+            )
+        """))
+        conn.execute(text("ALTER TABLE app.item_combination_cleanup_runs ADD COLUMN IF NOT EXISTS approved_output_path TEXT"))
+        conn.execute(text("ALTER TABLE app.item_combination_cleanup_rows ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'PENDING'"))
+        conn.execute(text("ALTER TABLE app.item_combination_cleanup_rows ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES app.users(id)"))
+        conn.execute(text("ALTER TABLE app.item_combination_cleanup_rows ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ"))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS app.item_combination_cleanup_semantic_assessments (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                run_id UUID NOT NULL REFERENCES app.item_combination_cleanup_runs(id) ON DELETE CASCADE,
+                item_id_key TEXT NOT NULL,
+                relationship TEXT,
+                confidence TEXT,
+                reason TEXT,
+                signals_for_packed JSONB,
+                signals_against_packed JSONB,
+                identity_interpretations JSONB,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                prompt_version TEXT NOT NULL,
+                raw_response JSONB,
+                validation_status TEXT NOT NULL,
+                error_message TEXT,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                CONSTRAINT uq_cleanup_semantic_assessment_version
+                    UNIQUE(run_id,item_id_key,provider,model,prompt_version)
+            )
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS app.item_combination_cleanup_field_decisions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(), run_id UUID NOT NULL REFERENCES app.item_combination_cleanup_runs(id) ON DELETE CASCADE,
+                item_id_key TEXT NOT NULL, field_name TEXT NOT NULL, original_value TEXT, deterministic_proposed_value TEXT,
+                edited_value TEXT, decision TEXT NOT NULL DEFAULT 'NO_PROPOSAL', reviewed_by UUID REFERENCES app.users(id),
+                review_source TEXT NOT NULL DEFAULT 'UI', reviewed_at TIMESTAMPTZ DEFAULT now(),
+                CONSTRAINT uq_cleanup_field_decision UNIQUE(run_id,item_id_key,field_name)
+            )
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS app.item_combination_cleanup_name_suggestions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                run_id UUID NOT NULL REFERENCES app.item_combination_cleanup_runs(id) ON DELETE CASCADE,
+                item_id_key TEXT NOT NULL,
+                field_name TEXT NOT NULL DEFAULT 'name',
+                suggestion_source TEXT NOT NULL,
+                suggestion_version TEXT NOT NULL,
+                category TEXT NOT NULL,
+                base_value TEXT NOT NULL,
+                suggested_value TEXT NOT NULL,
+                transformations JSONB NOT NULL,
+                evidence JSONB NOT NULL,
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                created_at TIMESTAMPTZ DEFAULT now(),
+                reviewed_at TIMESTAMPTZ,
+                reviewed_by UUID REFERENCES app.users(id),
+                CONSTRAINT uq_cleanup_name_suggestion_version
+                    UNIQUE(run_id,item_id_key,field_name,suggestion_source,suggestion_version)
+            )
+        """))
+        conn.execute(text("""
             TRUNCATE TABLE
+                app.item_combination_cleanup_name_suggestions,
+                app.item_combination_cleanup_field_decisions,
+                app.item_combination_cleanup_semantic_assessments,
+                app.item_combination_cleanup_rows,
+                app.item_combination_cleanup_runs,
                 app.product_bom,
                 app.product_bom_suggestions,
                 app.users

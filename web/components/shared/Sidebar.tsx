@@ -11,7 +11,7 @@ import { PipelineTriggerModal } from "@/components/pipeline/PipelineTriggerModal
 import {
   LayoutDashboard, Activity, Package, Users, BarChart2,
   Wallet, FileText, GitMerge, Zap, FlaskConical, Settings, Sparkles,
-  GraduationCap,
+  GraduationCap, FileSpreadsheet,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -59,6 +59,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     { href: "/tools/pamphlet-generator",   label: "Pamphlets",        icon: <FileText className={sz} /> },
     { href: "/tools/entity-resolution",    label: "Entity Resolution",icon: <GitMerge className={sz} /> },
     { href: "/tools/bom-manager",          label: "BOM Manager",      icon: <FlaskConical className={sz} /> },
+    { href: "/tools/item-combination-cleanup", label: "Item Combinations", icon: <FileSpreadsheet className={sz} /> },
     { href: "/academy",                    label: "Academy",          icon: <GraduationCap className={sz} /> },
     { href: "/settings",                   label: "AI Settings",      icon: <Settings className={sz} /> },
   ];

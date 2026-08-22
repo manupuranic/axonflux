@@ -58,6 +58,10 @@ import type {
   DesignChatRequest,
   DesignChatResponse,
   AppUserOut,
+  ItemCombinationCleanupRun,
+  ItemCombinationCleanupRow,
+  ItemCombinationCleanupRowList,
+  ItemCombinationCleanupRowParams,
 } from "@/types/api";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -710,4 +714,128 @@ export const usersApi = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+};
+
+export const itemCombinationCleanup = {
+  upload: async (file: File): Promise<ItemCombinationCleanupRun> => {
+    const token = getToken();
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/api/tools/item-combination-cleanup/runs`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (res.status === 401) {
+      clearToken();
+      window.location.href = "/login";
+      throw new Error("Unauthorized");
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail ?? `Upload failed: ${res.status}`);
+    }
+    return res.json();
+  },
+
+  get: (runId: string) =>
+    apiFetch<ItemCombinationCleanupRun>(`/api/tools/item-combination-cleanup/runs/${runId}`),
+
+  list: () => apiFetch<ItemCombinationCleanupRun[]>("/api/tools/item-combination-cleanup/runs"),
+
+  process: (runId: string) =>
+    apiFetch<ItemCombinationCleanupRun>(
+      `/api/tools/item-combination-cleanup/runs/${runId}/process`,
+      { method: "POST" }
+    ),
+
+  exportVerified: (runId: string) =>
+    apiFetch<ItemCombinationCleanupRun>(
+      `/api/tools/item-combination-cleanup/runs/${runId}/export`,
+      { method: "POST" }
+    ),
+
+  download: (runId: string, filename: string) =>
+    downloadWithAuth(
+      `/api/tools/item-combination-cleanup/runs/${runId}/download`,
+      filename
+    ),
+
+  setApproval: (runId: string, itemId: string, status: "APPROVED" | "REJECTED") =>
+    apiFetch<ItemCombinationCleanupRow>(`/api/tools/item-combination-cleanup/runs/${runId}/rows/${encodeURIComponent(itemId)}/approval`, { method: "POST", body: JSON.stringify({ status }) }),
+
+  decideField: (runId: string, itemId: string, field: string, body: { decision: "ACCEPTED" | "REJECTED" | "EDITED"; edited_value?: string }) =>
+    apiFetch<{ field: string; decision: "ACCEPTED" | "REJECTED" | "EDITED"; edited_value: string | null; row_complete: boolean; approval_status: "PENDING" | "APPROVED" | "REJECTED" }>(`/api/tools/item-combination-cleanup/runs/${runId}/rows/${encodeURIComponent(itemId)}/fields/${field}`, { method: "POST", body: JSON.stringify(body) }),
+
+  finalizeFieldDecisions: (runId: string, itemId: string) =>
+    apiFetch<{ approval_status: "APPROVED" | "REJECTED" }>(`/api/tools/item-combination-cleanup/runs/${runId}/rows/${encodeURIComponent(itemId)}/finalize-field-decisions`, { method: "POST" }),
+
+  exportStaffReview: async (runId: string, body: { item_ids?: string[]; packed_only?: boolean }) => {
+    const res = await fetch(`${BASE}/api/tools/item-combination-cleanup/runs/${runId}/staff-review-export`, { method: "POST", headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error("Staff-review export failed");
+    const url = URL.createObjectURL(await res.blob()); const a = document.createElement("a"); a.href = url; a.download = "staff_review.xlsx"; a.click(); URL.revokeObjectURL(url);
+  },
+  previewStaffReviewImport: async (runId: string, file: File) => {
+    const form = new FormData(); form.append("file", file);
+    const res = await fetch(`${BASE}/api/tools/item-combination-cleanup/runs/${runId}/staff-review-import-preview`, { method: "POST", headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {}, body: form });
+    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || "Staff-review preview failed");
+    return res.json() as Promise<{ file_hash: string; preview_only: boolean; summary: { applicable: number; protected: number; not_sure: number; invalid: number }; rows: Array<{ item_id: string; eligibility: string; staff_decision?: string; reason?: string; actions: Array<{ field: string; action: string; from: string | null; to: string | null; corrected: boolean }> }> }>;
+  },
+  applyStaffReviewImport: async (runId: string, file: File, previewHash: string) => {
+    const form = new FormData(); form.append("file", file); form.append("preview_hash", previewHash);
+    const res = await fetch(`${BASE}/api/tools/item-combination-cleanup/runs/${runId}/staff-review-import-apply`, { method: "POST", headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {}, body: form });
+    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || "Staff-review apply failed");
+    return res.json() as Promise<{ applied_rows: number; applied_fields: number; protected_rows: number; not_sure_rows: number }>;
+  },
+
+  bulkApprove: (runId: string, filters: Omit<ItemCombinationCleanupRowParams, "limit" | "offset" | "approval_status">) =>
+    apiFetch<{ updated: number }>(`/api/tools/item-combination-cleanup/runs/${runId}/bulk-approval`, { method: "POST", body: JSON.stringify(filters) }),
+
+  bulkDecision: (runId: string, body: { status: "APPROVED" | "REJECTED"; item_ids?: string[]; type?: string; confidence?: string; supplier_match_method?: string }) =>
+    apiFetch<{ updated: number; summary: Record<string, number> }>(`/api/tools/item-combination-cleanup/runs/${runId}/bulk-decision`, { method: "POST", body: JSON.stringify(body) }),
+
+  aiSupportedPackedPendingCount: (runId: string) =>
+    apiFetch<{ count: number }>(`/api/tools/item-combination-cleanup/runs/${runId}/ai-supported-packed-pending-count`),
+
+  approveAiSupportedPacked: (runId: string) =>
+    apiFetch<{ updated: number; summary: Record<string, number> }>(`/api/tools/item-combination-cleanup/runs/${runId}/approve-ai-supported-packed`, { method: "POST" }),
+
+  exportApproved: (runId: string) => apiFetch<ItemCombinationCleanupRun>(`/api/tools/item-combination-cleanup/runs/${runId}/approved-export`, { method: "POST" }),
+
+  downloadApproved: (runId: string, filename: string) =>
+    downloadWithAuth(`/api/tools/item-combination-cleanup/runs/${runId}/approved-download`, filename),
+
+  listRows: (runId: string, params: ItemCombinationCleanupRowParams) =>
+    apiFetch<ItemCombinationCleanupRowList>(
+      `/api/tools/item-combination-cleanup/runs/${runId}/rows${buildQuery(params)}`
+    ),
+
+  getRow: (runId: string, itemId: string) =>
+    apiFetch<ItemCombinationCleanupRow>(
+      `/api/tools/item-combination-cleanup/runs/${runId}/rows/${encodeURIComponent(itemId)}`
+    ),
+
+  downloadProposalsAudit: async (runId: string, filename: string): Promise<void> => {
+    const token = getToken();
+    const res = await fetch(
+      `${BASE}/api/tools/item-combination-cleanup/runs/${runId}/proposals-export`,
+      {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }
+    );
+    if (res.status === 401) {
+      clearToken();
+      window.location.href = "/login";
+      return;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 };

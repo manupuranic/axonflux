@@ -704,3 +704,102 @@ export interface AppUserOut {
   created_at: string | null;
   last_login_at: string | null;
 }
+
+export interface ItemCombinationCleanupRun {
+  id: string;
+  status: string;
+  source_file_name: string;
+  sheet_name: string | null;
+  header_row: number | null;
+  row_count: number | null;
+  column_count: number | null;
+  headers: string[] | null;
+  summary: {
+    row_count: number;
+    product_type: Record<string, number>;
+    confidence: Record<string, number>;
+    review_status: Record<string, number>;
+    protected_identity_keys?: string[];
+  } | null;
+  validation_status: string | null;
+  error_message: string | null;
+  created_at: string | null;
+  has_output: boolean;
+  has_approved_output: boolean;
+}
+
+export interface ItemCombinationCleanupRow {
+  item_id: string;
+  barcode: string | number | null;
+  mrp: string | number | null;
+  original_item_name: string | null;
+  proposed_item_name: string | null;
+  original_brand: string | null;
+  proposed_brand: string | null;
+  original_size: string | null;
+  proposed_size: string | null;
+  product_type: string;
+  classification_confidence: string | null;
+  review_status: string;
+  approval_status: "PENDING" | "APPROVED" | "REJECTED";
+  supplier_name: string | null;
+  supplier_purchase_date: string | null;
+  supplier_purchase_id: string | null;
+  supplier_invoice_no: string | null;
+  supplier_source_file: string | null;
+  supplier_match_method: string | null;
+  classification_evidence: unknown;
+  name_evidence: unknown;
+  semantic_assessment: {
+    relationship: "LIKELY_PACKED_VERSION" | "LIKELY_EXTERNAL_OR_DIFFERENT_PRODUCT" | "UNCERTAIN";
+    confidence: "HIGH" | "MEDIUM" | "LOW";
+    reason: string;
+    signals_for_packed: string[];
+    signals_against_packed: string[];
+    identity_interpretations: { text: string; possible_role: string }[];
+  } | null;
+  semantic_disagrees_with_packed_proposal: boolean;
+  field_decisions: Record<string, { decision: "ACCEPTED" | "REJECTED" | "EDITED"; edited_value: string | null }>;
+  proposed_changes: Record<string, { original: string | null; proposed: string | null }>;
+  name_changed: boolean;
+  brand_changed: boolean;
+  size_changed: boolean;
+  row_index: number;
+}
+
+export interface ItemCombinationCleanupRowList {
+  total: number;
+  limit: number;
+  offset: number;
+  items: ItemCombinationCleanupRow[];
+  stats: {
+    total: number;
+    product_type: Record<string, number>;
+    confidence: Record<string, number>;
+    review_status: Record<string, number>;
+    approval_status?: Record<string, number>;
+    name_changed: number;
+    brand_changed: number;
+    size_changed: number;
+    multi_field_changed: number;
+    individual_completed?: number;
+  };
+}
+
+export interface ItemCombinationCleanupRowParams {
+  type?: string;
+  status?: string;
+  confidence?: string;
+  q?: string;
+  brand_changed?: boolean;
+  name_changed?: boolean;
+  size_changed?: boolean;
+  approval_status?: string;
+  semantic_relationship?: "LIKELY_PACKED_VERSION" | "LIKELY_EXTERNAL_OR_DIFFERENT_PRODUCT" | "UNCERTAIN";
+  semantic_confidence?: "HIGH" | "MEDIUM" | "LOW";
+  semantic_disagreement?: boolean;
+  semantic_sample?: boolean;
+  limit?: number;
+  offset?: number;
+  [key: string]: unknown;
+}
