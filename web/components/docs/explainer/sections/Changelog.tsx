@@ -13,6 +13,12 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    date: "2026-08-22",
+    title: "Item Master Cleanup — production closure + reusable fresh-workbook workflow",
+    detail: "Closed the first ER4U Item Combination Master cleanup without mutating raw data: 13,507 source rows preserved, 10,954 Item IDs changed in the validated output, 226/226 actionable Name reviews completed, zero unresolved conflicts, and zero protected-field changes. Phase 5B added exact deterministic naming standards, an edit-distance-one detector over every effective Name, label-blind semantic-v2 evaluation with a hash-pinned 61-row ground truth, stale-baseline reconciliation, and advisory-only semantic suggestions. The recurring workflow is now productized: Upload fresh workbook creates a separate run, performs validation/evidence/classification/mechanical/deterministic/semantic stages through the normal API, conservatively reuses only exact-identity + exact-baseline historical decisions, routes new/changed/ambiguous cases to the existing Decision Inbox, and generates a fidelity-validated Excel on explicit operator request. Commits 9e8e7b9 and a672075; relevant cleanup suite 96 passed.",
+    type: "feature",
+  },
+  {
     date: "2026-08-01",
     title: "Campaign Studio — campaign/design editing UI + AI chat markdown & resize",
     detail: "Two frontend gaps. (1) Campaign header (title/type/objective/status/valid_until) had no edit UI at all, and design cards' overflow menu had Export/Duplicate/Delete but no Rename — both backed by existing updateCampaign/updateDesign API methods that the UI just never called. Added EditCampaignDialog + RenameDesignDialog. (2) AI Design Chat rendered assistant markdown as raw text (**bold**, tables showed literally) — added react-markdown + remark-gfm with table/list/code styling matching the existing Pamphlet ChatPanel pattern. Chat/Properties panel was fixed at 320px; added a drag handle (260–720px range) that live-rescales the preview via the existing ResizeObserver.",

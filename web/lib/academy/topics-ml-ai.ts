@@ -822,7 +822,7 @@ export const ML_AI_TOPICS: Topic[] = [
     title: "LLM Evaluation",
     domain: "ai",
     difficulty: "advanced",
-    status: "planned",
+    status: "ready",
     tagline: "unit tests for a nondeterministic function",
     analogy:
       "Taste-testing at a restaurant chain. You can't taste every plate (nondeterminism, volume), so you standardize recipes (prompts), keep a tasting panel with scorecards (golden set + judges), and never change a recipe without a panel pass (eval-gated deployment). 'The new chef seems good' is how chains die.",
@@ -836,13 +836,44 @@ export const ML_AI_TOPICS: Topic[] = [
       "Direct lineage from MLflow discipline: baseline, controlled comparison, tracked runs — evals are experiment tracking where the model is a prompt.",
     ],
     level2: [
-      { heading: "Deep content lands with Phase 4", body: "Golden-set curation from production traces, judge-bias pitfalls (position, verbosity, self-preference), pass/fail thresholds vs score drift, and cost-aware eval scheduling — written with the harness." },
+      {
+        heading: "The label-blind split: the answer key never enters the exam room",
+        body: "Phase 5B turned this from roadmap theory into code. `load_ground_truth()` accepts exactly one frozen 61-row workbook only when its SHA-256 matches `15da…6b1`; labels stay in the scoring process. `build_production_payload()` deliberately emits only the effective Name, suspicious token, lexical neighbor, detector reason, and bounded purchase/catalog context. A regression test serializes that payload and proves the word `human` and the ground-truth label cannot leak into it. This is more important than prompt cleverness: if the answer key reaches the model, the score measures leakage rather than generalization.",
+        mode: "analogy",
+      },
+      {
+        heading: "Assert the mechanical contract before judging semantics",
+        body: "The evaluator returns a Pydantic-discriminated result: CORRECTION, NO_CHANGE, or UNCERTAIN; CORRECTION requires exactly one declared replacement and a complete suggested Name. `minimal_edit_violations()` then recomputes the expected Name in ordinary code and rejects spacing, punctuation, capitalization, unit, or second-token changes. This is the assert-first hierarchy in practice: schema and edit geometry are deterministic facts, so an LLM judge would only make them less reliable. The model is used solely for the irreducible question—whether the suspicious token is actually wrong in this bounded catalog context.",
+        mode: "formal",
+      },
+      {
+        heading: "Production evidence must match evaluation evidence",
+        body: "A clean offline score is meaningless if production supplies different context. Both paths use the same bounded payload builder and the same `phase5b-v2-advisory` behavior: up to five same-item purchase Names and five catalog siblings. The safety prompt gives repeated same-item preservation more weight than unrelated lexical neighbors because false correction is costlier than abstention. The detector ran across all 13,507 effective Names, deterministic-resolved cases were removed before semantic calls, and every surviving result remained a review suggestion—not an authoritative write.",
+        mode: "intuition",
+      },
     ],
-    level3: [],
-    axonflux: "Planned Phase 4: eval suites for highlight copy, DSL patches, co-pilot answers; CI-gated; scores tracked per prompt version.",
+    level3: [
+      {
+        heading: "Golden-set integrity is a chain, not a file",
+        body: "The chain is: human-labeled workbook → hash pin → exact header contract → exact 61-row count → label-blind production payload → structured tool call → deterministic minimal-edit validation → scoring. Break any link and the metric can lie. A mutable spreadsheet silently changes the benchmark; an extra context field creates train/test leakage; accepting free text makes failures unscorable; auto-repairing an invalid correction hides model behavior. Phase 5B therefore fails closed at every boundary and keeps evaluation code write-free—it cannot mutate cleanup tables, suggestions, decisions, or exports.",
+      },
+      {
+        heading: "Cost asymmetry determines the threshold and abstention policy",
+        body: "For catalog cleanup, a false positive rewrites legitimate brand, local, model, or product terminology; a false negative leaves a visible typo for later review. That asymmetry means precision matters more than coverage and UNCERTAIN is a feature, not model weakness. HIGH confidence is still not authority. The system turns a valid correction into an advisory row and waits for Accept/Edit; Reject preserves the prior effective Name. This separates model calibration from business authorization.",
+      },
+      {
+        heading: "What Phase 5B did not complete",
+        body: "This is a real feature-specific eval harness, not the whole Phase 4 LLMOps platform. There is no shared prompt registry, trace store, generalized CI quality gate, or online drift monitor yet. The reusable lesson is the shape—frozen evidence, leakage tests, structured contracts, deterministic validators, versioned prompt behavior, and an explicit authority boundary. Generalizing that shape should happen only after a second feature needs it; otherwise an eval platform would be abstraction ahead of evidence.",
+      },
+    ],
+    axonflux: "Shipped first in Item Master Cleanup Phase 5B: a hash-pinned 61-row, label-blind semantic Name benchmark; structured three-way assessment; deterministic minimal-edit validation; production/evaluation payload parity; advisory-only output. Broader Phase 4 suites for campaign copy, DSL patches, and co-pilot answers remain planned.",
     companies: "Anthropic/OpenAI's eval culture; Braintrust/LangSmith/Langfuse exist because every serious team needs this; 'how do you eval?' is now a standard AI-engineer interview question.",
     whenNot: "Don't judge what you can assert — LLM-judging JSON validity is waste. Truly one-off explorations don't need harnesses. But any prompt users depend on does, at whatever size.",
-    files: [{ path: "tests/", note: "the pytest suite evals will extend" }],
+    files: [
+      { path: "api/tools/item_combination_cleanup/name_semantic_eval.py", note: "frozen benchmark loader, payload, prompt, structured contract" },
+      { path: "tests/test_cleanup_name_semantic_eval.py", note: "hash, leakage, minimal-edit, and safety-policy regressions" },
+      { path: "scripts/run_phase5b_final_semantic_evaluation.py", note: "label-blind benchmark runner" },
+    ],
     interview: [
       {
         q: "How do you know a prompt change didn't regress?",
@@ -854,7 +885,11 @@ export const ML_AI_TOPICS: Topic[] = [
       abstract: ["Eval-platform features until the harness outgrows pytest"],
       mistakes: ["LLM-judging the assertable", "Golden sets of easy cases only", "Evals that run 'sometimes' — ungated is unenforced"],
     },
-    exercises: ["Start the golden set NOW: save 20 real highlight-generation inputs+outputs, mark each pass/fail with a one-line reason — the harness's seed."],
+    exercises: [
+      "Without reading name_semantic_eval.py, design the smallest payload that can distinguish a typo from legitimate catalog terminology—then diff it against build_production_payload().",
+      "Add one deliberately invalid multi-edit CORRECTION case to the validator tests and explain why prompt instructions alone are not a safety boundary.",
+      "Start the next golden set: save 20 real highlight-generation inputs+outputs, mark each pass/fail with a one-line reason, and identify which criteria are deterministic assertions versus genuine judge work.",
+    ],
     pos: { x: 95, y: 78 },
   },
   {

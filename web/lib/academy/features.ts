@@ -162,6 +162,74 @@ export const FEATURES: Feature[] = [
     ],
   },
   {
+    id: "item-master-cleanup",
+    title: "Item Master Cleanup",
+    status: "shipped",
+    problem:
+      "ER4U's Item Combination Master mixes mechanical formatting defects, catalog-specific naming errors, PACKED/LOOSE ambiguity, and human business judgment in one 13,507-row workbook. Blind normalization can corrupt protected fields; reviewing every row every month does not scale.",
+    value:
+      "A recurring, audit-safe workbook workflow: global rules resolve repeatable defects, prior human knowledge carries forward only while its evidence baseline remains valid, and staff spend attention only on new, changed, or ambiguous items.",
+    architecture: [
+      "One immutable app.item_combination_cleanup_runs aggregate per uploaded workbook; rows, semantic assessments, Name suggestions, field decisions, and exports retain run-local provenance",
+      "Deterministic pipeline: workbook/identity validation → purchase evidence → PURCHASED/PACKED/LOOSE/UNKNOWN classification → Brand/Size/mechanical Name cleanup → exact naming standards",
+      "Optimized semantic funnel: edit-distance-one candidate generation over all effective Names → context qualification → remove deterministic-resolved → semantic-v2 advisory evaluation",
+      "Conservative cross-run reuse: exact Item_Id + barcode, exact source baseline, and exact current proposal; stale baselines are invalidated, never patched in place",
+      "Card-based Decision Inbox keeps Accept/Reject/Edit human-authoritative; validated export applies only explicit decisions and preserves protected cells",
+    ],
+    codeFlow: [
+      { step: "Upload", detail: "POST /runs validates the .xlsx and creates a separate uploaded run", file: "api/tools/item_combination_cleanup/router.py" },
+      { step: "Analyze", detail: "POST /runs/{id}/analyze orchestrates existing deterministic, evidence, reuse, detector, and semantic stages", file: "api/tools/item_combination_cleanup/workflow.py" },
+      { step: "Review", detail: "Actionable field and Name suggestions enter the existing card inbox; exact prior rejections remain resolved", file: "web/app/(internal)/tools/item-combination-cleanup/page.tsx" },
+      { step: "Decide", detail: "Accept adopts the proposal, Reject preserves the prior effective value, Edit records the operator value as authoritative" },
+      { step: "Export", detail: "Approved export copies the source workbook, changes only authorized mutable cells, then revalidates identity/protected fields", file: "api/tools/item_combination_cleanup/service.py" },
+    ],
+    dbFlow: [
+      "Fresh workbook → new app cleanup run + 13,507-style run-local cleanup rows",
+      "Historical runs are read-only evidence; valid decisions are copied with HISTORICAL_REUSE provenance into the new run",
+      "Semantic assessments/suggestions are advisory app state; effective export values come only from accepted or edited field decisions",
+      "raw.*, source workbooks, supplier/PACKED decisions from older runs, and closed approved exports are never mutated",
+    ],
+    apiFlow: [
+      "UI upload → POST /runs → POST /runs/{id}/analyze → ready_for_review summary",
+      "Decision Inbox reads actionable rows/Name suggestions and posts Accept/Reject/Edit",
+      "Explicit approved-export → fidelity validation → authenticated download; ER4U import stays manual",
+    ],
+    theory: ["three-layer-architecture", "idempotent-rebuilds", "structured-outputs", "llm-evals"],
+    interview: [
+      {
+        q: "Why not automatically reuse every accepted correction on next month's workbook?",
+        a: "A decision is valid against evidence, not merely an Item ID. AxonFlux requires Item_Id + barcode identity and exact original/proposed baselines. If the source Name or deterministic proposal changed, the old answer becomes stale and the item is reconsidered. The deliberate trade-off is extra review instead of silent corruption.",
+      },
+      {
+        q: "How do you safely combine deterministic cleanup and an LLM evaluator?",
+        a: "A funnel with authority boundaries: deterministic exact rules run first; the detector scans every effective Name but sends only context-qualified unresolved candidates; the model must return a schema-valid one-token replacement; code verifies that minimal edit; the result is still only a pending suggestion. Human acceptance—not confidence—creates the authoritative field decision.",
+      },
+      {
+        q: "What proves the workbook transformation is safe?",
+        a: "The exporter begins from a copy of the source, applies only explicitly accepted mutable fields, and validates row count, Item identity, formulas, and protected columns. The first production run preserved 13,507 rows, closed 226/226 naming reviews, and changed zero protected fields; source and output hashes were recorded separately.",
+      },
+    ],
+    production: [
+      "First production closure: 13,507 rows preserved, 10,954 Item IDs changed, 226/226 actionable Name reviews complete, zero protected-field changes",
+      "Detector scans all effective Names via generated edit-distance-one neighbors rather than a quadratic vocabulary scan; production-scale detector pass measured 0.536s",
+      "61-row human ground truth is SHA-256 pinned and never exposed to evaluator payloads; structured output and minimal-edit invariants are tested",
+      "Semantic calls are synchronous and advisory; failures are counted and surfaced without converting them into approvals",
+      "Fresh-workbook public-path acceptance proves upload → analysis → selective reuse → review → validated sandbox export",
+    ],
+    improvements: [
+      "Move expensive semantic stages to a checkpointed background job with per-stage progress",
+      "Add retry-only execution for failed semantic advisory checks",
+      "Expose run-to-run reuse/invalidation metrics in a compact operator summary",
+    ],
+    files: [
+      { path: "api/tools/item_combination_cleanup/workflow.py", note: "recurring orchestration + historical reuse policy" },
+      { path: "api/tools/item_combination_cleanup/service.py", note: "processing, decisions, review, export" },
+      { path: "api/tools/item_combination_cleanup/name_semantic_eval.py", note: "label-blind structured evaluator" },
+      { path: "tests/test_cleanup_fresh_workflow.py", note: "future-workbook acceptance proof" },
+      { path: "docs/decisions/007-item-master-cleanup-reuse.md", note: "reuse and authority decision" },
+    ],
+  },
+  {
     id: "entity-resolution-feature",
     title: "Entity Resolution Tool",
     status: "shipped",

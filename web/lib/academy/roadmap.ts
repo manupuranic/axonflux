@@ -13,6 +13,7 @@ export const ROADMAP: RoadmapPhase[] = [
     dependencies: "None — start here. RBAC first (small, unblocks everything).",
     features: [
       { name: "✅ A4 RBAC: manager role + require_manager + endpoint audit", difficulty: "beginner" },
+      { name: "✅ Reusable Item Master Cleanup: immutable runs, evidence-backed review, safe decision reuse", difficulty: "advanced" },
       { name: "Redis cache-aside on analytics (rebuild-triggered invalidation)", difficulty: "intermediate" },
       { name: "Job queue for pipeline (status, retries, single-flight lock)", difficulty: "intermediate" },
       { name: "Transactional outbox: pipeline_completed → cache flush + notify", difficulty: "intermediate" },

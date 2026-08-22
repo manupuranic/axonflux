@@ -5,6 +5,35 @@ import type { Challenge } from "./types";
 
 export const CHALLENGES: Challenge[] = [
   {
+    id: "rebuild-label-blind-name-eval",
+    title: "Rebuild a Label-Blind Name Evaluator",
+    topicId: "llm-evals",
+    difficulty: "advanced",
+    brief:
+      "Design the evaluation boundary for a model deciding whether one suspicious product-name token is a genuine correction. The benchmark has human labels, but production never does. Build the contract on paper or in a scratch module before reading Phase 5B.",
+    requirements: [
+      "Freeze the ground-truth artifact and prove the evaluator input cannot contain labels or corrected answers",
+      "Use a structured CORRECTION / NO_CHANGE / UNCERTAIN result with exactly one replacement for CORRECTION",
+      "Validate edit geometry deterministically: every character outside the declared replacement must remain unchanged",
+      "Explain the false-positive/false-negative asymmetry and why confidence cannot authorize a write",
+      "Keep evaluation code unable to mutate production suggestions, decisions, or exports",
+    ],
+    hints: [
+      "A file hash protects benchmark identity; an exact schema protects benchmark meaning",
+      "Construct production payloads from an allowlist—do not serialize a row and delete known label fields",
+      "Given original + old token + replacement, ordinary string code can calculate the only valid suggested Name",
+      "The safest evaluator output is still a pending review suggestion",
+    ],
+    solutionFiles: [
+      { path: "api/tools/item_combination_cleanup/name_semantic_eval.py", note: "the shipped evaluation boundary" },
+      { path: "tests/test_cleanup_name_semantic_eval.py", note: "integrity and leakage proofs" },
+    ],
+    solutionNotes: [
+      "Compare your boundary, not your prompt wording. Did any human-only field cross into the model payload? Could invalid free text pass? Could the evaluator write application state?",
+      "The shipped system deliberately accepts abstention and requires human review even at HIGH confidence because a false catalog correction is more damaging than a missed typo.",
+    ],
+  },
+  {
     id: "rebuild-rbac",
     title: "Implement require_manager",
     topicId: "rbac",

@@ -169,6 +169,34 @@ export const ARCH_NODES: ArchNode[] = [
     myConfidence: "solid",
   },
   {
+    id: "item-cleanup",
+    label: "Item Master Cleanup",
+    sublabel: "immutable runs · decision reuse · validated XLSX",
+    x: 27, y: 74, w: 22, h: 14, tone: "backend",
+    purpose: "Turn a fresh ER4U Item Combination Master into a minimal human review queue and a fidelity-validated workbook without granting heuristics or LLMs authority over business fields.",
+    responsibilities: [
+      "Validate workbook identity and protected fields",
+      "Build purchase/classification/Brand/Size/Name evidence",
+      "Reuse exact-baseline historical decisions conservatively",
+      "Run deterministic standards and advisory semantic funnels",
+      "Persist Accept/Reject/Edit audit history and generate approved copies",
+    ],
+    whyThisDesign: "Each upload is an audit boundary; global rules rerun, but item-specific judgment is reused only while identity and evidence baselines remain exact. This buys incremental monthly review without turning yesterday's answer into an unsafe global rule.",
+    alternatives: "Mutate the source workbook in place (no recovery), re-review all 13,507 rows monthly (wasted attention), or auto-apply HIGH-confidence model output (confidence mistaken for authority).",
+    tradeoffs: "Conservative invalidation creates extra review when evidence changes, and synchronous semantic analysis can make upload requests long-running. Both are accepted in favor of correctness; checkpointed background execution is the next operational improvement.",
+    interview: [
+      "How do you reuse human decisions without applying stale corrections?",
+      "Where is the authority boundary between deterministic rules, semantic suggestions, and export values?",
+    ],
+    files: [
+      { path: "api/tools/item_combination_cleanup/workflow.py", note: "orchestration + reuse" },
+      { path: "api/tools/item_combination_cleanup/service.py", note: "review + export" },
+      { path: "docs/decisions/007-item-master-cleanup-reuse.md", note: "decision record" },
+    ],
+    relatedTopics: ["idempotent-rebuilds", "structured-outputs", "llm-evals"],
+    myConfidence: "partial",
+  },
+  {
     id: "nextjs",
     label: "Next.js Dashboard",
     sublabel: "internal tools · charts · this Academy",
@@ -198,4 +226,7 @@ export const ARCH_EDGES: ArchEdge[] = [
   { from: "ai-layer", to: "llm-providers", label: "adapters" },
   { from: "ml-stack", to: "pipeline", label: "batch predictions" },
   { from: "storage", to: "fastapi", label: "asset URLs" },
+  { from: "er4u", to: "item-cleanup", label: "Item Master XLSX" },
+  { from: "item-cleanup", to: "app-schema", label: "runs + decisions" },
+  { from: "item-cleanup", to: "nextjs", label: "review queue" },
 ];

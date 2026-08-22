@@ -241,6 +241,9 @@ Superseded the client-side PDF builder:
 **A4 — Role-Based Access Control** ✅
 Three-role lattice `staff(1) < manager(2) < admin(3)` via `require_role()` factory in `api/dependencies.py` — adding a role = one dict line. Migration 013 CHECK constraint on `app.users.role`. Endpoint audit: pipeline trigger/cancel manager+, pipeline reads staff+, cash verify manager+, entity confirm/reject manager+ (recompute/alias-delete stay admin), all business routes `require_staff` (garbage-role tokens 403). Admin user-management API (`/api/users`) + Settings UI section. Frontend `hasRole()` mirrors the lattice. Machine/agent identities are NOT roles — Phase E API-key plane. See `docs/superpowers/specs/2026-07-26-a4-rbac-design.md`.
 
+**A6 — Item Master Cleanup** ✅
+Reusable ER4U Item Combination Master cleanup at `/tools/item-combination-cleanup`: fresh `.xlsx` upload creates an independent immutable run, validates identity/workbook fidelity, loads purchase evidence, applies deterministic PACKED/LOOSE/Brand/Size/Name rules, runs optimized long-tail detection plus semantic-v2 advisory evaluation, and populates the existing card-based Decision Inbox. Cross-run decisions are reused only for exact `Item_Id` + barcode identity and unchanged field/suggestion baselines; stale evidence is reconsidered. Accept/Reject/Edit remain human-authoritative, semantic results never write export fields directly, and final export validates protected cells and row identity. First production closure preserved 13,507/13,507 rows with 226/226 actionable naming items reviewed and zero protected-field changes. See `docs/decisions/007-item-master-cleanup-reuse.md`.
+
 ---
 
 ### Phase B — ML Upgrade *(after Phase A)*
