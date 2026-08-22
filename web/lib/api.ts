@@ -811,6 +811,12 @@ export const itemCombinationCleanup = {
       `/api/tools/item-combination-cleanup/runs/${runId}/rows${buildQuery(params)}`
     ),
 
+  analyze: (runId: string, includeSemantic = true) =>
+    apiFetch<ItemCombinationCleanupRun>(
+      `/api/tools/item-combination-cleanup/runs/${runId}/analyze`,
+      { method: "POST", body: JSON.stringify({ include_semantic: includeSemantic }) }
+    ),
+
   listNameReview: (runId: string) =>
     apiFetch<ItemCombinationNameReview>(`/api/tools/item-combination-cleanup/runs/${runId}/name-review`),
 

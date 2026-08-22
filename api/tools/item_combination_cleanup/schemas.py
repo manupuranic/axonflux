@@ -22,6 +22,10 @@ class CleanupRunResponse(BaseModel):
     has_approved_output: bool = False
 
 
+class CleanupAnalyzeRequest(BaseModel):
+    include_semantic: bool = True
+
+
 class CleanupRowOut(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 

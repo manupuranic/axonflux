@@ -720,6 +720,26 @@ export interface ItemCombinationCleanupRun {
     confidence: Record<string, number>;
     review_status: Record<string, number>;
     protected_identity_keys?: string[];
+    analysis?: {
+      deterministic_suggestions_created: number;
+      historical_field_decisions_reused: number;
+      historical_name_acceptances_reused: number;
+      historical_name_rejections_reused: number;
+      historical_decisions_invalidated: number;
+      historical_items_matched?: number;
+      new_items?: number;
+      items_requiring_human_review?: number;
+      automatically_resolved_by_rules?: number;
+      packed_semantic_candidates?: number;
+      packed_semantic_calls?: number;
+      packed_semantic_assessments_created?: number;
+      packed_semantic_failures?: number;
+      semantic_candidates?: number;
+      semantic_conflicts?: number;
+      semantic_calls: number;
+      semantic_suggestions_created: number;
+      semantic_failures?: number;
+    };
   } | null;
   validation_status: string | null;
   error_message: string | null;

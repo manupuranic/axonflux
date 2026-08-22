@@ -15,6 +15,7 @@ from api.tools.item_combination_cleanup.schemas import (
     CleanupRowListResponse,
     CleanupRowOut,
     CleanupRunResponse,
+    CleanupAnalyzeRequest,
     CleanupApprovalRequest,
     CleanupBulkApprovalRequest,
     CleanupBulkApprovalResponse,
@@ -108,6 +109,25 @@ def process_run(
     except service.CleanupServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
     return _to_response(run)
+
+
+@router.post("/runs/{run_id}/analyze", response_model=CleanupRunResponse)
+def analyze_run(
+    run_id: uuid.UUID,
+    payload: CleanupAnalyzeRequest,
+    db: Session = Depends(get_db),
+    conn: Connection = Depends(get_conn),
+    _: CurrentUser = Depends(require_staff),
+):
+    run = service.get_run(db, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    try:
+        from api.tools.item_combination_cleanup.workflow import analyze_run as analyze
+
+        return _to_response(analyze(db, conn, run, include_semantic=payload.include_semantic))
+    except service.CleanupServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
 
 
 @router.post("/runs/{run_id}/export", response_model=CleanupRunResponse)
