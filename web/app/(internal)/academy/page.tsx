@@ -338,13 +338,17 @@ export default function AcademyCommandCenter() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {recentJournal.map((j) => (
-              <Link
+              <article
                 key={j.id}
-                href="/academy/journal"
                 className="rounded-xl border border-gray-200 bg-white p-3 hover:border-gray-300"
               >
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-sm font-semibold text-[#1b293e]">{j.title}</span>
+                  <Link
+                    href="/academy/journal"
+                    className="text-sm font-semibold text-[#1b293e] hover:text-[#105dff] hover:underline"
+                  >
+                    {j.title}
+                  </Link>
                   <span className="font-mono text-[11px] text-gray-400">{j.date}</span>
                 </div>
                 <p className="mt-1 line-clamp-2 text-xs text-gray-500">{j.problem}</p>
@@ -357,7 +361,7 @@ export default function AcademyCommandCenter() {
                     />
                   ) : null}
                 </div>
-              </Link>
+              </article>
             ))}
           </div>
         </div>

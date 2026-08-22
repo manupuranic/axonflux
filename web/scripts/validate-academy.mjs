@@ -15,9 +15,10 @@
  *
  * Exits non-zero on any dangling reference.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import ts from "typescript";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const A = join(here, "..", "lib", "academy");
@@ -146,6 +147,60 @@ for (const block of nodeBlocks) {
   if (!empty && flagged) {
     problems.push(`civilization: node "${id}" is marked contentGap but does have topics`);
   }
+}
+
+// Markup safety — Next's Link and CapabilityChip both render <a>. A link-like
+// component nested inside Link is valid JSX but invalid HTML, so React reports
+// a hydration error only in the browser. Catch that call-site shape at build
+// time across every Academy page/component.
+const uiRoots = [
+  join(here, "..", "app", "(internal)", "academy"),
+  join(here, "..", "components", "academy"),
+];
+const tsxFiles = [];
+const collectTsx = (dir) => {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) collectTsx(path);
+    else if (entry.isFile() && entry.name.endsWith(".tsx")) tsxFiles.push(path);
+  }
+};
+for (const root of uiRoots) collectTsx(root);
+
+for (const path of tsxFiles) {
+  const source = ts.createSourceFile(
+    path,
+    readFileSync(path, "utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const tagName = (node) => node.tagName?.getText(source);
+  const visit = (node) => {
+    if (ts.isJsxElement(node) && tagName(node.openingElement) === "Link") {
+      const inspectDescendants = (descendant) => {
+        if (descendant !== node) {
+          const nestedTag = ts.isJsxElement(descendant)
+            ? tagName(descendant.openingElement)
+            : ts.isJsxSelfClosingElement(descendant)
+              ? tagName(descendant)
+              : null;
+          if (nestedTag === "Link" || nestedTag === "CapabilityChip") {
+            const { line, character } = source.getLineAndCharacterOfPosition(
+              descendant.getStart(source),
+            );
+            problems.push(
+              `academy markup: ${path}:${line + 1}:${character + 1} nests ${nestedTag} inside Link`,
+            );
+          }
+        }
+        ts.forEachChild(descendant, inspectDescendants);
+      };
+      ts.forEachChild(node, inspectDescendants);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
 }
 
 const counts = Object.entries(known)
